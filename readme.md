@@ -105,6 +105,7 @@ cp batch/prompts/community_note_system_prompt.txt.example batch/prompts/communit
 - `DEFAULT_LOGIN`
 - `QUICK_LINK_LOGINS`
 - `HOST_CHECK_ENABLED`
+- `FORWARDED_ALLOW_IPS`（既定 `127.0.0.1`。リバースプロキシ経由時はプロキシIPを設定）
 - `APP_ENV`, `BATCH_DATA_DIR` などのバッチ入出力先
 
 Docker Compose で動かす場合、DB 接続先はコンテナ名 `db:3306` を使います（ホストへの DB ポート公開は不要）。
@@ -194,6 +195,8 @@ docker compose up --build
 - `app`: `http://localhost:8000/twicome`（healthcheck: `GET /health` を30秒ごとに確認）
 - `batch`: 起動直後に1回実行、その後4時間ごとに定期実行
 - `migrate`: 起動時に `alembic upgrade head` を実行（完了後に停止）
+
+リバースプロキシ配下で実IPを扱う場合は、`.env` に `FORWARDED_ALLOW_IPS` を設定してください（例: `FORWARDED_ALLOW_IPS=192.168.222.112,127.0.0.1`）。
 
 開発設定（`db` + `migrate` + `app` + `batch` を同時起動）:
 
