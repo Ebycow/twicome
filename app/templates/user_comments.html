@@ -507,6 +507,7 @@
         try {
           const stored = localStorage.getItem(`best9_${userLogin}`);
           if (stored) JSON.parse(stored).forEach(id => best9Selected.add(id));
+          isBest9Mode = localStorage.getItem(`best9_mode_${userLogin}`) === '1';
         } catch(e) {}
       })();
       const listElement = document.querySelector('.list');
@@ -868,22 +869,29 @@
         }
       }
 
-      // ページ読み込み時にボタンラベルを初期化（保存件数を反映）
+      function applyBest9ModeUI() {
+        if (!best9ToggleBtn) return;
+        best9ToggleBtn.style.borderColor = isBest9Mode ? '#4caf50' : '';
+        best9ToggleBtn.style.color = isBest9Mode ? '#4caf50' : '';
+        best9Bar.style.display = isBest9Mode ? 'flex' : 'none';
+        if (isBest9Mode) {
+          updateBest9Bar();
+          document.querySelectorAll('.comment').forEach(div => addBest9Button(div));
+        } else {
+          document.querySelectorAll('.best9-add-btn').forEach(btn => btn.remove());
+          document.querySelectorAll('.best9-selected').forEach(div => div.classList.remove('best9-selected'));
+        }
+      }
+
+      // ページ読み込み時にボタンラベルを初期化（保存件数を反映）、モードも復元
       updateBest9ToggleLabel();
+      applyBest9ModeUI();
 
       if (best9ToggleBtn) {
         best9ToggleBtn.addEventListener('click', () => {
           isBest9Mode = !isBest9Mode;
-          best9ToggleBtn.style.borderColor = isBest9Mode ? '#4caf50' : '';
-          best9ToggleBtn.style.color = isBest9Mode ? '#4caf50' : '';
-          best9Bar.style.display = isBest9Mode ? 'flex' : 'none';
-          if (isBest9Mode) {
-            updateBest9Bar();
-            document.querySelectorAll('.comment').forEach(div => addBest9Button(div));
-          } else {
-            document.querySelectorAll('.best9-add-btn').forEach(btn => btn.remove());
-            document.querySelectorAll('.best9-selected').forEach(div => div.classList.remove('best9-selected'));
-          }
+          try { localStorage.setItem(`best9_mode_${userLogin}`, isBest9Mode ? '1' : '0'); } catch(e) {}
+          applyBest9ModeUI();
           updateBest9ToggleLabel();
         });
 

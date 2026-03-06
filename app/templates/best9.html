@@ -181,8 +181,9 @@
       .cell {
         position: relative;
         padding: 22px 18px 18px;
-        background: linear-gradient(155deg, var(--card-bg2) 0%, var(--card-bg) 100%);
-        border: 1px solid rgba(255,215,0,0.12);
+        background: linear-gradient(155deg, #171200, #100d00, #0f0f14);
+        border: 1px solid rgba(255,215,0,0.4);
+        box-shadow: 0 0 50px rgba(255,215,0,0.07), inset 0 1px 0 rgba(255,215,0,0.12);
         border-radius: 18px;
         display: flex;
         flex-direction: column;
@@ -233,9 +234,9 @@
         font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.06em;
-        color: rgba(255,215,0,0.6);
-        background: rgba(255,215,0,0.07);
-        border: 1px solid rgba(255,215,0,0.18);
+        color: var(--gold);
+        background: rgba(255,215,0,0.12);
+        border: 1px solid rgba(255,215,0,0.35);
         border-radius: 999px;
         padding: 2px 9px;
         width: fit-content;
@@ -259,17 +260,6 @@
         line-height: 1.5;
         position: relative;
         z-index: 1;
-      }
-      /* センターカード（5番目）特別スタイル */
-      .cell:nth-child(5):not(.empty) {
-        border-color: rgba(255,215,0,0.4);
-        background: linear-gradient(155deg, #171200, #100d00, #0f0f14);
-        box-shadow: 0 0 50px rgba(255,215,0,0.07), inset 0 1px 0 rgba(255,215,0,0.12);
-      }
-      .cell:nth-child(5):not(.empty) .cell-badge {
-        color: var(--gold);
-        background: rgba(255,215,0,0.12);
-        border-color: rgba(255,215,0,0.35);
       }
       a.cell {
         text-decoration: none;
@@ -352,7 +342,7 @@
 
       <div class="grid">
         {% for c in comments %}
-          <a class="cell" href="../u/{{ c.commenter_login_snapshot }}?cursor={{ c.comment_id }}" target="_blank" rel="noopener">
+          <a class="cell" href="./u/{{ c.commenter_login_snapshot }}?cursor={{ c.comment_id }}" target="_blank" rel="noopener">
             <div class="cell-bg-num">{{ loop.index }}</div>
             <div class="cell-badge">No.{{ loop.index }}</div>
             <div class="cell-body">{{ c.body_html | safe }}</div>
