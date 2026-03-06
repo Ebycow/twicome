@@ -6,7 +6,7 @@ if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set. Set DATABASE_URL in .env or environment variables.")
 
 DEFAULT_PLATFORM = os.getenv("DEFAULT_PLATFORM", "twitch")
-ROOT_PATH = os.getenv("ROOT_PATH", "/twicome")
+ROOT_PATH = os.getenv("ROOT_PATH", "/twicome").rstrip("/")
 DEFAULT_LOGIN = os.getenv("DEFAULT_LOGIN", "").strip()
 
 

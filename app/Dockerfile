@@ -14,6 +14,7 @@ COPY core/ ./core/
 COPY services/ ./services/
 COPY routers/ ./routers/
 COPY templates/ ./templates/
+COPY static/ ./static/
 
 EXPOSE 8000
 
