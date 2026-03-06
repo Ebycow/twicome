@@ -139,6 +139,10 @@
       @media (max-width: 720px) {
         body { margin: 12px; }
       }
+      .best9-bar { position:fixed; bottom:0; left:0; right:0; background:var(--card-bg); border-top:2px solid #4caf50; padding:12px 24px; z-index:100; gap:16px; align-items:center; flex-wrap:wrap; }
+      .best9-selected { outline:3px solid #4caf50 !important; }
+      .best9-add-btn { padding:3px 8px; border:1px solid #4caf50; border-radius:4px; background:transparent; color:#4caf50; cursor:pointer; font-size:0.8rem; white-space:nowrap; }
+      .best9-add-btn.selected { background:#4caf50; color:white; }
     </style>
   </head>
   <body>
@@ -153,6 +157,9 @@
         {% endif %}
       </div>
       <div style="display:flex; gap:16px; align-items:center;">
+        {% if user %}
+          <button type="button" id="best9-toggle-btn" style="border:1px solid var(--pill-border); background:var(--button-bg); color:var(--button-text);">Best9モード</button>
+        {% endif %}
         <a href="{{ request.url_for('quiz_page', login=user.login) }}?platform={{ filters.platform }}">クイズで遊ぶ</a>
         <a href="{{ request.url_for('manual_page') }}">使い方ガイド</a>
         <a href="{{ request.url_for('index') }}">← 検索に戻る</a>
@@ -413,6 +420,19 @@
       </div>
 
     {% endif %}
+
+    {% if user %}
+    <div id="best9-bar" class="best9-bar" style="display:none;">
+      <strong>Best9: <span id="best9-count">0/9</span></strong>
+      <div id="best9-url-box" style="display:none; flex:1; gap:8px; align-items:center; min-width:0; flex-wrap:wrap;">
+        <input id="best9-url-input" readonly style="flex:1; min-width:200px; padding:6px 10px; border-radius:6px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:0.85rem;" />
+        <button type="button" id="best9-copy-btn">URLをコピー</button>
+        <button type="button" id="best9-go-btn" style="background:#4caf50; color:white; border:0; font-weight:bold;">Best9を表示 →</button>
+      </div>
+      <button type="button" id="best9-clear-btn" style="margin-left:auto;">選択リセット</button>
+    </div>
+    {% endif %}
+
     <script type="application/json" id="filters-data">{{ filters | tojson }}</script>
     <script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
     <script type="application/json" id="page-data">{{ page | tojson }}</script>
@@ -480,6 +500,15 @@
       let currentMaxPage = initialPage;
       let loadedPages = new Set([initialPage]);
       let isLoading = false;
+      let isBest9Mode = false;
+      const best9Selected = new Set();
+      // localStorage から復元
+      (function() {
+        try {
+          const stored = localStorage.getItem(`best9_${userLogin}`);
+          if (stored) JSON.parse(stored).forEach(id => best9Selected.add(id));
+        } catch(e) {}
+      })();
       const listElement = document.querySelector('.list');
       const isCursorMode = !!filters.cursor;
 
@@ -594,6 +623,7 @@
             } else {
               listElement.appendChild(link);
             }
+            if (isBest9Mode) addBest9Button(commentDiv);
           });
 
           if (direction === 'prepend') {
@@ -729,6 +759,126 @@
       document.querySelector('form').addEventListener('submit', function(e) {
         // Allow normal form submission to reload the page
       });
+
+      // -----------------------
+      // Best9モード
+      // -----------------------
+      const best9ToggleBtn = document.getElementById('best9-toggle-btn');
+      const best9Bar = document.getElementById('best9-bar');
+
+      function addBest9Button(commentDiv) {
+        if (commentDiv.querySelector('.best9-add-btn')) return;
+        const commentId = commentDiv.id;
+        if (!commentId) return;
+        const btn = document.createElement('button');
+        const isSelected = best9Selected.has(commentId);
+        btn.className = 'best9-add-btn' + (isSelected ? ' selected' : '');
+        btn.textContent = isSelected ? '選択済み ✓' : '+ Best9';
+        btn.type = 'button';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleBest9(commentId, btn, commentDiv);
+        });
+        const metaDiv = commentDiv.querySelector('.comment-head > div.meta');
+        if (metaDiv) metaDiv.appendChild(btn);
+      }
+
+      function saveBest9() {
+        try {
+          localStorage.setItem(`best9_${userLogin}`, JSON.stringify(Array.from(best9Selected)));
+        } catch(e) {}
+      }
+
+      function updateBest9ToggleLabel() {
+        if (!best9ToggleBtn) return;
+        const count = best9Selected.size;
+        if (isBest9Mode) {
+          best9ToggleBtn.textContent = count > 0 ? `Best9: ON（${count}件）` : 'Best9: ON';
+        } else {
+          best9ToggleBtn.textContent = count > 0 ? `Best9モード（${count}件保存中）` : 'Best9モード';
+        }
+      }
+
+      function toggleBest9(commentId, btn, commentDiv) {
+        if (best9Selected.has(commentId)) {
+          best9Selected.delete(commentId);
+          btn.className = 'best9-add-btn';
+          btn.textContent = '+ Best9';
+          commentDiv.classList.remove('best9-selected');
+        } else {
+          if (best9Selected.size >= 9) {
+            alert('9件まで選択できます');
+            return;
+          }
+          best9Selected.add(commentId);
+          btn.className = 'best9-add-btn selected';
+          btn.textContent = '選択済み ✓';
+          commentDiv.classList.add('best9-selected');
+        }
+        saveBest9();
+        updateBest9Bar();
+        updateBest9ToggleLabel();
+      }
+
+      function best9PageUrl() {
+        const ids = Array.from(best9Selected).join(',');
+        return `${location.origin}${rootPath}/best9?ids=${encodeURIComponent(ids)}&login=${encodeURIComponent(userLogin)}`;
+      }
+
+      function updateBest9Bar() {
+        document.getElementById('best9-count').textContent = `${best9Selected.size}/9`;
+        const urlBox = document.getElementById('best9-url-box');
+        if (best9Selected.size > 0) {
+          const url = best9PageUrl();
+          document.getElementById('best9-url-input').value = url;
+          document.getElementById('best9-go-btn').onclick = () => window.open(url, '_blank');
+          urlBox.style.display = 'flex';
+        } else {
+          urlBox.style.display = 'none';
+        }
+      }
+
+      // ページ読み込み時にボタンラベルを初期化（保存件数を反映）
+      updateBest9ToggleLabel();
+
+      if (best9ToggleBtn) {
+        best9ToggleBtn.addEventListener('click', () => {
+          isBest9Mode = !isBest9Mode;
+          best9ToggleBtn.style.borderColor = isBest9Mode ? '#4caf50' : '';
+          best9ToggleBtn.style.color = isBest9Mode ? '#4caf50' : '';
+          best9Bar.style.display = isBest9Mode ? 'flex' : 'none';
+          if (isBest9Mode) {
+            updateBest9Bar();
+            document.querySelectorAll('.comment').forEach(div => addBest9Button(div));
+          } else {
+            document.querySelectorAll('.best9-add-btn').forEach(btn => btn.remove());
+            document.querySelectorAll('.best9-selected').forEach(div => div.classList.remove('best9-selected'));
+          }
+          updateBest9ToggleLabel();
+        });
+
+        document.getElementById('best9-copy-btn').addEventListener('click', () => {
+          const input = document.getElementById('best9-url-input');
+          navigator.clipboard.writeText(input.value).then(() => {
+            const btn = document.getElementById('best9-copy-btn');
+            btn.textContent = 'コピーしました！';
+            setTimeout(() => { btn.textContent = 'URLをコピー'; }, 2000);
+          });
+        });
+
+        document.getElementById('best9-clear-btn').addEventListener('click', () => {
+          best9Selected.clear();
+          saveBest9();
+          document.querySelectorAll('.best9-add-btn').forEach(btn => {
+            btn.className = 'best9-add-btn';
+            btn.textContent = '+ Best9';
+          });
+          document.querySelectorAll('.best9-selected').forEach(div => div.classList.remove('best9-selected'));
+          updateBest9Bar();
+          updateBest9ToggleLabel();
+        });
+      }
 
       {% if faiss_enabled %}
       // -----------------------
@@ -890,6 +1040,7 @@
           `;
           link.appendChild(commentDiv);
           listElement.appendChild(link);
+          if (isBest9Mode) addBest9Button(commentDiv);
         });
       }
 
