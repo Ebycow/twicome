@@ -821,16 +821,45 @@
         updateBest9ToggleLabel();
       }
 
-      function best9PageUrl() {
-        const ids = Array.from(best9Selected).join(',');
-        return `${location.origin}${rootPath}/best9?ids=${encodeURIComponent(ids)}&login=${encodeURIComponent(userLogin)}`;
+      async function compressIds(idArray) {
+        if (!window.CompressionStream) return null;
+        try {
+          const encoded = new TextEncoder().encode(idArray.join(','));
+          const cs = new CompressionStream('deflate-raw');
+          const writer = cs.writable.getWriter();
+          writer.write(encoded);
+          writer.close();
+          const chunks = [];
+          const reader = cs.readable.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+          }
+          const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
+          const buf = new Uint8Array(totalLen);
+          let offset = 0;
+          for (const c of chunks) { buf.set(c, offset); offset += c.length; }
+          let binary = '';
+          buf.forEach(b => { binary += String.fromCharCode(b); });
+          return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        } catch(e) { return null; }
       }
 
-      function updateBest9Bar() {
+      async function buildBest9Url() {
+        const idArray = Array.from(best9Selected);
+        const z = await compressIds(idArray);
+        if (z) {
+          return `${location.origin}${rootPath}/best9?z=${z}&login=${encodeURIComponent(userLogin)}`;
+        }
+        return `${location.origin}${rootPath}/best9?ids=${encodeURIComponent(idArray.join(','))}&login=${encodeURIComponent(userLogin)}`;
+      }
+
+      async function updateBest9Bar() {
         document.getElementById('best9-count').textContent = `${best9Selected.size}/9`;
         const urlBox = document.getElementById('best9-url-box');
         if (best9Selected.size > 0) {
-          const url = best9PageUrl();
+          const url = await buildBest9Url();
           document.getElementById('best9-url-input').value = url;
           document.getElementById('best9-go-btn').onclick = () => window.open(url, '_blank');
           urlBox.style.display = 'flex';

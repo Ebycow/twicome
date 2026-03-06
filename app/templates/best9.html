@@ -271,6 +271,15 @@
         background: rgba(255,215,0,0.12);
         border-color: rgba(255,215,0,0.35);
       }
+      a.cell {
+        text-decoration: none;
+        color: inherit;
+      }
+      a.cell:not(.empty):hover .cell-badge {
+        background: rgba(255,215,0,0.18);
+        border-color: rgba(255,215,0,0.5);
+        color: var(--gold);
+      }
       /* 空カード */
       .cell.empty {
         opacity: 0.22;
@@ -343,7 +352,7 @@
 
       <div class="grid">
         {% for c in comments %}
-          <div class="cell">
+          <a class="cell" href="../u/{{ c.commenter_login_snapshot }}?cursor={{ c.comment_id }}" target="_blank" rel="noopener">
             <div class="cell-bg-num">{{ loop.index }}</div>
             <div class="cell-badge">No.{{ loop.index }}</div>
             <div class="cell-body">{{ c.body_html | safe }}</div>
@@ -352,7 +361,7 @@
               · {{ c.vod_title }}
               {% if c.comment_created_at_jst %}<br>{{ c.comment_created_at_jst }} JST{% endif %}
             </div>
-          </div>
+          </a>
         {% endfor %}
         {% for i in range(9 - comments|length) %}
           <div class="cell empty">

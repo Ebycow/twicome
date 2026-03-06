@@ -1,25 +1,44 @@
+import base64
+import zlib
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import text
 
 from core.db import SessionLocal
 from core.templates import templates
-from sqlalchemy import text
-
 from services.comment_utils import decorate_comment
 
 router = APIRouter()
 
 
+def _decompress_ids(z: str) -> list[str]:
+    """deflate-raw + base64url で圧縮された ID リストを復元"""
+    pad = (4 - len(z) % 4) % 4
+    data = base64.urlsafe_b64decode(z + "=" * pad)
+    decompressed = zlib.decompress(data, wbits=-15)
+    return [i.strip() for i in decompressed.decode("utf-8").split(",") if i.strip()][:9]
+
+
 @router.get("/best9", response_class=HTMLResponse)
 def best9_page(
     request: Request,
-    ids: str = Query(...),
+    z: Optional[str] = Query(None),    # 圧縮版（新形式）
+    ids: Optional[str] = Query(None),  # レガシー互換
     login: Optional[str] = Query(None),
 ):
-    id_list = [i.strip() for i in ids.split(",") if i.strip()][:9]
+    if z:
+        try:
+            id_list = _decompress_ids(z)
+        except Exception:
+            return HTMLResponse("URLが壊れています", status_code=400)
+    elif ids:
+        id_list = [i.strip() for i in ids.split(",") if i.strip()][:9]
+    else:
+        return HTMLResponse("IDが指定されていません", status_code=400)
+
     if not id_list:
         return HTMLResponse("IDが指定されていません", status_code=400)
 
