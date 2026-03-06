@@ -139,10 +139,23 @@
       @media (max-width: 720px) {
         body { margin: 12px; }
       }
-      .best9-bar { position:fixed; bottom:0; left:0; right:0; background:var(--card-bg); border-top:2px solid #4caf50; padding:12px 24px; z-index:100; gap:16px; align-items:center; flex-wrap:wrap; }
+      .best9-bar { position:fixed; bottom:0; left:0; right:0; background:var(--card-bg); border-top:2px solid #4caf50; padding:12px 24px; z-index:100; flex-direction:column; gap:10px; }
+      .best9-bar-controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; width:100%; }
       .best9-selected { outline:3px solid #4caf50 !important; }
       .best9-add-btn { padding:3px 8px; border:1px solid #4caf50; border-radius:4px; background:transparent; color:#4caf50; cursor:pointer; font-size:0.8rem; white-space:nowrap; }
       .best9-add-btn.selected { background:#4caf50; color:white; }
+      .best9-preview-area { width:100%; }
+      .best9-preview-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+      .best9-slot { border-radius:8px; padding:8px 10px; min-height:64px; font-size:0.75rem; position:relative; background:var(--comment-bg); }
+      .best9-slot.filled { border:1px solid #4caf50; cursor:grab; user-select:none; }
+      .best9-slot.filled:active { cursor:grabbing; }
+      .best9-slot.empty-slot { border:1px dashed rgba(76,175,80,0.3); opacity:0.5; }
+      .best9-slot.drag-over { border-color:#ffd700 !important; background:rgba(255,215,0,0.08); }
+      .best9-slot.dragging { opacity:0.35; }
+      .best9-slot-num { font-size:0.65rem; font-weight:bold; color:#4caf50; margin-bottom:3px; }
+      .best9-slot-text { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.4; color:var(--text-color); }
+      .best9-slot-remove { position:absolute; top:3px; right:5px; background:none; border:none; color:var(--meta-color); cursor:pointer; font-size:1rem; padding:0; line-height:1; }
+      .best9-slot-remove:hover { color:#f44336; }
     </style>
   </head>
   <body>
@@ -423,13 +436,20 @@
 
     {% if user %}
     <div id="best9-bar" class="best9-bar" style="display:none;">
-      <strong>Best9: <span id="best9-count">0/9</span></strong>
-      <div id="best9-url-box" style="display:none; flex:1; gap:8px; align-items:center; min-width:0; flex-wrap:wrap;">
-        <input id="best9-url-input" readonly style="flex:1; min-width:200px; padding:6px 10px; border-radius:6px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:0.85rem;" />
-        <button type="button" id="best9-copy-btn">URLをコピー</button>
-        <button type="button" id="best9-go-btn" style="background:#4caf50; color:white; border:0; font-weight:bold;">Best9を表示 →</button>
+      <div id="best9-preview-area" class="best9-preview-area" style="display:none;">
+        <div style="font-size:0.72rem; color:rgba(76,175,80,0.7); margin-bottom:6px; font-family:system-ui,sans-serif;">ドラッグで並び替え可能</div>
+        <div id="best9-preview-grid" class="best9-preview-grid"></div>
       </div>
-      <button type="button" id="best9-clear-btn" style="margin-left:auto;">選択リセット</button>
+      <div class="best9-bar-controls">
+        <strong>Best9: <span id="best9-count">0/9</span></strong>
+        <button type="button" id="best9-preview-btn" style="border:1px solid #4caf50; background:transparent; color:#4caf50; border-radius:4px; padding:3px 8px; font-size:0.8rem; cursor:pointer; white-space:nowrap;">▲ プレビュー</button>
+        <div id="best9-url-box" style="display:none; flex:1; gap:8px; align-items:center; min-width:0; flex-wrap:wrap;">
+          <input id="best9-url-input" readonly style="flex:1; min-width:200px; padding:6px 10px; border-radius:6px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:0.85rem;" />
+          <button type="button" id="best9-copy-btn">URLをコピー</button>
+          <button type="button" id="best9-go-btn" style="background:#4caf50; color:white; border:0; font-weight:bold;">Best9を表示 →</button>
+        </div>
+        <button type="button" id="best9-clear-btn" style="margin-left:auto;">選択リセット</button>
+      </div>
     </div>
     {% endif %}
 
@@ -501,12 +521,17 @@
       let loadedPages = new Set([initialPage]);
       let isLoading = false;
       let isBest9Mode = false;
-      const best9Selected = new Set();
+      let best9List = []; // 順序を保持する配列
+      const best9Selected = new Set(); // 高速な存在確認用
+      const best9Data = new Map(); // comment_id → 本文テキスト（プレビュー用）
       // localStorage から復元
       (function() {
         try {
           const stored = localStorage.getItem(`best9_${userLogin}`);
-          if (stored) JSON.parse(stored).forEach(id => best9Selected.add(id));
+          if (stored) {
+            best9List = JSON.parse(stored);
+            best9List.forEach(id => best9Selected.add(id));
+          }
           isBest9Mode = localStorage.getItem(`best9_mode_${userLogin}`) === '1';
         } catch(e) {}
       })();
@@ -771,6 +796,11 @@
         if (commentDiv.querySelector('.best9-add-btn')) return;
         const commentId = commentDiv.id;
         if (!commentId) return;
+        // プレビュー用に本文テキストをキャッシュ
+        if (best9Selected.has(commentId) && !best9Data.has(commentId)) {
+          const bodyEl = commentDiv.querySelector('.body');
+          if (bodyEl) best9Data.set(commentId, (bodyEl.innerText || bodyEl.textContent || '').trim());
+        }
         const btn = document.createElement('button');
         const isSelected = best9Selected.has(commentId);
         btn.className = 'best9-add-btn' + (isSelected ? ' selected' : '');
@@ -787,13 +817,13 @@
 
       function saveBest9() {
         try {
-          localStorage.setItem(`best9_${userLogin}`, JSON.stringify(Array.from(best9Selected)));
+          localStorage.setItem(`best9_${userLogin}`, JSON.stringify(best9List));
         } catch(e) {}
       }
 
       function updateBest9ToggleLabel() {
         if (!best9ToggleBtn) return;
-        const count = best9Selected.size;
+        const count = best9List.length;
         if (isBest9Mode) {
           best9ToggleBtn.textContent = count > 0 ? `Best9: ON（${count}件）` : 'Best9: ON';
         } else {
@@ -804,22 +834,30 @@
       function toggleBest9(commentId, btn, commentDiv) {
         if (best9Selected.has(commentId)) {
           best9Selected.delete(commentId);
-          btn.className = 'best9-add-btn';
-          btn.textContent = '+ Best9';
-          commentDiv.classList.remove('best9-selected');
+          best9List = best9List.filter(id => id !== commentId);
+          if (btn) { btn.className = 'best9-add-btn'; btn.textContent = '+ Best9'; }
+          if (commentDiv) commentDiv.classList.remove('best9-selected');
         } else {
-          if (best9Selected.size >= 9) {
+          if (best9List.length >= 9) {
             alert('9件まで選択できます');
             return;
           }
+          best9List.push(commentId);
           best9Selected.add(commentId);
-          btn.className = 'best9-add-btn selected';
-          btn.textContent = '選択済み ✓';
-          commentDiv.classList.add('best9-selected');
+          if (btn) { btn.className = 'best9-add-btn selected'; btn.textContent = '選択済み ✓'; }
+          if (commentDiv) commentDiv.classList.add('best9-selected');
+          // プレビュー用に本文テキストをキャッシュ
+          if (commentDiv && !best9Data.has(commentId)) {
+            const bodyEl = commentDiv.querySelector('.body');
+            if (bodyEl) best9Data.set(commentId, (bodyEl.innerText || bodyEl.textContent || '').trim());
+          }
         }
         saveBest9();
         updateBest9Bar();
         updateBest9ToggleLabel();
+        if (document.getElementById('best9-preview-area').style.display !== 'none') {
+          renderPreviewGrid();
+        }
       }
 
       async function compressIds(idArray) {
@@ -848,7 +886,7 @@
       }
 
       async function buildBest9Url() {
-        const idArray = Array.from(best9Selected);
+        const idArray = best9List;
         const z = await compressIds(idArray);
         if (z) {
           return `${location.origin}${rootPath}/best9?z=${z}&login=${encodeURIComponent(userLogin)}`;
@@ -857,9 +895,9 @@
       }
 
       async function updateBest9Bar() {
-        document.getElementById('best9-count').textContent = `${best9Selected.size}/9`;
+        document.getElementById('best9-count').textContent = `${best9List.length}/9`;
         const urlBox = document.getElementById('best9-url-box');
-        if (best9Selected.size > 0) {
+        if (best9List.length > 0) {
           const url = await buildBest9Url();
           document.getElementById('best9-url-input').value = url;
           document.getElementById('best9-go-btn').onclick = () => window.open(url, '_blank');
@@ -906,15 +944,110 @@
 
         document.getElementById('best9-clear-btn').addEventListener('click', () => {
           best9Selected.clear();
+          best9List = [];
+          best9Data.clear();
           saveBest9();
           document.querySelectorAll('.best9-add-btn').forEach(btn => {
             btn.className = 'best9-add-btn';
             btn.textContent = '+ Best9';
           });
           document.querySelectorAll('.best9-selected').forEach(div => div.classList.remove('best9-selected'));
+          if (document.getElementById('best9-preview-area').style.display !== 'none') {
+            renderPreviewGrid();
+          }
           updateBest9Bar();
           updateBest9ToggleLabel();
         });
+
+        // ----- プレビュートグル -----
+        const best9PreviewBtn = document.getElementById('best9-preview-btn');
+        if (best9PreviewBtn) {
+          best9PreviewBtn.addEventListener('click', () => {
+            const area = document.getElementById('best9-preview-area');
+            const isVisible = area.style.display !== 'none';
+            area.style.display = isVisible ? 'none' : 'block';
+            best9PreviewBtn.textContent = isVisible ? '▲ プレビュー' : '▼ プレビュー';
+            if (!isVisible) renderPreviewGrid();
+          });
+        }
+      }
+
+      // ----- プレビューグリッド -----
+      function renderPreviewGrid() {
+        const grid = document.getElementById('best9-preview-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+          const slot = document.createElement('div');
+          const id = best9List[i];
+          if (id) {
+            slot.className = 'best9-slot filled';
+            slot.draggable = true;
+            slot.dataset.index = i;
+            const text = best9Data.get(id) || '';
+            const snippet = text.length > 80 ? text.substring(0, 80) + '…' : text;
+            slot.innerHTML =
+              `<div class="best9-slot-num">No.${i + 1}</div>` +
+              `<div class="best9-slot-text">${escapeHtml(snippet)}</div>` +
+              `<button type="button" class="best9-slot-remove" title="選択解除">×</button>`;
+            slot.addEventListener('dragstart', onSlotDragStart);
+            slot.addEventListener('dragover', onSlotDragOver);
+            slot.addEventListener('dragleave', onSlotDragLeave);
+            slot.addEventListener('drop', onSlotDrop);
+            slot.addEventListener('dragend', onSlotDragEnd);
+            slot.querySelector('.best9-slot-remove').addEventListener('click', (e) => {
+              e.stopPropagation();
+              const commentDiv = document.getElementById(id);
+              const addBtn = commentDiv ? commentDiv.querySelector('.best9-add-btn') : null;
+              toggleBest9(id, addBtn, commentDiv);
+            });
+          } else {
+            slot.className = 'best9-slot empty-slot';
+            slot.innerHTML =
+              `<div class="best9-slot-num">No.${i + 1}</div>` +
+              `<div class="best9-slot-text">（未選択）</div>`;
+          }
+          grid.appendChild(slot);
+        }
+      }
+
+      // ----- ドラッグ&ドロップ -----
+      let dragSrcIndex = null;
+
+      function onSlotDragStart(e) {
+        dragSrcIndex = parseInt(this.dataset.index);
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      }
+
+      function onSlotDragOver(e) {
+        if (!this.classList.contains('filled')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        this.classList.add('drag-over');
+      }
+
+      function onSlotDragLeave() {
+        this.classList.remove('drag-over');
+      }
+
+      function onSlotDrop(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        const destIndex = parseInt(this.dataset.index);
+        if (dragSrcIndex === null || dragSrcIndex === destIndex) return;
+        if (destIndex >= best9List.length) return;
+        const moved = best9List.splice(dragSrcIndex, 1)[0];
+        best9List.splice(destIndex, 0, moved);
+        saveBest9();
+        renderPreviewGrid();
+        updateBest9Bar();
+      }
+
+      function onSlotDragEnd() {
+        this.classList.remove('dragging');
+        dragSrcIndex = null;
+        document.querySelectorAll('.best9-slot').forEach(s => s.classList.remove('drag-over'));
       }
 
       {% if faiss_enabled %}
