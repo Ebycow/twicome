@@ -1,4 +1,4 @@
-const CACHE_NAME = 'twicome-v7';
+const CACHE_NAME = 'twicome-v8';
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -35,6 +35,27 @@ self.addEventListener('fetch', (event) => {
 
   // API リクエストはキャッシュしない（常にネットワーク）
   if (url.pathname.startsWith(`${BASE}/api/`)) return;
+
+  // Twitch CDN 画像: キャッシュファースト、未キャッシュ時はネットワーク取得してキャッシュ、オフライン時はプレースホルダー
+  if (url.hostname === 'static-cdn.jtvnw.net') {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+          }
+          return response;
+        }).catch(() =>
+          new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#555"/></svg>',
+            { headers: { 'Content-Type': 'image/svg+xml' } }
+          )
+        );
+      })
+    );
+    return;
+  }
 
   // 静的ファイルはキャッシュファースト
   if (url.pathname.startsWith(`${BASE}/static/`)) {
