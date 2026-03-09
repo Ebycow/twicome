@@ -656,6 +656,7 @@
       const maxCandidates = 25;
       const statsPathTemplate = {{ (request.url_for('user_stats_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
       const quizPathTemplate = {{ (request.url_for('quiz_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
+      const commentsPathTemplate = {{ (request.url_for('user_comments_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
 
       let currentSort = 'login';
       // null = フィルターなし, Set = 絞り込み済み, 'loading' = 取得中
@@ -893,12 +894,12 @@
       });
 
       form.addEventListener('submit', (event) => {
+        event.preventDefault();
         const resolved = resolveLogin(loginInput.value);
         if (resolved) {
-          loginInput.value = resolved;
+          window.location.href = `${pathForLogin(commentsPathTemplate, resolved)}?platform=twitch`;
           return;
         }
-        event.preventDefault();
         renderCandidates(loginInput.value);
         loginInput.setCustomValidity('候補からTwitchユーザを選択してください');
         loginInput.reportValidity();

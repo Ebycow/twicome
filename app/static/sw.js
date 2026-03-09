@@ -1,4 +1,4 @@
-const CACHE_NAME = 'twicome-v5';
+const CACHE_NAME = 'twicome-v6';
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -59,12 +59,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         cache.match(request).then((cached) => {
+          // cache.put を await することで SW が終了する前にキャッシュ書き込みを完了させる
           const networkFetch = fetch(request).then((response) => {
-            if (response.ok) cache.put(request, response.clone());
+            if (response.ok) return cache.put(request, response.clone()).then(() => response);
             return response;
           }).catch(() => null);
           if (cached) {
-            networkFetch; // バックグラウンド更新（結果は捨てる）
+            event.waitUntil(networkFetch); // バックグラウンド更新中は SW を生かし続ける
             return cached;
           }
           return networkFetch.then((response) => {

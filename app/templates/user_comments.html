@@ -120,7 +120,7 @@
       .meta { color: var(--meta-color); font-size: 0.9rem; }
       .list { margin-top: 16px; display:flex; flex-direction: column; gap: 10px; }
       .comment { padding: 12px; border: 1px solid var(--comment-border); border-radius: 12px; background: var(--comment-bg); }
-      .comment-head { display:flex; gap: 10px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; font-size: 0.9rem; }
+      .comment-head { display:flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 0.9rem; }
       .body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: bold; }
       .emote { height: 1.35em; vertical-align: -0.2em; }
       .pager { display:flex; gap: 10px; align-items:center; justify-content: center; margin-top: 14px; }
@@ -372,18 +372,14 @@
 
       <div class="list">
         {% for c in comments %}
-          <a href="?cursor={{ c.comment_id }}" style="text-decoration: none; color: inherit;" onclick="if (event.target.closest('button')) { event.preventDefault(); return false; }"></a>
-          {% if filters.cursor %}
-            {% if c.comment_id == filters.cursor %}
-              <div class="comment highlighted" id="{{ c.comment_id }}">
-            {% elif c.commenter_login_snapshot == user.login %}
-              <div class="comment grayed" id="{{ c.comment_id }}">
-            {% else %}
-              <div class="comment" id="{{ c.comment_id }}">
-            {% endif %}
+          {% if filters.cursor and c.comment_id == filters.cursor %}
+            {% set comment_class = 'comment highlighted' %}
+          {% elif filters.cursor and c.commenter_login_snapshot == user.login %}
+            {% set comment_class = 'comment grayed' %}
           {% else %}
-            <div class="comment" id="{{ c.comment_id }}">
+            {% set comment_class = 'comment' %}
           {% endif %}
+          <div class="{{ comment_class }}" id="{{ c.comment_id }}" onclick="if (!event.target.closest('button, a')) window.location.href='?cursor={{ c.comment_id }}';" style="cursor:pointer;">
             <div class="comment-head">
               <div>
                 <a href="{{ c.vod_jump_link }}" target="_blank" class="pill">VOD {{ c.vod_id }}</a>
@@ -635,6 +631,7 @@
             link.href = `?cursor=${comment.comment_id}`;
             link.style.textDecoration = 'none';
             link.style.color = 'inherit';
+            link.style.display = 'block';
             link.addEventListener('click', (e) => {
               if (e.target.closest('button')) {
                 e.preventDefault();
@@ -721,16 +718,15 @@
         loadComments(currentMinPage - 1, 'prepend');
       });
 
-      // Initial load
-      loadComments(initialPage, 'append', true).then(() => {
-        if (filters.cursor) {
-          const element = document.getElementById(filters.cursor);
-          if (element) {
-            element.classList.add('highlighted');
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+      // SSRコンテンツをそのまま使用（初期APIコール不要・オフラインでも表示可能）
+      updatePrevButton();
+      if (filters.cursor) {
+        const element = document.getElementById(filters.cursor);
+        if (element) {
+          element.classList.add('highlighted');
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      });
+      }
 
       function spawnConfetti(button) {
         const rect = button.getBoundingClientRect();
@@ -1151,6 +1147,7 @@
             link.href = `?cursor=${comment.comment_id}`;
             link.style.textDecoration = 'none';
             link.style.color = 'inherit';
+            link.style.display = 'block';
             link.addEventListener('click', (e) => {
               if (e.target.closest('button')) { e.preventDefault(); return; }
             });
@@ -1216,6 +1213,7 @@
           link.href = `?cursor=${comment.comment_id}`;
           link.style.textDecoration = 'none';
           link.style.color = 'inherit';
+          link.style.display = 'block';
           link.addEventListener('click', (e) => { if (e.target.closest('button')) { e.preventDefault(); return; } });
           const commentDiv = document.createElement('div');
           commentDiv.className = 'comment';
