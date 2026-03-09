@@ -1,4 +1,4 @@
-const CACHE_NAME = 'twicome-v6';
+const CACHE_NAME = 'twicome-v7';
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -53,38 +53,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML ページ: キャッシュがあれば即返しバックグラウンドで更新（stale-while-revalidate）
-  // 一度表示したページ（メインページ・コメントページ等）はオフラインでも表示可能
+  // HTML ページ: ネットワークファースト。失敗時のみキャッシュ（オフライン対応）
   if (request.mode === 'navigate') {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          // cache.put を await することで SW が終了する前にキャッシュ書き込みを完了させる
-          const networkFetch = fetch(request).then((response) => {
-            if (response.ok) return cache.put(request, response.clone()).then(() => response);
-            return response;
-          }).catch(() => null);
-          if (cached) {
-            event.waitUntil(networkFetch); // バックグラウンド更新中は SW を生かし続ける
-            return cached;
-          }
-          return networkFetch.then((response) => {
-            if (response) return response;
-            // オフライン + キャッシュなし → offline.html を返す
-            return caches.match(OFFLINE_URL).then(
+        fetch(request).then((response) => {
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        }).catch(() =>
+          cache.match(request).then(
+            (cached) => cached || caches.match(OFFLINE_URL).then(
               (r) => r || new Response('<h1>オフライン</h1><p>ネットワーク接続を確認してください。</p>', {
                 status: 503,
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
               })
-            );
-          });
-        })
-      ).catch(() =>
-        caches.match(OFFLINE_URL).then(
-          (r) => r || new Response('<h1>オフライン</h1><p>ネットワーク接続を確認してください。</p>', {
-            status: 503,
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-          })
+            )
+          )
         )
       )
     );
