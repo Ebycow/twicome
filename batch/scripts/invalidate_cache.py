@@ -27,9 +27,6 @@ if not REDIS_URL:
 
 QUICK_LINK_LOGINS_RAW = os.getenv("QUICK_LINK_LOGINS", "")
 logins = [lo.strip() for lo in QUICK_LINK_LOGINS_RAW.split(",") if lo.strip()]
-if not logins:
-    print("QUICK_LINK_LOGINS が設定されていません。スキップします。")
-    sys.exit(0)
 
 try:
     import redis
@@ -40,7 +37,7 @@ except Exception as e:
     print(f"Redis 接続失敗（スキップ）: {e}")
     sys.exit(0)
 
-keys = ["twicome:index"]
+keys = ["twicome:index:landing", "twicome:index:users"]
 for login in logins:
     keys.append(f"twicome:meta:{login}")
 deleted = r.delete(*keys)

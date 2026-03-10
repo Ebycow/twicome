@@ -7,9 +7,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from cache import (
-    get_index_cache,
+    get_index_landing_cache,
+    get_index_users_cache,
     get_user_meta_cache,
-    set_index_cache,
+    set_index_landing_cache,
+    set_index_users_cache,
     set_user_meta_cache,
 )
 from core.config import DEFAULT_LOGIN, DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
@@ -92,87 +94,115 @@ def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
     set_user_meta_cache(login, meta)
     return meta
 
+
+def _fetch_index_users(db) -> list[dict]:
+    rows = db.execute(
+        text(
+            """
+            SELECT
+                u.login,
+                u.display_name,
+                u.profile_image_url,
+                COALESCE(stats.comment_count, 0) AS comment_count,
+                stats.last_comment_at
+            FROM users u
+            LEFT JOIN (
+                SELECT commenter_login_snapshot,
+                       COUNT(*) AS comment_count,
+                       MAX(comment_created_at_utc) AS last_comment_at
+                FROM comments
+                GROUP BY commenter_login_snapshot
+            ) stats ON stats.commenter_login_snapshot = u.login
+            WHERE u.platform = 'twitch'
+            ORDER BY u.login
+            """
+        )
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def _fetch_index_quick_links(db) -> list[dict]:
+    if not QUICK_LINK_LOGINS:
+        return []
+
+    placeholders = ", ".join([f":login_{i}" for i in range(len(QUICK_LINK_LOGINS))])
+    params = {f"login_{i}": login for i, login in enumerate(QUICK_LINK_LOGINS)}
+    rows = db.execute(
+        text(f"""
+            SELECT login, display_name, profile_image_url
+            FROM users
+            WHERE platform = 'twitch' AND login IN ({placeholders})
+        """),
+        params,
+    ).mappings().all()
+    quick_link_by_login = {row["login"]: dict(row) for row in rows}
+
+    quick_links = []
+    for login in QUICK_LINK_LOGINS:
+        row = quick_link_by_login.get(login)
+        if not row:
+            continue
+        display_name = row.get("display_name") or row["login"]
+        quick_links.append(
+            {
+                "login": row["login"],
+                "platform": "twitch",
+                "profile_image_url": row.get("profile_image_url"),
+                "alt": display_name,
+                "label": f"{display_name}をみるならここ",
+            }
+        )
+    return quick_links
+
+
+def _fetch_index_streamers(db) -> list[dict]:
+    rows = db.execute(
+        text("""
+            SELECT u.login, u.display_name
+            FROM users u
+            JOIN vods v ON v.owner_user_id = u.user_id
+            WHERE u.platform = 'twitch'
+            GROUP BY u.user_id, u.login, u.display_name
+            ORDER BY u.login
+        """),
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def _load_index_landing() -> dict:
+    cached = get_index_landing_cache()
+    if cached is not None:
+        return cached
+
+    with SessionLocal() as db:
+        data = {
+            "quick_links": _fetch_index_quick_links(db),
+            "streamers": _fetch_index_streamers(db),
+        }
+
+    set_index_landing_cache(data)
+    return data
+
+
+def _load_index_users() -> list[dict]:
+    cached = get_index_users_cache()
+    if cached is not None:
+        return cached
+
+    with SessionLocal() as db:
+        users = _fetch_index_users(db)
+
+    set_index_users_cache(users)
+    return users
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    # ユーザー統計・ストリーマー一覧は重いクエリのため Redis キャッシュを使う
-    cached = get_index_cache()
-    if cached:
-        users = cached["users"]
-        streamers = cached["streamers"]
-        quick_links_out = cached["quick_links"]
-    else:
-        quick_links_out = []
-        with SessionLocal() as db:
-            users = [dict(row) for row in db.execute(
-                text(
-                    """
-                    SELECT
-                        u.login,
-                        u.display_name,
-                        u.profile_image_url,
-                        COALESCE(stats.comment_count, 0) AS comment_count,
-                        stats.last_comment_at
-                    FROM users u
-                    LEFT JOIN (
-                        SELECT commenter_login_snapshot,
-                               COUNT(*) AS comment_count,
-                               MAX(comment_created_at_utc) AS last_comment_at
-                        FROM comments
-                        GROUP BY commenter_login_snapshot
-                    ) stats ON stats.commenter_login_snapshot = u.login
-                    WHERE u.platform = 'twitch'
-                    ORDER BY u.login
-                    """
-                )
-            ).mappings().all()]
-
-            if QUICK_LINK_LOGINS:
-                placeholders = ", ".join([f":login_{i}" for i in range(len(QUICK_LINK_LOGINS))])
-                params = {f"login_{i}": login for i, login in enumerate(QUICK_LINK_LOGINS)}
-                quick_link_rows = db.execute(
-                    text(f"""
-                        SELECT login, display_name, profile_image_url
-                        FROM users
-                        WHERE platform = 'twitch' AND login IN ({placeholders})
-                    """),
-                    params,
-                ).mappings().all()
-                quick_link_by_login = {row["login"]: dict(row) for row in quick_link_rows}
-                for login in QUICK_LINK_LOGINS:
-                    row = quick_link_by_login.get(login)
-                    if not row:
-                        continue
-                    display_name = row.get("display_name") or row["login"]
-                    quick_links_out.append(
-                        {
-                            "login": row["login"],
-                            "platform": "twitch",
-                            "profile_image_url": row.get("profile_image_url"),
-                            "alt": display_name,
-                            "label": f"{display_name}をみるならここ",
-                        }
-                    )
-
-            # Streamer list for filter dropdown
-            streamers = [dict(row) for row in db.execute(
-                text("""
-                    SELECT u.login, u.display_name
-                    FROM users u
-                    JOIN vods v ON v.owner_user_id = u.user_id
-                    WHERE u.platform = 'twitch'
-                    GROUP BY u.user_id, u.login, u.display_name
-                    ORDER BY u.login
-                """),
-            ).mappings().all()]
-
-        set_index_cache({"users": users, "streamers": streamers, "quick_links": quick_links_out})
-
-    user_logins = [row["login"] for row in users]
-    if DEFAULT_LOGIN and DEFAULT_LOGIN in user_logins:
-        selected_login = DEFAULT_LOGIN
-    else:
-        selected_login = user_logins[0] if user_logins else ""
-    selected_login_for_links = selected_login or "__LOGIN_PLACEHOLDER__"
+    landing = _load_index_landing()
+    quick_links_out = landing["quick_links"]
+    streamers = landing["streamers"]
+    selected_login = DEFAULT_LOGIN or ""
+    selected_login_for_links = "__LOGIN_PLACEHOLDER__"
 
     # 人気コメントランキングはキャッシュしない（いいね数が動的に変わる）
     with SessionLocal() as db:
@@ -211,7 +241,6 @@ def index(request: Request):
         "index.html",
         {
             "request": request,
-            "users": users,
             "selected_login": selected_login,
             "selected_login_for_links": selected_login_for_links,
             "popular_comments": popular_comments_out,
@@ -219,6 +248,12 @@ def index(request: Request):
             "streamers": streamers,
         },
     )
+
+
+@router.get("/api/users/index", response_class=JSONResponse)
+def api_users_index():
+    """トップページ検索用のユーザー一覧を返す。"""
+    return {"users": _load_index_users()}
 
 
 @router.get("/api/users/commenters", response_class=JSONResponse)

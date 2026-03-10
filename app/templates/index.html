@@ -516,7 +516,7 @@
 
       <!-- Main Card -->
       <div class="main-card">
-        <form method="post" action="{{ request.url_for('go') }}">
+        <form method="post" action="{{ root_path }}/go">
           <input type="hidden" name="platform" value="twitch">
 
           {% if streamers %}
@@ -560,8 +560,8 @@
 
           <div class="actions">
             <button class="btn btn-primary" type="submit">&#9654; コメント一覧を表示</button>
-            <a id="stats-link" class="btn btn-secondary" href="{{ request.url_for('user_stats_page', login=selected_login_for_links) }}?platform=twitch">&#128202; 統計ページ</a>
-            <a id="quiz-link" class="btn btn-secondary" href="{{ request.url_for('quiz_page', login=selected_login_for_links) }}?platform=twitch">&#127922; コメント当てクイズで遊ぶ</a>
+            <a id="stats-link" class="btn btn-secondary" aria-disabled="true" href="{{ root_path }}/u/{{ selected_login_for_links }}/stats?platform=twitch">&#128202; 統計ページ</a>
+            <a id="quiz-link" class="btn btn-secondary" aria-disabled="true" href="{{ root_path }}/u/{{ selected_login_for_links }}/quiz?platform=twitch">&#127922; コメント当てクイズで遊ぶ</a>
           </div>
         </form>
 
@@ -569,7 +569,7 @@
         <!-- Quick Links -->
         <div class="quick-links">
           {% for quick_link in quick_links %}
-          <a class="quick-link" href="{{ request.url_for('user_comments_page', login=quick_link.login) }}?platform={{ quick_link.platform }}">
+          <a class="quick-link" href="{{ root_path }}/u/{{ quick_link.login }}?platform={{ quick_link.platform }}">
             {% if quick_link.profile_image_url %}
             <img class="quick-link-icon" src="{{ quick_link.profile_image_url }}" alt="{{ quick_link.alt }}">
             {% else %}
@@ -585,8 +585,8 @@
 
         <!-- Sub Links -->
         <div class="sub-links">
-          <a class="sub-link" href="{{ request.url_for('add_user_page') }}">&#43; 配信者を追加</a>
-          <a class="sub-link" href="{{ request.url_for('manual_page') }}">&#128214; 使い方ガイド</a>
+          <a class="sub-link" href="{{ root_path }}/add_user">&#43; 配信者を追加</a>
+          <a class="sub-link" href="{{ root_path }}/manual">&#128214; 使い方ガイド</a>
         </div>
 
         <p class="hint">例: /u/someone?platform=twitch でも直接アクセスできます。</p>
@@ -598,7 +598,7 @@
         <h2 class="section-title">&#127942; 人気コメントランキング</h2>
         <ol class="ranking-list">
           {% for comment in popular_comments %}
-          <a class="ranking-item" href="{{ request.url_for('user_comments_page', login=comment.commenter_login_snapshot) }}?cursor={{ comment.comment_id }}">
+          <a class="ranking-item" href="{{ root_path }}/u/{{ comment.commenter_login_snapshot }}?cursor={{ comment.comment_id }}">
             <div class="rank-badge {% if loop.index <= 3 %}rank-{{ loop.index }}{% endif %}">{{ loop.index }}</div>
             <div class="ranking-body">
               <div class="ranking-comment">{{ comment.body_html | safe }}</div>
@@ -627,37 +627,19 @@
       const streamerFilter = document.getElementById('streamer-filter');
       const sortSelect = document.getElementById('sort-select');
       const form = loginInput.closest('form');
-
-      const allUsers = [
-        {% for user in users %}
-          {
-            login: {{ user.login | tojson }},
-            displayName: {{ (user.display_name or "") | tojson }},
-            profileImageUrl: {{ (user.profile_image_url or "") | tojson }},
-            commentCount: {{ user.comment_count }},
-            lastCommentAt: {{ ((user.last_comment_at if user.last_comment_at is string else user.last_comment_at.isoformat()) if user.last_comment_at else None) | tojson }},
-          },
-        {% endfor %}
-      ];
-
-      const indexedUsers = allUsers.map((user) => ({
-        ...user,
-        loginLower: user.login.toLowerCase(),
-        displayLower: user.displayName.toLowerCase(),
-      }));
-      const loginMap = new Map(indexedUsers.map(user => [user.loginLower, user.login]));
-      const displayMap = new Map();
-      for (const user of indexedUsers) {
-        if (!user.displayLower) continue;
-        if (!displayMap.has(user.displayLower)) displayMap.set(user.displayLower, []);
-        displayMap.get(user.displayLower).push(user.login);
-      }
+      const rootPath = {{ root_path | tojson }};
 
       const maxCandidates = 25;
-      const statsPathTemplate = {{ (request.url_for('user_stats_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
-      const quizPathTemplate = {{ (request.url_for('quiz_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
-      const commentsPathTemplate = {{ (request.url_for('user_comments_page', login='__LOGIN_PLACEHOLDER__') | string) | tojson }};
+      const usersIndexUrl = `${rootPath}/api/users/index`;
+      const statsPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__/stats`;
+      const quizPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__/quiz`;
+      const commentsPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__`;
 
+      let indexedUsers = [];
+      let loginMap = new Map();
+      let displayMap = new Map();
+      let usersLoaded = false;
+      let usersLoadPromise = null;
       let currentSort = 'login';
       // null = フィルターなし, Set = 絞り込み済み, 'loading' = 取得中
       let streamerFilterSet = null;
@@ -675,6 +657,58 @@
       function setActionLinks(login) {
         statsLink.href = `${pathForLogin(statsPathTemplate, login)}?platform=twitch`;
         quizLink.href = `${pathForLogin(quizPathTemplate, login)}?platform=twitch`;
+      }
+
+      function showCandidateMessage(message) {
+        loginSearchResults.innerHTML = `<div class="search-empty">${message}</div>`;
+        loginSearchResults.hidden = false;
+      }
+
+      function hydrateUsers(rawUsers) {
+        const normalizedUsers = Array.isArray(rawUsers) ? rawUsers.map((user) => ({
+          login: user.login,
+          displayName: user.display_name || '',
+          profileImageUrl: user.profile_image_url || '',
+          commentCount: Number(user.comment_count || 0),
+          lastCommentAt: user.last_comment_at || null,
+        })) : [];
+
+        indexedUsers = normalizedUsers.map((user) => ({
+          ...user,
+          loginLower: user.login.toLowerCase(),
+          displayLower: user.displayName.toLowerCase(),
+        }));
+
+        loginMap = new Map(indexedUsers.map((user) => [user.loginLower, user.login]));
+        displayMap = new Map();
+        for (const user of indexedUsers) {
+          if (!user.displayLower) continue;
+          if (!displayMap.has(user.displayLower)) displayMap.set(user.displayLower, []);
+          displayMap.get(user.displayLower).push(user.login);
+        }
+      }
+
+      async function ensureUsersLoaded() {
+        if (usersLoaded) return indexedUsers;
+        if (usersLoadPromise) return usersLoadPromise;
+
+        usersLoadPromise = fetch(usersIndexUrl, {
+          headers: { Accept: 'application/json' },
+        })
+          .then(async (response) => {
+            if (!response.ok) throw new Error(`failed_to_load_users:${response.status}`);
+            const data = await response.json();
+            hydrateUsers(data.users || []);
+            usersLoaded = true;
+            syncActionLinksFromInput();
+            return indexedUsers;
+          })
+          .catch((error) => {
+            usersLoadPromise = null;
+            throw error;
+          });
+
+        return usersLoadPromise;
       }
 
       function formatRelativeTime(isoStr) {
@@ -699,6 +733,7 @@
       }
 
       function resolveLogin(input) {
+        if (!usersLoaded) return '';
         const normalized = input.trim().toLowerCase();
         if (!normalized) return '';
         const loginMatch = loginMap.get(normalized);
@@ -846,13 +881,24 @@
         hideCandidates();
       }
 
-      function renderCandidates(input) {
+      async function renderCandidates(input) {
+        if (!usersLoaded) {
+          showCandidateMessage('候補を読み込み中...');
+        }
+
+        try {
+          await ensureUsersLoaded();
+        } catch {
+          setActionLinkState(false);
+          showCandidateMessage('候補の読み込みに失敗しました');
+          return;
+        }
+
         const candidates = getCandidates(input);
         loginSearchResults.innerHTML = '';
 
         if (!candidates.length) {
-          loginSearchResults.innerHTML = '<div class="search-empty">該当するユーザが見つかりません</div>';
-          loginSearchResults.hidden = false;
+          showCandidateMessage('該当するユーザが見つかりません');
           return;
         }
 
@@ -866,6 +912,10 @@
       }
 
       function syncActionLinksFromInput() {
+        if (!usersLoaded) {
+          setActionLinkState(false);
+          return;
+        }
         const resolved = resolveLogin(loginInput.value);
         if (resolved) {
           setActionLinks(resolved);
@@ -876,12 +926,12 @@
       }
 
       loginInput.addEventListener('focus', function() {
-        renderCandidates(this.value);
+        void renderCandidates(this.value);
       });
 
       loginInput.addEventListener('input', function() {
         this.setCustomValidity('');
-        renderCandidates(this.value);
+        void renderCandidates(this.value);
         syncActionLinksFromInput();
       });
 
@@ -893,14 +943,22 @@
         if (!loginSearchWrapper.contains(event.target)) hideCandidates();
       });
 
-      form.addEventListener('submit', (event) => {
+      form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        try {
+          await ensureUsersLoaded();
+        } catch {
+          loginInput.setCustomValidity('候補の読み込みに失敗しました。しばらくしてから再度お試しください');
+          loginInput.reportValidity();
+          loginInput.focus();
+          return;
+        }
         const resolved = resolveLogin(loginInput.value);
         if (resolved) {
           window.location.href = `${pathForLogin(commentsPathTemplate, resolved)}?platform=twitch`;
           return;
         }
-        renderCandidates(loginInput.value);
+        void renderCandidates(loginInput.value);
         loginInput.setCustomValidity('候補からTwitchユーザを選択してください');
         loginInput.reportValidity();
         loginInput.focus();
@@ -915,15 +973,14 @@
 
           if (!streamer) {
             streamerFilterSet = null;
-            renderCandidates('');
+            void renderCandidates('');
             loginInput.focus();
             return;
           }
 
           // ローディング中は空リストを表示
           streamerFilterSet = 'loading';
-          loginSearchResults.innerHTML = '<div class="search-empty">読み込み中...</div>';
-          loginSearchResults.hidden = false;
+          showCandidateMessage('読み込み中...');
 
           try {
             const res = await fetch(`{{ root_path }}/api/users/commenters?streamer=${encodeURIComponent(streamer)}`);
@@ -932,7 +989,7 @@
           } catch {
             streamerFilterSet = null;
           }
-          renderCandidates('');
+          void renderCandidates('');
           loginInput.focus();
         });
       }
@@ -940,9 +997,21 @@
       if (sortSelect) {
         sortSelect.addEventListener('change', function() {
           currentSort = this.value;
-          renderCandidates(loginInput.value);
+          void renderCandidates(loginInput.value);
         });
       }
+
+      window.addEventListener('load', () => {
+        if ('requestIdleCallback' in window) {
+          window.requestIdleCallback(() => {
+            void ensureUsersLoaded().catch(() => {});
+          }, { timeout: 2000 });
+        } else {
+          window.setTimeout(() => {
+            void ensureUsersLoaded().catch(() => {});
+          }, 1200);
+        }
+      });
 
       syncActionLinksFromInput();
     </script>

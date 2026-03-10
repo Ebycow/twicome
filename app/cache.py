@@ -13,6 +13,9 @@ REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
 # コメント全件キャッシュの TTL（秒）。バッチ間隔 4 時間に合わせる
 COMMENTS_CACHE_TTL: int = int(os.getenv("COMMENTS_CACHE_TTL", "14400"))
 
+INDEX_LANDING_CACHE_KEY = "twicome:index:landing"
+INDEX_USERS_CACHE_KEY = "twicome:index:users"
+
 _redis_client = None
 
 
@@ -62,41 +65,71 @@ def set_user_meta_cache(login: str, meta: dict) -> None:
     except Exception as e:
         print(f"[cache] set_user_meta_cache error: {e}")
 
-def get_index_cache() -> Optional[dict]:
-    """トップページの重いクエリ結果キャッシュを取得する。未ヒット時は None。"""
+
+def get_index_landing_cache() -> Optional[dict]:
+    """トップページ表示に必要な軽量データのキャッシュを取得する。"""
     r = _get_redis()
     if not r:
         return None
     try:
-        data = r.get("twicome:index")
+        data = r.get(INDEX_LANDING_CACHE_KEY)
         if data:
             return json.loads(data)
     except Exception as e:
-        print(f"[cache] get_index_cache error: {e}")
+        print(f"[cache] get_index_landing_cache error: {e}")
     return None
 
 
-def set_index_cache(data: dict) -> None:
-    """トップページのクエリ結果を Redis にキャッシュする。"""
+def set_index_landing_cache(data: dict) -> None:
+    """トップページ表示に必要な軽量データを Redis にキャッシュする。"""
     r = _get_redis()
     if not r:
         return
     try:
         r.setex(
-            "twicome:index",
+            INDEX_LANDING_CACHE_KEY,
             COMMENTS_CACHE_TTL,
             json.dumps(data, default=str),
         )
     except Exception as e:
-        print(f"[cache] set_index_cache error: {e}")
+        print(f"[cache] set_index_landing_cache error: {e}")
 
 
-def invalidate_index_cache() -> None:
-    """トップページキャッシュを削除する（バッチ後の無効化用）。"""
+def get_index_users_cache() -> Optional[list]:
+    """トップページ検索用ユーザー一覧キャッシュを取得する。"""
+    r = _get_redis()
+    if not r:
+        return None
+    try:
+        data = r.get(INDEX_USERS_CACHE_KEY)
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        print(f"[cache] get_index_users_cache error: {e}")
+    return None
+
+
+def set_index_users_cache(users: list) -> None:
+    """トップページ検索用ユーザー一覧を Redis にキャッシュする。"""
     r = _get_redis()
     if not r:
         return
     try:
-        r.delete("twicome:index")
+        r.setex(
+            INDEX_USERS_CACHE_KEY,
+            COMMENTS_CACHE_TTL,
+            json.dumps(users, default=str),
+        )
+    except Exception as e:
+        print(f"[cache] set_index_users_cache error: {e}")
+
+
+def invalidate_index_cache() -> None:
+    """トップページ関連キャッシュを削除する（バッチ後の無効化用）。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.delete(INDEX_LANDING_CACHE_KEY, INDEX_USERS_CACHE_KEY)
     except Exception as e:
         print(f"[cache] invalidate_index_cache error: {e}")
