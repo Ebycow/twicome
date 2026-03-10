@@ -51,7 +51,7 @@
         --comment-border: #eee;
         --comment-bg: #ffffff;
         --pill-border: #ddd;
-        --link-color: #007bff;
+        --link-color: #0056b3;
         --error-bg: #fff3f3;
         --error-border: #f2b3b3;
         --vote-btn-bg: #f9f9f9;
@@ -125,7 +125,7 @@
       .emote { height: 1.35em; vertical-align: -0.2em; }
       .pager { display:flex; gap: 10px; align-items:center; justify-content: center; margin-top: 14px; }
       .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--pill-border); font-size: 0.85rem; }
-      .recent { color: red; }
+      .recent { color: #c00000; }
       .vote-btn { margin-right: 8px; padding: 4px 8px; border: 1px solid var(--vote-btn-border); border-radius: 4px; background: var(--vote-btn-bg); cursor: pointer; color: var(--text-color); }
       .vote-btn:hover { background: var(--vote-btn-hover); }
       .highlighted { background-color: var(--highlighted-bg); border-color: var(--highlighted-border); }
@@ -140,6 +140,7 @@
       .similarity-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e8f5e9; border:1px solid #4caf50; color:#2e7d32; }
       @media (prefers-color-scheme: dark) {
         .similarity-badge { background:#1b3a1b; border-color:#4caf50; color:#81c784; }
+        .best9-slot-num { color:#4caf50; }
       }
       .slider-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
       .slider-row label { min-width:100px; margin:0; font-size:0.9rem; }
@@ -184,7 +185,7 @@
       .best9-slot.empty-slot { border:1px dashed rgba(76,175,80,0.3); opacity:0.5; }
       .best9-slot.drag-over { border-color:#ffd700 !important; background:rgba(255,215,0,0.08); }
       .best9-slot.dragging { opacity:0.35; }
-      .best9-slot-num { font-size:0.65rem; font-weight:bold; color:#4caf50; margin-bottom:3px; }
+      .best9-slot-num { font-size:0.65rem; font-weight:bold; color:#1b5e20; margin-bottom:3px; }
       .best9-slot-text { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.4; color:var(--text-color); }
       .best9-slot-remove { position:absolute; top:3px; right:5px; background:none; border:none; color:var(--meta-color); cursor:pointer; font-size:1rem; padding:0; line-height:1; }
       .best9-slot-remove:hover { color:#f44336; }
@@ -211,6 +212,7 @@
       </div>
     </div>
 
+    <main>
     <div style="margin:2rem;">
       使い方：<br>
       <ul>
@@ -233,8 +235,8 @@
         <input type="hidden" name="platform" value="{{ filters.platform }}" />
         <div class="filters">
           <div class="wide">
-            <label>VOD</label>
-            <select name="vod_id">
+            <label for="select-vod">VOD</label>
+            <select id="select-vod" name="vod_id">
               <option value="">（すべて）</option>
               {% for v in vod_options %}
                 <option value="{{ v.vod_id }}" {% if filters.vod_id and (filters.vod_id|int == v.vod_id) %}selected{% endif %}>
@@ -244,8 +246,8 @@
             </select>
           </div>
           <div>
-            <label>配信者</label>
-            <select name="owner_user_id">
+            <label for="select-owner">配信者</label>
+            <select id="select-owner" name="owner_user_id">
               <option value="">（すべて）</option>
               {% for o in owner_options %}
                 <option value="{{ o.user_id }}" {% if filters.owner_user_id and (filters.owner_user_id|int == o.user_id) %}selected{% endif %}>
@@ -263,8 +265,8 @@
             <input name="exclude_q" value="{{ filters.exclude_q or '' }}" placeholder="含まれると除外（空白/カンマ区切り）" />
           </div>
           <div>
-            <label>並び</label>
-            <select name="sort">
+            <label for="select-sort">並び</label>
+            <select id="select-sort" name="sort">
               <option value="created_at" {% if not filters.sort or filters.sort == 'created_at' %}selected{% endif %}>コメント時刻</option>
               <option value="vod_time" {% if filters.sort == 'vod_time' %}selected{% endif %}>VOD/時間</option>
               <option value="likes" {% if filters.sort == 'likes' %}selected{% endif %}>いいね順</option>
@@ -275,8 +277,8 @@
             </select>
           </div>
           <div>
-            <label>1ページ</label>
-            <select name="page_size">
+            <label for="select-page-size">1ページ</label>
+            <select id="select-page-size" name="page_size">
               {% for s in [20,50,100,200] %}
                 <option value="{{ s }}" {% if filters.page_size == s %}selected{% endif %}>{{ s }}</option>
               {% endfor %}
@@ -297,7 +299,7 @@
             <input id="similar-q" placeholder="例: おもしろい、ありがとう、草" />
           </div>
           <div>
-            <label>件数</label>
+            <label for="similar-top-k">件数</label>
             <select id="similar-top-k">
               <option value="20">20</option>
               <option value="50" selected>50</option>
@@ -324,6 +326,7 @@
             <span class="slider-val" id="centroid-val">0%</span>
           </div>
           <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+            <label for="centroid-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
             <select id="centroid-top-k">
               <option value="20">20</option>
               <option value="50" selected>50</option>
@@ -350,6 +353,7 @@
             <div class="slider-row"><label>応援</label><input type="range" data-emotion="cheer" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
           </div>
           <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+            <label for="emotion-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
             <select id="emotion-top-k">
               <option value="20">20</option>
               <option value="50" selected>50</option>
@@ -1365,6 +1369,7 @@
       emotionClearBtn.addEventListener('click', exitSpecialMode);
       {% endif %}
     </script>
+    </main>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
