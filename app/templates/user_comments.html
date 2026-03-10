@@ -459,6 +459,7 @@
           </div>
         {% endfor %}
       </div>
+      <div id="scroll-sentinel" style="height:1px;"></div>
 
     {% endif %}
 
@@ -700,18 +701,15 @@
         }
       }
 
-      function handleScroll() {
-        if (isCursorMode) return;
-        const windowHeight = window.innerHeight;
-        const documentHeight = document.body.offsetHeight;
-
-        // Load next page if near bottom
-        if (windowHeight + window.scrollY >= documentHeight - 100 && currentMaxPage < totalPages) {
+      const sentinel = document.getElementById('scroll-sentinel');
+      const scrollObserver = new IntersectionObserver((entries) => {
+        if (isCursorMode || (typeof isSimilarMode !== 'undefined' && isSimilarMode) || (typeof isSpecialMode !== 'undefined' && isSpecialMode)) return;
+        if (entries[0].isIntersecting && currentMaxPage < totalPages) {
           loadComments(currentMaxPage + 1, 'append');
         }
-      }
+      }, { rootMargin: '0px 0px 600px 0px' });
 
-      window.addEventListener('scroll', handleScroll);
+      if (!isCursorMode) scrollObserver.observe(sentinel);
 
       // Handle load previous button
       document.getElementById('load-prev-btn').addEventListener('click', () => {
@@ -1194,13 +1192,8 @@
       // 共通: 特殊モード中はスクロール読み込みを無効化
       // -----------------------
       let isSpecialMode = false; // 類似/重心/感情いずれかのモード中
-      const originalHandleScroll = handleScroll;
-      function handleScrollWrapper() {
-        if (isSimilarMode || isSpecialMode) return;
-        originalHandleScroll();
-      }
-      window.removeEventListener('scroll', handleScroll);
-      window.addEventListener('scroll', handleScrollWrapper);
+      // scrollObserver のコールバック内で isSimilarMode / isSpecialMode を参照するため、
+      // ここで変数を宣言するだけで十分（scroll イベントリスナーは不要）
 
       // 共通: コメントを描画するヘルパー（badge付き）
       function renderSearchResults(items, badgeHtml) {
