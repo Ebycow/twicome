@@ -1,5 +1,4 @@
 import math
-import random as _random
 from datetime import datetime
 from typing import Optional
 
@@ -8,11 +7,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from cache import (
-    get_comments_cache,
     get_index_cache,
     get_user_meta_cache,
-    invalidate_user_cache,
-    set_comments_cache,
     set_index_cache,
     set_user_meta_cache,
 )
@@ -20,149 +16,81 @@ from core.config import DEFAULT_LOGIN, DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LI
 from core.db import SessionLocal
 from core.templates import templates
 from services.comment_utils import (
+    BODY_HTML_RENDER_VERSION,
+    _build_comment_body_select_sql,
     _decorate_comment,
-    _render_comment_body_html,
+    _get_comment_body_html,
     _split_filter_terms,
-    render_comment_body_html,
 )
 
 router = APIRouter()
 
-# QUICK_LINK ユーザのコメント全件を取得する SQL（LIMIT なし）
-# owner_user_id / cn_created_at_utc はキャッシュ上でのフィルタ・ソートに使用
-_FULL_COMMENTS_SQL = """
-    SELECT
-        c.comment_id,
-        c.vod_id,
-        c.offset_seconds,
-        c.comment_created_at_utc,
-        c.commenter_login_snapshot,
-        c.commenter_display_name_snapshot,
-        c.body,
-        c.raw_json,
-        c.user_color,
-        c.bits_spent,
-        c.twicome_likes_count,
-        c.twicome_dislikes_count,
-        cn.note AS community_note_body,
-        cn.eligible AS cn_eligible,
-        cn.status AS cn_status,
-        cn.verifiability AS cn_verifiability,
-        cn.harm_risk AS cn_harm_risk,
-        cn.exaggeration AS cn_exaggeration,
-        cn.evidence_gap AS cn_evidence_gap,
-        cn.subjectivity AS cn_subjectivity,
-        cn.issues AS cn_issues,
-        cn.ask AS cn_ask,
-        cn.created_at_utc AS cn_created_at_utc,
-        v.title AS vod_title,
-        v.url AS vod_url,
-        v.youtube_url AS youtube_url,
-        v.created_at_utc AS vod_created_at_utc,
-        v.owner_user_id AS owner_user_id,
-        u.login AS owner_login,
-        u.display_name AS owner_display_name
-    FROM comments c
-    JOIN vods v ON v.vod_id = c.vod_id
-    JOIN users u ON u.user_id = v.owner_user_id
-    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-    WHERE c.commenter_user_id = :uid
-    ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC
-"""
-
-# ソートキー関数（キャッシュ済みリストに対して Python 側でソート）
-_SORT_KEYS = {
-    "created_at": lambda c: (
-        c.get("comment_created_at_utc") or "",
-        c.get("vod_id") or 0,
-        c.get("offset_seconds") or 0,
-    ),
-    "likes": lambda c: (
-        c.get("twicome_likes_count") or 0,
-        c.get("vod_id") or 0,
-        c.get("offset_seconds") or 0,
-    ),
-    "dislikes": lambda c: (
-        c.get("twicome_dislikes_count") or 0,
-        c.get("vod_id") or 0,
-        c.get("offset_seconds") or 0,
-    ),
-    "community_note": lambda c: (
-        c.get("cn_created_at_utc") or "",
-        c.get("vod_id") or 0,
-        c.get("offset_seconds") or 0,
-    ),
-    "danger": lambda c: (
-        float(c.get("cn_harm_risk") or 0)
-        + float(c.get("cn_exaggeration") or 0)
-        + float(c.get("cn_evidence_gap") or 0)
-        + float(c.get("cn_subjectivity") or 0),
-        c.get("vod_id") or 0,
-        c.get("offset_seconds") or 0,
-    ),
-    # vod_time / その他（デフォルト）
-    "_default": lambda c: (c.get("vod_id") or 0, c.get("offset_seconds") or 0),
-}
+_COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
+_COMMENT_BODY_SUBQUERY_SELECT_SQL = _build_comment_body_select_sql("c0")
 
 
-def _filter_and_sort_cached(
-    all_comments: list,
-    vod_id_int: Optional[int],
-    owner_user_id_int: Optional[int],
-    q: Optional[str],
-    exclude_terms: list,
-    sort: str,
-) -> list:
-    """キャッシュ済みコメントリストにフィルタ・ソートを Python 側で適用する。"""
-    result = all_comments
-
-    if vod_id_int is not None:
-        result = [c for c in result if c.get("vod_id") == vod_id_int]
-
-    if owner_user_id_int is not None:
-        result = [c for c in result if c.get("owner_user_id") == owner_user_id_int]
-
-    if q:
-        q_lower = q.lower()
-        result = [c for c in result if q_lower in (c.get("body") or "").lower()]
-
-    for term in exclude_terms:
-        t_lower = term.lower()
-        result = [c for c in result if t_lower not in (c.get("body") or "").lower()]
-
-    if sort == "random":
-        result = list(result)
-        _random.shuffle(result)
+def _fetch_user_vod_options(uid: int, owner_user_id_int: Optional[int], db) -> list[dict]:
+    if owner_user_id_int is None:
+        rows = db.execute(
+            text("""
+ SELECT v.vod_id, v.title, sub.last_commented_at
+ FROM (
+     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
+     FROM comments c
+     WHERE c.commenter_user_id = :uid
+     GROUP BY c.vod_id
+ ) sub
+ JOIN vods v ON v.vod_id = sub.vod_id
+ ORDER BY sub.last_commented_at DESC
+ LIMIT 300
+            """),
+            {"uid": uid},
+        ).mappings().all()
     else:
-        key_fn = _SORT_KEYS.get(sort, _SORT_KEYS["_default"])
-        result = sorted(result, key=key_fn, reverse=True)
+        rows = db.execute(
+            text("""
+ SELECT v.vod_id, v.title, MAX(c.comment_created_at_utc) AS last_commented_at
+ FROM comments c
+ JOIN vods v ON v.vod_id = c.vod_id
+ WHERE c.commenter_user_id = :uid AND v.owner_user_id = :owner_user_id
+ GROUP BY v.vod_id, v.title
+ ORDER BY last_commented_at DESC
+ LIMIT 300
+            """),
+            {"uid": uid, "owner_user_id": owner_user_id_int},
+        ).mappings().all()
+    return [dict(row) for row in rows]
 
-    return result
+
+def _fetch_user_owner_options(uid: int, db) -> list[dict]:
+    rows = db.execute(
+        text("""
+ SELECT DISTINCT u.user_id, u.login, u.display_name
+ FROM users u
+ JOIN vods v ON v.owner_user_id = u.user_id
+ JOIN comments c ON c.vod_id = v.vod_id
+ WHERE c.commenter_user_id = :uid
+ ORDER BY u.login
+        """),
+        {"uid": uid},
+    ).mappings().all()
+    return [dict(row) for row in rows]
 
 
-def _load_all_comments(login: str, uid: int, db) -> Optional[list]:
-    """QUICK_LINK ユーザのコメント全件をキャッシュから取得する。
-    キャッシュミス時は DB から取得してキャッシュに保存する。
-    QUICK_LINK 対象外の場合は None を返す。
-    """
+def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
     if login not in QUICK_LINK_LOGINS:
         return None
 
-    cached = get_comments_cache(login)
+    cached = get_user_meta_cache(login)
     if cached is not None:
         return cached
 
-    # キャッシュミス: DB から全件取得
-    rows = db.execute(text(_FULL_COMMENTS_SQL), {"uid": uid}).mappings().all()
-    all_comments = []
-    for row in rows:
-        r = dict(row)
-        # body_html を事前レンダリングして raw_json を除去（キャッシュサイズ削減）
-        raw_json = r.pop("raw_json", None)
-        r["body_html"] = render_comment_body_html(raw_json, r.get("body"))
-        all_comments.append(r)
-    set_comments_cache(login, all_comments)
-    return all_comments
+    meta = {
+        "vod_options": _fetch_user_vod_options(uid, None, db),
+        "owner_options": _fetch_user_owner_options(uid, db),
+    }
+    set_user_meta_cache(login, meta)
+    return meta
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -249,11 +177,10 @@ def index(request: Request):
     # 人気コメントランキングはキャッシュしない（いいね数が動的に変わる）
     with SessionLocal() as db:
         popular_comments = db.execute(
-            text("""
+            text(f"""
                 SELECT
                     c.comment_id,
-                    c.body,
-                    c.raw_json,
+                    {_COMMENT_BODY_SELECT_SQL},
                     c.twicome_likes_count,
                     c.twicome_dislikes_count,
                     (c.twicome_likes_count + c.twicome_dislikes_count) AS score,
@@ -269,13 +196,15 @@ def index(request: Request):
                 ORDER BY (c.twicome_likes_count + c.twicome_dislikes_count) DESC
                 LIMIT 20
             """),
+            {"body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
     popular_comments_out = []
     for row in popular_comments:
         r = dict(row)
-        r["body_html"] = _render_comment_body_html(r.get("raw_json"), r.get("body"))
+        r["body_html"] = _get_comment_body_html(r)
         r.pop("raw_json", None)
+        r.pop("body_html_version", None)
         popular_comments_out.append(r)
 
     return templates.TemplateResponse(
@@ -396,134 +325,15 @@ def user_comments_page(
             )
 
         uid = user_row["user_id"]
-
-        # ── キャッシュパス（QUICK_LINK ユーザ かつ カーソルなし）──────────────
-        all_comments = _load_all_comments(login, uid, db)
-        if all_comments is not None and not cursor:
-            filtered = _filter_and_sort_cached(
-                all_comments, vod_id_int, owner_user_id_int, q, exclude_terms, sort
-            )
-            total = len(filtered)
-            pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
-            page = min(page, pages) if pages else 1
-            offset = (page - 1) * page_size
-            now = datetime.utcnow()
-            comments = []
-            for r in filtered[offset : offset + page_size]:
-                pre_html = r.get("body_html")  # キャッシュに事前レンダリング済み
-                decorated = _decorate_comment(r, now)
-                if pre_html:
-                    decorated["body_html"] = pre_html
-                comments.append(decorated)
-
-            # vod_options / owner_options をキャッシュから取得（なければ DB から取得して保存）
-            meta = get_user_meta_cache(login)
-            if meta is None:
-                vod_rows = db.execute(
-                    text("""
- SELECT v.vod_id, v.title, sub.last_commented_at
- FROM (
-     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
-     FROM comments c
-     WHERE c.commenter_user_id = :uid
-     GROUP BY c.vod_id
- ) sub
- JOIN vods v ON v.vod_id = sub.vod_id
- ORDER BY sub.last_commented_at DESC
- LIMIT 300
-                    """),
-                    {"uid": uid},
-                ).mappings().all()
-                owner_rows = db.execute(
-                    text("""
- SELECT DISTINCT u.user_id, u.login, u.display_name
- FROM users u
- JOIN vods v ON v.owner_user_id = u.user_id
- JOIN comments c ON c.vod_id = v.vod_id
- WHERE c.commenter_user_id = :uid
- ORDER BY u.login
-                    """),
-                    {"uid": uid},
-                ).mappings().all()
-                meta = {
-                    "vod_options": [dict(x) for x in vod_rows],
-                    "owner_options": [dict(x) for x in owner_rows],
-                }
-                set_user_meta_cache(login, meta)
-
-            return templates.TemplateResponse(
-                "user_comments.html",
-                {
-                    "request": request,
-                    "error": None,
-                    "user": dict(user_row),
-                    "comments": comments,
-                    "vod_options": meta["vod_options"],
-                    "owner_options": meta["owner_options"],
-                    "page": page,
-                    "pages": pages,
-                    "total": total,
-                    "filters": {
-                        "platform": platform,
-                        "vod_id": vod_id_int,
-                        "owner_user_id": owner_user_id_int,
-                        "q": q,
-                        "exclude_q": exclude_q,
-                        "page_size": page_size,
-                        "sort": sort,
-                        "cursor": None,
-                    },
-                    "root_path": request.scope.get("root_path", ""),
-                    "page_title": page_title,
-                    "faiss_enabled": FAISS_ENABLED,
-                },
-            )
-        # ── DB パス（非 QUICK_LINK、またはカーソルモード）──────────────────────
-
-        # 2) vod filter options (そのユーザがコメントしたVODのみ、配信者フィルター適用)
-        if owner_user_id_int is None:
-            # 最適化: サブクエリで comments を先に集計してカバリングインデックスを使用
-            vod_options = db.execute(
-                text("""
- SELECT v.vod_id, v.title, sub.last_commented_at
- FROM (
-     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
-     FROM comments c
-     WHERE c.commenter_user_id = :uid
-     GROUP BY c.vod_id
- ) sub
- JOIN vods v ON v.vod_id = sub.vod_id
- ORDER BY sub.last_commented_at DESC
- LIMIT 300
-                """),
-                {"uid": uid},
-            ).mappings().all()
+        cached_meta = _load_user_meta(login, uid, db)
+        if owner_user_id_int is None and cached_meta is not None:
+            vod_options = cached_meta["vod_options"]
         else:
-            vod_options = db.execute(
-                text("""
- SELECT v.vod_id, v.title, MAX(c.comment_created_at_utc) AS last_commented_at
- FROM comments c
- JOIN vods v ON v.vod_id = c.vod_id
- WHERE c.commenter_user_id = :uid AND v.owner_user_id = :owner_user_id
- GROUP BY v.vod_id, v.title
- ORDER BY last_commented_at DESC
- LIMIT 300
-                """),
-                {"uid": uid, "owner_user_id": owner_user_id_int},
-            ).mappings().all()
-
-        # 2.5) owner filter options (そのユーザがコメントしたVODのオーナーのみ)
-        owner_options = db.execute(
-            text("""
- SELECT DISTINCT u.user_id, u.login, u.display_name
- FROM users u
- JOIN vods v ON v.owner_user_id = u.user_id
- JOIN comments c ON c.vod_id = v.vod_id
- WHERE c.commenter_user_id = :uid
- ORDER BY u.login
-             """),
-            {"uid": uid},
-        ).mappings().all()
+            vod_options = _fetch_user_vod_options(uid, owner_user_id_int, db)
+        if cached_meta is not None:
+            owner_options = cached_meta["owner_options"]
+        else:
+            owner_options = _fetch_user_owner_options(uid, db)
 
         # 3) build WHERE
         where = ["c.commenter_user_id = :uid"]
@@ -654,10 +464,11 @@ def user_comments_page(
         # 6) fetch page
         # created_at ソートかつフィルターなしの場合: サブクエリで comments を先に LIMIT してから JOIN
         # (idx_comments_user_created_sort を使って filesort を回避)
-        _col_list = """
+        _col_list = f"""
                     c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
                     c.commenter_login_snapshot, c.commenter_display_name_snapshot,
-                    c.body, c.raw_json, c.user_color, c.bits_spent,
+                    {_COMMENT_BODY_SELECT_SQL},
+                    c.user_color, c.bits_spent,
                     c.twicome_likes_count, c.twicome_dislikes_count,
                     cn.note AS community_note_body, cn.eligible AS cn_eligible,
                     cn.status AS cn_status, cn.verifiability AS cn_verifiability,
@@ -681,9 +492,10 @@ def user_comments_page(
                     FROM (
                         SELECT comment_id, vod_id, offset_seconds, comment_created_at_utc,
                                commenter_login_snapshot, commenter_display_name_snapshot,
-                               body, raw_json, user_color, bits_spent,
+                               {_COMMENT_BODY_SUBQUERY_SELECT_SQL},
+                               user_color, bits_spent,
                                twicome_likes_count, twicome_dislikes_count
-                        FROM comments
+                        FROM comments c0
                         WHERE commenter_user_id = :uid
                         ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC
                         LIMIT :limit OFFSET :offset
@@ -692,7 +504,7 @@ def user_comments_page(
                     JOIN users u ON u.user_id = v.owner_user_id
                     LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 """),
-                {"uid": uid, "limit": limit, "offset": offset},
+                {"uid": uid, "limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION},
             ).mappings().all()
         else:
             rows = db.execute(
@@ -706,7 +518,7 @@ def user_comments_page(
                     {order_sql}
                     LIMIT :limit OFFSET :offset
                 """),
-                {**params, "limit": limit, "offset": offset},
+                {**params, "limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION},
             ).mappings().all()
 
         now = datetime.utcnow()
@@ -786,31 +598,6 @@ def user_comments_api(
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
         uid = user_row["user_id"]
-
-        # ── キャッシュパス（QUICK_LINK ユーザ かつ カーソルなし）──────────────
-        all_comments = _load_all_comments(login, uid, db)
-        if all_comments is not None and not cursor:
-            filtered = _filter_and_sort_cached(
-                all_comments, vod_id_int, owner_user_id_int, q, exclude_terms, sort
-            )
-            total = len(filtered)
-            offset = (page - 1) * page_size
-            now = datetime.utcnow()
-            comments = []
-            for r in filtered[offset : offset + page_size]:
-                pre_html = r.get("body_html")
-                decorated = _decorate_comment(r, now)
-                if pre_html:
-                    decorated["body_html"] = pre_html
-                comments.append(decorated)
-            return {
-                "user": dict(user_row),
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "items": comments,
-            }
-        # ── DB パス（非 QUICK_LINK、またはカーソルモード）──────────────────────
 
         # 3) build WHERE
         where = ["c.commenter_user_id = :uid"]
@@ -935,10 +722,11 @@ def user_comments_api(
             offset = (page - 1) * page_size
             limit = page_size
 
-        _col_list = """
+        _col_list = f"""
                     c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
                     c.commenter_login_snapshot, c.commenter_display_name_snapshot,
-                    c.body, c.raw_json, c.user_color, c.bits_spent,
+                    {_COMMENT_BODY_SELECT_SQL},
+                    c.user_color, c.bits_spent,
                     c.twicome_likes_count, c.twicome_dislikes_count,
                     cn.note AS community_note_body, cn.eligible AS cn_eligible,
                     cn.status AS cn_status, cn.verifiability AS cn_verifiability,
@@ -962,9 +750,10 @@ def user_comments_api(
                     FROM (
                         SELECT comment_id, vod_id, offset_seconds, comment_created_at_utc,
                                commenter_login_snapshot, commenter_display_name_snapshot,
-                               body, raw_json, user_color, bits_spent,
+                               {_COMMENT_BODY_SUBQUERY_SELECT_SQL},
+                               user_color, bits_spent,
                                twicome_likes_count, twicome_dislikes_count
-                        FROM comments
+                        FROM comments c0
                         WHERE commenter_user_id = :uid
                         ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC
                         LIMIT :limit OFFSET :offset
@@ -973,7 +762,7 @@ def user_comments_api(
                     JOIN users u ON u.user_id = v.owner_user_id
                     LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 """),
-                {"uid": uid, "limit": limit, "offset": offset},
+                {"uid": uid, "limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION},
             ).mappings().all()
         else:
             rows = db.execute(
@@ -987,7 +776,7 @@ def user_comments_api(
                     {order_sql}
                     LIMIT :limit OFFSET :offset
                 """),
-                {**params, "limit": limit, "offset": offset},
+                {**params, "limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION},
             ).mappings().all()
 
         now = datetime.utcnow()

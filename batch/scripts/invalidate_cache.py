@@ -2,7 +2,7 @@
 Redis キャッシュ無効化スクリプト
 
 バッチ処理（insertdb.py）完了後に呼ばれ、
-QUICK_LINK_LOGINS に含まれるユーザのコメントキャッシュを削除する。
+QUICK_LINK_LOGINS に含まれるユーザのメタキャッシュを削除する。
 次回アクセス時に最新データが DB から取得されキャッシュが再構築される。
 
 REDIS_URL が未設定の場合はスキップ（エラーにしない）。
@@ -42,7 +42,6 @@ except Exception as e:
 
 keys = ["twicome:index"]
 for login in logins:
-    keys.append(f"twicome:comments:{login}")
     keys.append(f"twicome:meta:{login}")
 deleted = r.delete(*keys)
 print(f"キャッシュ無効化完了: {deleted} キー削除 ({', '.join(keys)})")

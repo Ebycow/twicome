@@ -9,9 +9,10 @@ from sqlalchemy import text
 
 from core.db import SessionLocal
 from core.templates import templates
-from services.comment_utils import decorate_comment
+from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body_select_sql, decorate_comment
 
 router = APIRouter()
+_COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
 
 
 def _decompress_ids(z: str) -> list[str]:
@@ -55,8 +56,7 @@ def best9_page(
                     c.comment_created_at_utc,
                     c.commenter_login_snapshot,
                     c.commenter_display_name_snapshot,
-                    c.body,
-                    c.raw_json,
+                    {_COMMENT_BODY_SELECT_SQL},
                     c.user_color,
                     c.bits_spent,
                     c.twicome_likes_count,
@@ -72,7 +72,7 @@ def best9_page(
                 JOIN users u ON u.user_id = v.owner_user_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            params,
+            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
     now = datetime.utcnow()

@@ -7,9 +7,10 @@ from sqlalchemy import text
 from core.config import DEFAULT_PLATFORM, FAISS_ENABLED
 from core.db import SessionLocal
 from faiss_search import centroid_search, emotion_search, get_emotion_axes, is_index_available, similar_search
-from services.comment_utils import _decorate_comment
+from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body_select_sql, _decorate_comment
 
 router = APIRouter()
+_COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
 
 
 def _faiss_unavailable_response():
@@ -76,8 +77,7 @@ def similar_search_api(
                     c.comment_created_at_utc,
                     c.commenter_login_snapshot,
                     c.commenter_display_name_snapshot,
-                    c.body,
-                    c.raw_json,
+                    {_COMMENT_BODY_SELECT_SQL},
                     c.user_color,
                     c.bits_spent,
                     c.twicome_likes_count,
@@ -104,7 +104,7 @@ def similar_search_api(
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            params,
+            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
     rows_map = {r["comment_id"]: r for r in rows}
@@ -136,7 +136,7 @@ def _fetch_comment_details(results: list) -> list:
                 SELECT
                     c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
                     c.commenter_login_snapshot, c.commenter_display_name_snapshot,
-                    c.body, c.raw_json, c.user_color, c.bits_spent,
+                    {_COMMENT_BODY_SELECT_SQL}, c.user_color, c.bits_spent,
                     c.twicome_likes_count, c.twicome_dislikes_count,
                     cn.note AS community_note_body,
                     cn.eligible AS cn_eligible,
@@ -156,7 +156,7 @@ def _fetch_comment_details(results: list) -> list:
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            params,
+            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
     rows_map = {r["comment_id"]: r for r in rows}

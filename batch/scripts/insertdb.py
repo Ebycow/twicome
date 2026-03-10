@@ -13,6 +13,8 @@ from mysql.connector.cursor import MySQLCursor
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
 
+from comment_body_html import BODY_HTML_RENDER_VERSION, render_comment_body_html
+
 
 # -----------------------
 # 設定（環境変数で上書き可）😺🦐
@@ -135,16 +137,17 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: Dict[str, Any], platform: s
         upsert_user(cur, commenter_user_id, commenter_login, commenter_display, commenter_logo, platform)
 
     raw_json_str = json.dumps(c, ensure_ascii=False)
+    body_html = render_comment_body_html(c, body)
 
     sql = """
     INSERT INTO comments
       (comment_id, vod_id, offset_seconds, comment_created_at_utc,
        commenter_user_id, commenter_login_snapshot, commenter_display_name_snapshot,
-       body, user_color, bits_spent, raw_json, ingested_at)
+       body, body_html, body_html_version, user_color, bits_spent, raw_json, ingested_at)
     VALUES
       (%s, %s, %s, %s,
        %s, %s, %s,
-       %s, %s, %s, CAST(%s AS JSON), NOW(6))
+       %s, %s, %s, %s, %s, CAST(%s AS JSON), NOW(6))
     ON DUPLICATE KEY UPDATE
       vod_id = VALUES(vod_id),
       offset_seconds = VALUES(offset_seconds),
@@ -153,6 +156,8 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: Dict[str, Any], platform: s
       commenter_login_snapshot = COALESCE(VALUES(commenter_login_snapshot), commenter_login_snapshot),
       commenter_display_name_snapshot = COALESCE(VALUES(commenter_display_name_snapshot), commenter_display_name_snapshot),
       body = VALUES(body),
+      body_html = VALUES(body_html),
+      body_html_version = VALUES(body_html_version),
       user_color = COALESCE(VALUES(user_color), user_color),
       bits_spent = COALESCE(VALUES(bits_spent), bits_spent),
       raw_json = VALUES(raw_json),
@@ -161,7 +166,7 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: Dict[str, Any], platform: s
     cur.execute(sql, (
         comment_id, vod_id, offset_seconds, created_at_utc,
         commenter_user_id, commenter_login, commenter_display,
-        body, user_color, bits_spent, raw_json_str
+        body, body_html, BODY_HTML_RENDER_VERSION, user_color, bits_spent, raw_json_str
     ))
 
 

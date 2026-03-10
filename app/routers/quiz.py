@@ -7,9 +7,10 @@ from sqlalchemy import text
 from core.config import DEFAULT_PLATFORM
 from core.db import SessionLocal
 from core.templates import templates
-from services.comment_utils import _render_comment_body_html
+from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body_select_sql, _get_comment_body_html
 
 router = APIRouter()
+_COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
 
 @router.get("/u/{login}/quiz", response_class=HTMLResponse)
 def quiz_page(
@@ -76,8 +77,8 @@ def quiz_start_api(
         other_count = count - target_count
 
         target_comments = db.execute(
-            text("""
-                SELECT c.body, c.raw_json, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
+            text(f"""
+                SELECT {_COMMENT_BODY_SELECT_SQL}, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
                        c.user_color, v.title AS vod_title
                 FROM comments c
                 JOIN vods v ON v.vod_id = c.vod_id
@@ -86,12 +87,12 @@ def quiz_start_api(
                 ORDER BY RAND()
                 LIMIT :lim
             """),
-            {"uid": uid, "lim": target_count},
+            {"uid": uid, "lim": target_count, "body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
         other_comments = db.execute(
-            text("""
-                SELECT c.body, c.raw_json, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
+            text(f"""
+                SELECT {_COMMENT_BODY_SELECT_SQL}, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
                        c.user_color, v.title AS vod_title
                 FROM comments c
                 JOIN vods v ON v.vod_id = c.vod_id
@@ -101,14 +102,14 @@ def quiz_start_api(
                 ORDER BY RAND()
                 LIMIT :lim
             """),
-            {"uid": uid, "lim": other_count},
+            {"uid": uid, "lim": other_count, "body_html_version": BODY_HTML_RENDER_VERSION},
         ).mappings().all()
 
         questions = []
         for r in target_comments:
             questions.append({
                 "body": r["body"],
-                "body_html": _render_comment_body_html(r.get("raw_json"), r.get("body")),
+                "body_html": _get_comment_body_html(r),
                 "is_target": True,
                 "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
                 "vod_title": r["vod_title"],
@@ -117,7 +118,7 @@ def quiz_start_api(
         for r in other_comments:
             questions.append({
                 "body": r["body"],
-                "body_html": _render_comment_body_html(r.get("raw_json"), r.get("body")),
+                "body_html": _get_comment_body_html(r),
                 "is_target": False,
                 "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
                 "vod_title": r["vod_title"],

@@ -16,6 +16,8 @@ CREATE TABLE `comments` (
   `commenter_login_snapshot` varchar(64) DEFAULT NULL,
   `commenter_display_name_snapshot` varchar(128) DEFAULT NULL,
   `body` text NOT NULL,
+  `body_html` mediumtext,
+  `body_html_version` smallint unsigned NOT NULL DEFAULT '1',
   `community_note_body` text,
   `community_note_created_at_utc` datetime(6) DEFAULT NULL,
   `community_note_updated_at_utc` datetime(6) DEFAULT NULL,

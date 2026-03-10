@@ -7,6 +7,8 @@ from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import pytz
 
+BODY_HTML_RENDER_VERSION = 1
+
 
 def seconds_to_hms(total: int) -> str:
     h = total // 3600
@@ -127,10 +129,44 @@ def render_comment_body_html(raw_json, fallback_body):
     return "".join(parts)
 
 
+def _normalize_body_html_version(value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_comment_body_html(row) -> str:
+    stored_body_html = row.get("body_html")
+    if (
+        stored_body_html is not None
+        and _normalize_body_html_version(row.get("body_html_version")) == BODY_HTML_RENDER_VERSION
+    ):
+        return stored_body_html
+    return render_comment_body_html(row.get("raw_json"), row.get("body"))
+
+
+def build_comment_body_select_sql(alias: str = "c") -> str:
+    return f"""
+                    {alias}.body,
+                    {alias}.body_html,
+                    {alias}.body_html_version,
+                    CASE
+                        WHEN {alias}.body_html IS NOT NULL
+                         AND {alias}.body_html_version = :body_html_version
+                        THEN NULL
+                        ELSE {alias}.raw_json
+                    END AS raw_json
+    """.strip()
+
+
 def decorate_comment(row, now):
     r = dict(row)
-    raw_json = r.pop("raw_json", None)
-    r["body_html"] = render_comment_body_html(raw_json, r.get("body"))
+    r["body_html"] = get_comment_body_html(r)
+    r.pop("raw_json", None)
+    r.pop("body_html_version", None)
     offset_sec = int(r.get("offset_seconds") or 0)
     created_at = r.get("comment_created_at_utc")
     # Redis キャッシュから復元した場合は文字列になるため datetime に変換する
@@ -175,4 +211,6 @@ def decorate_comment(row, now):
 _split_filter_terms = split_filter_terms
 _parse_raw_comment = parse_raw_comment
 _render_comment_body_html = render_comment_body_html
+_get_comment_body_html = get_comment_body_html
+_build_comment_body_select_sql = build_comment_body_select_sql
 _decorate_comment = decorate_comment
