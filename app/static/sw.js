@@ -1,9 +1,109 @@
-const CACHE_NAME = 'twicome-v8';
+const CACHE_NAME = 'twicome-v9';
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
 
 const OFFLINE_URL = `${BASE}/static/offline.html`;
+const TOP_PAGE_URL = `${BASE}/`;
+const DATA_VERSION_URL = `${BASE}/api/meta/data-version`;
+const TOP_PAGE_VERSION_CACHE_URL = `${BASE}/__sw/top-page-version`;
+
+function normalizePath(pathname) {
+  if (pathname === '/') return '/';
+  return pathname.replace(/\/$/, '');
+}
+
+function isTopPageNavigation(url, request) {
+  return request.mode === 'navigate' && normalizePath(url.pathname) === normalizePath(TOP_PAGE_URL);
+}
+
+async function readTopPageVersion(cache) {
+  const response = await cache.match(TOP_PAGE_VERSION_CACHE_URL);
+  if (!response) return null;
+  try {
+    const data = await response.json();
+    return typeof data.dataVersion === 'string' && data.dataVersion ? data.dataVersion : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeTopPageVersion(cache, dataVersion) {
+  if (!dataVersion) return;
+  await cache.put(
+    TOP_PAGE_VERSION_CACHE_URL,
+    new Response(JSON.stringify({ dataVersion }), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    })
+  );
+}
+
+async function fetchDataVersion() {
+  const response = await fetch(DATA_VERSION_URL, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(`data-version:${response.status}`);
+  const data = await response.json();
+  return typeof data.data_version === 'string' && data.data_version ? data.data_version : null;
+}
+
+async function cacheTopPageResponse(cache, request, response, fallbackVersion) {
+  if (!response || !response.ok) return response;
+  await cache.put(request, response.clone());
+  const dataVersion = response.headers.get('X-Twicome-Data-Version') || fallbackVersion || null;
+  await writeTopPageVersion(cache, dataVersion);
+  return response;
+}
+
+async function fetchAndCacheTopPage(cache, request, fallbackVersion) {
+  const response = await fetch(request);
+  return cacheTopPageResponse(cache, request, response, fallbackVersion);
+}
+
+async function notifyTopPageUpdated(dataVersion) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    client.postMessage({ type: 'twicome-top-page-updated', dataVersion });
+  }
+}
+
+async function offlineFallback(cache, request) {
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  return caches.match(OFFLINE_URL).then(
+    (r) => r || new Response('<h1>オフライン</h1><p>ネットワーク接続を確認してください。</p>', {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  );
+}
+
+async function precacheTopPage(cache) {
+  try {
+    await fetchAndCacheTopPage(cache, TOP_PAGE_URL);
+  } catch {
+    // install 時の失敗は無視して次回アクセス時に構築する
+  }
+}
+
+async function revalidateTopPage(cache, request) {
+  const cachedVersion = await readTopPageVersion(cache);
+  try {
+    const latestVersion = await fetchDataVersion();
+    if (latestVersion && latestVersion === cachedVersion) return;
+
+    const response = await fetchAndCacheTopPage(cache, request, latestVersion);
+    if (!response || !response.ok) return;
+
+    const updatedVersion = response.headers.get('X-Twicome-Data-Version') || latestVersion;
+    if (updatedVersion && updatedVersion !== cachedVersion) {
+      await notifyTopPageUpdated(updatedVersion);
+    }
+  } catch {
+    // 背景再検証に失敗しても現在のキャッシュは維持する
+  }
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -12,7 +112,7 @@ self.addEventListener('install', (event) => {
         // offline.html とメインページを事前キャッシュ。失敗しても install は続行
         Promise.all([
           cache.add(OFFLINE_URL).catch(() => {}),
-          cache.add(`${BASE}/`).catch(() => {}),
+          precacheTopPage(cache),
         ])
       )
       .then(() => self.skipWaiting())
@@ -69,6 +169,25 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         }).catch(() => new Response('Not found', { status: 404 }));
+      })
+    );
+    return;
+  }
+
+  if (isTopPageNavigation(url, request)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(request);
+        if (cached) {
+          event.waitUntil(revalidateTopPage(cache, request));
+          return cached;
+        }
+
+        try {
+          return await fetchAndCacheTopPage(cache, request);
+        } catch {
+          return offlineFallback(cache, request);
+        }
       })
     );
     return;

@@ -6,6 +6,7 @@ REDIS_URL が設定されていない場合はすべての操作が no-op にな
 """
 import json
 import os
+from datetime import datetime, timezone
 from typing import Optional
 
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
@@ -13,8 +14,12 @@ REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
 # コメント全件キャッシュの TTL（秒）。バッチ間隔 4 時間に合わせる
 COMMENTS_CACHE_TTL: int = int(os.getenv("COMMENTS_CACHE_TTL", "14400"))
 
+DATA_VERSION_KEY = "twicome:data_version"
 INDEX_LANDING_CACHE_KEY = "twicome:index:landing"
 INDEX_USERS_CACHE_KEY = "twicome:index:users"
+INDEX_HTML_CACHE_KEY_PREFIX = "twicome:index:html"
+
+_startup_data_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
 
 _redis_client = None
 
@@ -64,6 +69,61 @@ def set_user_meta_cache(login: str, meta: dict) -> None:
         )
     except Exception as e:
         print(f"[cache] set_user_meta_cache error: {e}")
+
+
+def get_data_version() -> str:
+    """現在のデータバージョンを返す。Redis 未使用時は起動時刻ベース。"""
+    r = _get_redis()
+    if not r:
+        return _startup_data_version
+    try:
+        version = r.get(DATA_VERSION_KEY)
+        if version:
+            return version
+        r.set(DATA_VERSION_KEY, _startup_data_version)
+    except Exception as e:
+        print(f"[cache] get_data_version error: {e}")
+    return _startup_data_version
+
+
+def set_data_version(version: str) -> str:
+    """データバージョンを更新する。Redis 未使用時は no-op。"""
+    value = str(version).strip() or _startup_data_version
+    r = _get_redis()
+    if not r:
+        return value
+    try:
+        r.set(DATA_VERSION_KEY, value)
+    except Exception as e:
+        print(f"[cache] set_data_version error: {e}")
+    return value
+
+
+def get_index_html_cache(version: str) -> Optional[str]:
+    """データバージョンに紐づくトップ HTML キャッシュを取得する。"""
+    r = _get_redis()
+    if not r:
+        return None
+    key = f"{INDEX_HTML_CACHE_KEY_PREFIX}:{version}"
+    try:
+        data = r.get(key)
+        if data:
+            return data
+    except Exception as e:
+        print(f"[cache] get_index_html_cache error: {e}")
+    return None
+
+
+def set_index_html_cache(version: str, html: str) -> None:
+    """データバージョンに紐づくトップ HTML キャッシュを保存する。"""
+    r = _get_redis()
+    if not r:
+        return
+    key = f"{INDEX_HTML_CACHE_KEY_PREFIX}:{version}"
+    try:
+        r.setex(key, COMMENTS_CACHE_TTL, html)
+    except Exception as e:
+        print(f"[cache] set_index_html_cache error: {e}")
 
 
 def get_index_landing_cache() -> Optional[dict]:
@@ -130,6 +190,10 @@ def invalidate_index_cache() -> None:
     if not r:
         return
     try:
-        r.delete(INDEX_LANDING_CACHE_KEY, INDEX_USERS_CACHE_KEY)
+        keys = [INDEX_LANDING_CACHE_KEY, INDEX_USERS_CACHE_KEY]
+        html_keys = list(r.scan_iter(f"{INDEX_HTML_CACHE_KEY_PREFIX}:*"))
+        if html_keys:
+            keys.extend(html_keys)
+        r.delete(*keys)
     except Exception as e:
         print(f"[cache] invalidate_index_cache error: {e}")

@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="twicome-data-version" content="{{ data_version }}" />
     <title>ツイコメ - Twitch VOD コメント検索</title>
     <link rel="manifest" href="{{ root_path }}/manifest.json" />
     <meta name="theme-color" content="#9147ff" />
@@ -628,6 +629,8 @@
       const sortSelect = document.getElementById('sort-select');
       const form = loginInput.closest('form');
       const rootPath = {{ root_path | tojson }};
+      const currentDataVersion = {{ data_version | tojson }};
+      const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
 
       const maxCandidates = 25;
       const usersIndexUrl = `${rootPath}/api/users/index`;
@@ -1017,6 +1020,21 @@
     </script>
     <script>
       if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          const data = event.data || {};
+          if (data.type !== 'twicome-top-page-updated') return;
+          if (!data.dataVersion || data.dataVersion === currentDataVersion) return;
+
+          try {
+            if (sessionStorage.getItem(topPageReloadMarkerKey) === data.dataVersion) {
+              return;
+            }
+            sessionStorage.setItem(topPageReloadMarkerKey, data.dataVersion);
+          } catch {}
+
+          window.location.reload();
+        });
+
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
         });

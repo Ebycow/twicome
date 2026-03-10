@@ -7,9 +7,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from cache import (
+    get_data_version,
+    get_index_html_cache,
     get_index_landing_cache,
     get_index_users_cache,
     get_user_meta_cache,
+    set_index_html_cache,
     set_index_landing_cache,
     set_index_users_cache,
     set_user_meta_cache,
@@ -196,15 +199,14 @@ def _load_index_users() -> list[dict]:
     return users
 
 
-@router.get("/", response_class=HTMLResponse)
-def index(request: Request):
+def _build_index_context(data_version: str) -> dict:
     landing = _load_index_landing()
     quick_links_out = landing["quick_links"]
     streamers = landing["streamers"]
     selected_login = DEFAULT_LOGIN or ""
     selected_login_for_links = "__LOGIN_PLACEHOLDER__"
 
-    # 人気コメントランキングはキャッシュしない（いいね数が動的に変わる）
+    # 人気コメントランキングは HTML キャッシュに含めてサーバー側で安定化する
     with SessionLocal() as db:
         popular_comments = db.execute(
             text(f"""
@@ -237,15 +239,49 @@ def index(request: Request):
         r.pop("body_html_version", None)
         popular_comments_out.append(r)
 
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "selected_login": selected_login,
-            "selected_login_for_links": selected_login_for_links,
-            "popular_comments": popular_comments_out,
-            "quick_links": quick_links_out,
-            "streamers": streamers,
+    return {
+        "selected_login": selected_login,
+        "selected_login_for_links": selected_login_for_links,
+        "popular_comments": popular_comments_out,
+        "quick_links": quick_links_out,
+        "streamers": streamers,
+        "data_version": data_version,
+    }
+
+
+def _render_index_html(context: dict) -> str:
+    template = templates.env.get_template("index.html")
+    return template.render(context)
+
+
+@router.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    data_version = get_data_version()
+    headers = {
+        "X-Twicome-Data-Version": data_version,
+        "Cache-Control": "no-store",
+    }
+    cached_html = get_index_html_cache(data_version)
+    if cached_html is not None:
+        return HTMLResponse(cached_html, headers=headers)
+
+    html = _render_index_html(_build_index_context(data_version))
+    set_index_html_cache(data_version, html)
+    return HTMLResponse(
+        html,
+        headers=headers,
+    )
+
+
+@router.get("/api/meta/data-version", response_class=JSONResponse)
+def api_data_version():
+    """SW / クライアントが参照する最新データバージョン。"""
+    data_version = get_data_version()
+    return JSONResponse(
+        {"data_version": data_version},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "X-Twicome-Data-Version": data_version,
         },
     )
 
