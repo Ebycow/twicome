@@ -559,7 +559,7 @@ def user_comments_page(
             # Cursor-based pagination
             # If cursor is provided, show all comments from the VOD containing the cursor comment
             cursor_row = db.execute(
-                text("SELECT vod_id, body FROM comments WHERE comment_id = :cursor"),
+                text("SELECT vod_id, body, comment_created_at_utc, offset_seconds, twicome_likes_count, twicome_dislikes_count FROM comments WHERE comment_id = :cursor"),
                 {"cursor": cursor},
             ).mappings().first()
             if cursor_row:
@@ -574,17 +574,47 @@ def user_comments_page(
                     text("SELECT COUNT(*) AS cnt FROM comments c WHERE c.vod_id = :vod_id"),
                     {"vod_id": vod_id},
                 ).mappings().first()["cnt"]
-                # Find the position of the cursor comment in this VOD
-                cursor_pos = db.execute(
-                    text(f"""
-                        SELECT COUNT(*) AS pos
-                        FROM comments c
-                        LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-                        WHERE c.vod_id = :vod_id AND c.comment_id < :cursor
-                        {order_sql.replace('ORDER BY', 'ORDER BY c.comment_id DESC,')}
-                    """),
-                    {"vod_id": vod_id, "cursor": cursor},
-                ).mappings().first()["pos"]
+                # Find the position of the cursor comment based on actual sort order
+                c_created_at = cursor_row["comment_created_at_utc"]
+                c_offset = cursor_row["offset_seconds"]
+                c_likes = cursor_row["twicome_likes_count"] or 0
+                c_dislikes = cursor_row["twicome_dislikes_count"] or 0
+                if sort == "created_at":
+                    cursor_pos = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND (
+                                c.comment_created_at_utc > :c_created_at
+                                OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds > :c_offset)
+                            )
+                        """),
+                        {"vod_id": vod_id, "c_created_at": c_created_at, "c_offset": c_offset},
+                    ).mappings().first()["pos"]
+                elif sort == "likes":
+                    cursor_pos = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.twicome_likes_count > :c_likes
+                        """),
+                        {"vod_id": vod_id, "c_likes": c_likes},
+                    ).mappings().first()["pos"]
+                elif sort == "dislikes":
+                    cursor_pos = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.twicome_dislikes_count > :c_dislikes
+                        """),
+                        {"vod_id": vod_id, "c_dislikes": c_dislikes},
+                    ).mappings().first()["pos"]
+                else:
+                    # vod_time / その他: offset_seconds DESC
+                    cursor_pos = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.offset_seconds > :c_offset
+                        """),
+                        {"vod_id": vod_id, "c_offset": c_offset},
+                    ).mappings().first()["pos"]
             else:
                 # Cursor not found, fallback
                 cursor_pos = 0
@@ -795,12 +825,12 @@ def user_comments_api(
         if cursor:
             # Cursor-based pagination
             # If cursor is provided, show all comments from the VOD containing the cursor comment
-            cursor_vod_id = db.execute(
-                text("SELECT vod_id FROM comments WHERE comment_id = :cursor"),
+            cursor_row = db.execute(
+                text("SELECT vod_id, comment_created_at_utc, offset_seconds, twicome_likes_count, twicome_dislikes_count FROM comments WHERE comment_id = :cursor"),
                 {"cursor": cursor},
             ).mappings().first()
-            if cursor_vod_id:
-                vod_id = cursor_vod_id["vod_id"]
+            if cursor_row:
+                vod_id = cursor_row["vod_id"]
                 # Override filters to show all comments from this VOD
                 where_sql = "c.vod_id = :vod_id"
                 params = {"vod_id": vod_id}
@@ -809,33 +839,52 @@ def user_comments_api(
                     text("SELECT COUNT(*) AS cnt FROM comments c WHERE c.vod_id = :vod_id"),
                     {"vod_id": vod_id},
                 ).mappings().first()["cnt"]
-                # Find the position of the cursor comment in this VOD
-                cursor_pos = db.execute(
-                    text(f"""
-                        SELECT pos - 1 AS pos
-                        FROM (
-                            SELECT c.comment_id, ROW_NUMBER() OVER ({order_sql}) AS pos
-                            FROM comments c
-                            LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-                            WHERE c.vod_id = :vod_id
-                        ) ranked
-                        WHERE comment_id = :cursor
-                    """),
-                    {"vod_id": vod_id, "cursor": cursor},
-                ).mappings().first()
-
-                if cursor_pos:
-                    cursor_pos = cursor_pos["pos"]
-                    # Get half page_size before and after
-                    half = page_size // 2
-                    offset = max(0, cursor_pos - half)
-                    limit = page_size
-                    page = (offset // page_size) + 1  # For compatibility
+                # Find the position of the cursor comment based on actual sort order
+                c_created_at = cursor_row["comment_created_at_utc"]
+                c_offset = cursor_row["offset_seconds"]
+                c_likes = cursor_row["twicome_likes_count"] or 0
+                c_dislikes = cursor_row["twicome_dislikes_count"] or 0
+                if sort == "created_at":
+                    pos_row = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND (
+                                c.comment_created_at_utc > :c_created_at
+                                OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds > :c_offset)
+                            )
+                        """),
+                        {"vod_id": vod_id, "c_created_at": c_created_at, "c_offset": c_offset},
+                    ).mappings().first()
+                elif sort == "likes":
+                    pos_row = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.twicome_likes_count > :c_likes
+                        """),
+                        {"vod_id": vod_id, "c_likes": c_likes},
+                    ).mappings().first()
+                elif sort == "dislikes":
+                    pos_row = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.twicome_dislikes_count > :c_dislikes
+                        """),
+                        {"vod_id": vod_id, "c_dislikes": c_dislikes},
+                    ).mappings().first()
                 else:
-                    # Cursor not found, fallback
-                    offset = 0
-                    limit = page_size
-                    page = 1
+                    # vod_time / その他: offset_seconds DESC
+                    pos_row = db.execute(
+                        text("""
+                            SELECT COUNT(*) AS pos FROM comments c
+                            WHERE c.vod_id = :vod_id AND c.offset_seconds > :c_offset
+                        """),
+                        {"vod_id": vod_id, "c_offset": c_offset},
+                    ).mappings().first()
+                cursor_pos = pos_row["pos"] if pos_row else 0
+                half = page_size // 2
+                offset = max(0, cursor_pos - half)
+                limit = page_size
+                page = (offset // page_size) + 1  # For compatibility
             else:
                 # Cursor not found, fallback
                 offset = 0
