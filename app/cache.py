@@ -63,12 +63,41 @@ def set_comments_cache(login: str, comments: list) -> None:
         print(f"[cache] set_comments_cache error: {e}")
 
 
-def invalidate_comments_cache(login: str) -> None:
-    """指定ユーザのコメントキャッシュを削除する（バッチ後の無効化用）。"""
+def get_user_meta_cache(login: str) -> Optional[dict]:
+    """vod_options / owner_options のキャッシュを取得する。未ヒット時は None。"""
+    r = _get_redis()
+    if not r:
+        return None
+    try:
+        data = r.get(f"twicome:meta:{login}")
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        print(f"[cache] get_user_meta_cache error: {e}")
+    return None
+
+
+def set_user_meta_cache(login: str, meta: dict) -> None:
+    """vod_options / owner_options を Redis にキャッシュする。"""
     r = _get_redis()
     if not r:
         return
     try:
-        r.delete(f"twicome:comments:{login}")
+        r.setex(
+            f"twicome:meta:{login}",
+            COMMENTS_CACHE_TTL,
+            json.dumps(meta, default=str),
+        )
     except Exception as e:
-        print(f"[cache] invalidate_comments_cache error: {e}")
+        print(f"[cache] set_user_meta_cache error: {e}")
+
+
+def invalidate_user_cache(login: str) -> None:
+    """指定ユーザのコメント・メタキャッシュをまとめて削除する（バッチ後の無効化用）。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.delete(f"twicome:comments:{login}", f"twicome:meta:{login}")
+    except Exception as e:
+        print(f"[cache] invalidate_user_cache error: {e}")

@@ -8,11 +8,22 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import text
 
-from cache import get_comments_cache, set_comments_cache
+from cache import (
+    get_comments_cache,
+    get_user_meta_cache,
+    invalidate_user_cache,
+    set_comments_cache,
+    set_user_meta_cache,
+)
 from core.config import DEFAULT_LOGIN, DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
 from core.db import SessionLocal
 from core.templates import templates
-from services.comment_utils import _decorate_comment, _render_comment_body_html, _split_filter_terms
+from services.comment_utils import (
+    _decorate_comment,
+    _render_comment_body_html,
+    _split_filter_terms,
+    render_comment_body_html,
+)
 
 router = APIRouter()
 
@@ -142,7 +153,13 @@ def _load_all_comments(login: str, uid: int, db) -> Optional[list]:
 
     # キャッシュミス: DB から全件取得
     rows = db.execute(text(_FULL_COMMENTS_SQL), {"uid": uid}).mappings().all()
-    all_comments = [dict(r) for r in rows]
+    all_comments = []
+    for row in rows:
+        r = dict(row)
+        # body_html を事前レンダリングして raw_json を除去（キャッシュサイズ削減）
+        raw_json = r.pop("raw_json", None)
+        r["body_html"] = render_comment_body_html(raw_json, r.get("body"))
+        all_comments.append(r)
     set_comments_cache(login, all_comments)
     return all_comments
 
@@ -406,39 +423,45 @@ def user_comments_page(
             page = min(page, pages) if pages else 1
             offset = (page - 1) * page_size
             now = datetime.utcnow()
-            comments = [
-                _decorate_comment(r, now) for r in filtered[offset : offset + page_size]
-            ]
+            comments = []
+            for r in filtered[offset : offset + page_size]:
+                pre_html = r.get("body_html")  # キャッシュに事前レンダリング済み
+                decorated = _decorate_comment(r, now)
+                if pre_html:
+                    decorated["body_html"] = pre_html
+                comments.append(decorated)
 
-            # vod_options / owner_options は DB から取得（フィルタドロップダウン用）
-            vod_where_c = "c.commenter_user_id = :uid"
-            vod_params_c: dict = {"uid": uid}
-            if owner_user_id_int is not None:
-                vod_where_c += " AND v.owner_user_id = :owner_user_id"
-                vod_params_c["owner_user_id"] = owner_user_id_int
-            vod_options = db.execute(
-                text(f"""
+            # vod_options / owner_options をキャッシュから取得（なければ DB から取得して保存）
+            meta = get_user_meta_cache(login)
+            if meta is None:
+                vod_rows = db.execute(
+                    text("""
  SELECT v.vod_id, v.title, MAX(COALESCE(c.comment_created_at_utc, c.ingested_at)) AS last_commented_at
  FROM comments c
  JOIN vods v ON v.vod_id = c.vod_id
- WHERE {vod_where_c}
+ WHERE c.commenter_user_id = :uid
  GROUP BY v.vod_id, v.title
  ORDER BY last_commented_at DESC
  LIMIT 300
-                """),
-                vod_params_c,
-            ).mappings().all()
-            owner_options = db.execute(
-                text("""
+                    """),
+                    {"uid": uid},
+                ).mappings().all()
+                owner_rows = db.execute(
+                    text("""
  SELECT DISTINCT u.user_id, u.login, u.display_name
  FROM users u
  JOIN vods v ON v.owner_user_id = u.user_id
  JOIN comments c ON c.vod_id = v.vod_id
  WHERE c.commenter_user_id = :uid
  ORDER BY u.login
-                """),
-                {"uid": uid},
-            ).mappings().all()
+                    """),
+                    {"uid": uid},
+                ).mappings().all()
+                meta = {
+                    "vod_options": [dict(x) for x in vod_rows],
+                    "owner_options": [dict(x) for x in owner_rows],
+                }
+                set_user_meta_cache(login, meta)
 
             return templates.TemplateResponse(
                 "user_comments.html",
@@ -447,8 +470,8 @@ def user_comments_page(
                     "error": None,
                     "user": dict(user_row),
                     "comments": comments,
-                    "vod_options": [dict(x) for x in vod_options],
-                    "owner_options": [dict(x) for x in owner_options],
+                    "vod_options": meta["vod_options"],
+                    "owner_options": meta["owner_options"],
                     "page": page,
                     "pages": pages,
                     "total": total,
@@ -722,9 +745,13 @@ def user_comments_api(
             total = len(filtered)
             offset = (page - 1) * page_size
             now = datetime.utcnow()
-            comments = [
-                _decorate_comment(r, now) for r in filtered[offset : offset + page_size]
-            ]
+            comments = []
+            for r in filtered[offset : offset + page_size]:
+                pre_html = r.get("body_html")
+                decorated = _decorate_comment(r, now)
+                if pre_html:
+                    decorated["body_html"] = pre_html
+                comments.append(decorated)
             return {
                 "user": dict(user_row),
                 "total": total,

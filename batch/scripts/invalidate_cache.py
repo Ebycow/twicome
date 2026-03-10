@@ -40,6 +40,9 @@ except Exception as e:
     print(f"Redis 接続失敗（スキップ）: {e}")
     sys.exit(0)
 
-keys = [f"twicome:comments:{login}" for login in logins]
+keys = []
+for login in logins:
+    keys.append(f"twicome:comments:{login}")
+    keys.append(f"twicome:meta:{login}")
 deleted = r.delete(*keys)
-print(f"キャッシュ無効化完了: {deleted} キー削除 ({', '.join(logins)})")
+print(f"キャッシュ無効化完了: {deleted} キー削除 ({', '.join(keys)})")
