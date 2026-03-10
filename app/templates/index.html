@@ -635,7 +635,7 @@
             displayName: {{ (user.display_name or "") | tojson }},
             profileImageUrl: {{ (user.profile_image_url or "") | tojson }},
             commentCount: {{ user.comment_count }},
-            lastCommentAt: {{ (user.last_comment_at.isoformat() if user.last_comment_at else None) | tojson }},
+            lastCommentAt: {{ ((user.last_comment_at if user.last_comment_at is string else user.last_comment_at.isoformat()) if user.last_comment_at else None) | tojson }},
           },
         {% endfor %}
       ];

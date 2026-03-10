@@ -40,7 +40,7 @@ except Exception as e:
     print(f"Redis 接続失敗（スキップ）: {e}")
     sys.exit(0)
 
-keys = []
+keys = ["twicome:index"]
 for login in logins:
     keys.append(f"twicome:comments:{login}")
     keys.append(f"twicome:meta:{login}")

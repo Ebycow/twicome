@@ -1,6 +1,5 @@
 import math
 import random as _random
-import time
 from datetime import datetime
 from typing import Optional
 
@@ -10,9 +9,11 @@ from sqlalchemy import text
 
 from cache import (
     get_comments_cache,
+    get_index_cache,
     get_user_meta_cache,
     invalidate_user_cache,
     set_comments_cache,
+    set_index_cache,
     set_user_meta_cache,
 )
 from core.config import DEFAULT_LOGIN, DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
@@ -163,26 +164,10 @@ def _load_all_comments(login: str, uid: int, db) -> Optional[list]:
     set_comments_cache(login, all_comments)
     return all_comments
 
-# ホームページの重いクエリ結果をキャッシュ（ユーザー統計・ストリーマー一覧）
-_INDEX_CACHE: dict = {}
-_INDEX_CACHE_TTL = 60  # seconds
-
-
-def _get_index_cache() -> dict | None:
-    entry = _INDEX_CACHE.get("data")
-    if entry and time.monotonic() - _INDEX_CACHE.get("ts", 0) < _INDEX_CACHE_TTL:
-        return entry
-    return None
-
-
-def _set_index_cache(data: dict) -> None:
-    _INDEX_CACHE["data"] = data
-    _INDEX_CACHE["ts"] = time.monotonic()
-
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    # ユーザー統計・ストリーマー一覧は重いクエリのためキャッシュを使う
-    cached = _get_index_cache()
+    # ユーザー統計・ストリーマー一覧は重いクエリのため Redis キャッシュを使う
+    cached = get_index_cache()
     if cached:
         users = cached["users"]
         streamers = cached["streamers"]
@@ -190,7 +175,7 @@ def index(request: Request):
     else:
         quick_links_out = []
         with SessionLocal() as db:
-            users = db.execute(
+            users = [dict(row) for row in db.execute(
                 text(
                     """
                     SELECT
@@ -211,7 +196,7 @@ def index(request: Request):
                     ORDER BY u.login
                     """
                 )
-            ).mappings().all()
+            ).mappings().all()]
 
             if QUICK_LINK_LOGINS:
                 placeholders = ", ".join([f":login_{i}" for i in range(len(QUICK_LINK_LOGINS))])
@@ -241,7 +226,7 @@ def index(request: Request):
                     )
 
             # Streamer list for filter dropdown
-            streamers = db.execute(
+            streamers = [dict(row) for row in db.execute(
                 text("""
                     SELECT u.login, u.display_name
                     FROM users u
@@ -250,9 +235,9 @@ def index(request: Request):
                     GROUP BY u.user_id, u.login, u.display_name
                     ORDER BY u.login
                 """),
-            ).mappings().all()
+            ).mappings().all()]
 
-        _set_index_cache({"users": users, "streamers": streamers, "quick_links": quick_links_out})
+        set_index_cache({"users": users, "streamers": streamers, "quick_links": quick_links_out})
 
     user_logins = [row["login"] for row in users]
     if DEFAULT_LOGIN and DEFAULT_LOGIN in user_logins:

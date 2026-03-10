@@ -101,3 +101,43 @@ def invalidate_user_cache(login: str) -> None:
         r.delete(f"twicome:comments:{login}", f"twicome:meta:{login}")
     except Exception as e:
         print(f"[cache] invalidate_user_cache error: {e}")
+
+
+def get_index_cache() -> Optional[dict]:
+    """トップページの重いクエリ結果キャッシュを取得する。未ヒット時は None。"""
+    r = _get_redis()
+    if not r:
+        return None
+    try:
+        data = r.get("twicome:index")
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        print(f"[cache] get_index_cache error: {e}")
+    return None
+
+
+def set_index_cache(data: dict) -> None:
+    """トップページのクエリ結果を Redis にキャッシュする。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.setex(
+            "twicome:index",
+            COMMENTS_CACHE_TTL,
+            json.dumps(data, default=str),
+        )
+    except Exception as e:
+        print(f"[cache] set_index_cache error: {e}")
+
+
+def invalidate_index_cache() -> None:
+    """トップページキャッシュを削除する（バッチ後の無効化用）。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.delete("twicome:index")
+    except Exception as e:
+        print(f"[cache] invalidate_index_cache error: {e}")
