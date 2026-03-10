@@ -926,7 +926,7 @@
           loginSearchResults.hidden = false;
 
           try {
-            const res = await fetch(`/api/users/commenters?streamer=${encodeURIComponent(streamer)}`);
+            const res = await fetch(`{{ root_path }}/api/users/commenters?streamer=${encodeURIComponent(streamer)}`);
             const data = await res.json();
             streamerFilterSet = new Set(data.logins);
           } catch {
