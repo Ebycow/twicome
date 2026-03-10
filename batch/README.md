@@ -5,11 +5,14 @@
 - `batch/scripts/get_vod_list_batch.py`
 - `batch/scripts/batch_download_comments.py`
 - `batch/scripts/insertdb.py`
+- `batch/scripts/invalidate_cache.py`
+- `batch/scripts/prewarm_index_cache.py`
 - `batch/scripts/build_faiss_index.py`
 - `batch/scripts/generate_community_notes.py`
 
 `run_batch.sh` は `PROJECT_ROOT` を環境変数として渡すため、各スクリプトはカレントディレクトリに依存せず動作します。
 コメントJSONだけを一括投入したい場合は、リポジトリルートの `run_import_comments.sh` を使えます。
+`insertdb.py` の後には `invalidate_cache.py` と `prewarm_index_cache.py` が続き、トップページ HTML キャッシュを次のアクセス前に温めます。
 
 コメント取得に使う `TwitchDownloaderCLI` は `library/TwitchDownloaderCLI` を既定で参照します。
 別パスを使う場合は `TWITCH_DOWNLOADER_CLI` で上書きできます。
@@ -29,6 +32,10 @@
 - `COMMENTS_DIR` 既定値: `${BATCH_DATA_DIR}/comments`
 - `COMMUNITY_NOTE_BACKUP_DIR` 既定値: `${BATCH_DATA_DIR}/oldcommunitylog`
 - `LOG_DIR` 既定値: `${BATCH_DATA_DIR}/logs`
+- `APP_INTERNAL_BASE_URL` 既定値: `http://app:8000`
+- `INDEX_PREWARM_URL`:
+  - 未設定時は `APP_INTERNAL_BASE_URL + /` を使用
+  - 内部経路が特殊な場合だけ明示指定する
 
 例:
 
