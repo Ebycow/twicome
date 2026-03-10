@@ -421,12 +421,15 @@ def user_comments_page(
             if meta is None:
                 vod_rows = db.execute(
                     text("""
- SELECT v.vod_id, v.title, MAX(COALESCE(c.comment_created_at_utc, c.ingested_at)) AS last_commented_at
- FROM comments c
- JOIN vods v ON v.vod_id = c.vod_id
- WHERE c.commenter_user_id = :uid
- GROUP BY v.vod_id, v.title
- ORDER BY last_commented_at DESC
+ SELECT v.vod_id, v.title, sub.last_commented_at
+ FROM (
+     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
+     FROM comments c
+     WHERE c.commenter_user_id = :uid
+     GROUP BY c.vod_id
+ ) sub
+ JOIN vods v ON v.vod_id = sub.vod_id
+ ORDER BY sub.last_commented_at DESC
  LIMIT 300
                     """),
                     {"uid": uid},
@@ -478,23 +481,36 @@ def user_comments_page(
         # ── DB パス（非 QUICK_LINK、またはカーソルモード）──────────────────────
 
         # 2) vod filter options (そのユーザがコメントしたVODのみ、配信者フィルター適用)
-        vod_where = "c.commenter_user_id = :uid"
-        vod_params = {"uid": uid}
-        if owner_user_id_int is not None:
-            vod_where += " AND v.owner_user_id = :owner_user_id"
-            vod_params["owner_user_id"] = owner_user_id_int
-        vod_options = db.execute(
-            text(f"""
- SELECT v.vod_id, v.title, MAX(COALESCE(c.comment_created_at_utc, c.ingested_at)) AS last_commented_at
+        if owner_user_id_int is None:
+            # 最適化: サブクエリで comments を先に集計してカバリングインデックスを使用
+            vod_options = db.execute(
+                text("""
+ SELECT v.vod_id, v.title, sub.last_commented_at
+ FROM (
+     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
+     FROM comments c
+     WHERE c.commenter_user_id = :uid
+     GROUP BY c.vod_id
+ ) sub
+ JOIN vods v ON v.vod_id = sub.vod_id
+ ORDER BY sub.last_commented_at DESC
+ LIMIT 300
+                """),
+                {"uid": uid},
+            ).mappings().all()
+        else:
+            vod_options = db.execute(
+                text("""
+ SELECT v.vod_id, v.title, MAX(c.comment_created_at_utc) AS last_commented_at
  FROM comments c
  JOIN vods v ON v.vod_id = c.vod_id
- WHERE {vod_where}
+ WHERE c.commenter_user_id = :uid AND v.owner_user_id = :owner_user_id
  GROUP BY v.vod_id, v.title
  ORDER BY last_commented_at DESC
  LIMIT 300
-             """),
-            vod_params,
-        ).mappings().all()
+                """),
+                {"uid": uid, "owner_user_id": owner_user_id_int},
+            ).mappings().all()
 
         # 2.5) owner filter options (そのユーザがコメントしたVODのオーナーのみ)
         owner_options = db.execute(
@@ -550,8 +566,13 @@ def user_comments_page(
             order_sql = "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
 
         # 5) count
+        # community_notes は COUNT に不要。vods は owner_user_id フィルター時のみ必要
+        if owner_user_id_int is not None:
+            count_from = "FROM comments c JOIN vods v ON v.vod_id = c.vod_id"
+        else:
+            count_from = "FROM comments c"
         total = db.execute(
-            text(f"SELECT COUNT(*) AS cnt FROM comments c JOIN vods v ON v.vod_id = c.vod_id LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id WHERE {where_sql}"),
+            text(f"SELECT COUNT(*) AS cnt {count_from} WHERE {where_sql}"),
             params,
         ).mappings().first()["cnt"]
 
@@ -631,47 +652,62 @@ def user_comments_page(
             limit = page_size
 
         # 6) fetch page
-        rows = db.execute(
-            text(f"""
-                SELECT
-                    c.comment_id,
-                    c.vod_id,
-                    c.offset_seconds,
-                    c.comment_created_at_utc,
-                    c.commenter_login_snapshot,
-                    c.commenter_display_name_snapshot,
-                    c.body,
-                    c.raw_json,
-                    c.user_color,
-                    c.bits_spent,
-                    c.twicome_likes_count,
-                    c.twicome_dislikes_count,
-                    cn.note AS community_note_body,
-                    cn.eligible AS cn_eligible,
-                    cn.status AS cn_status,
-                    cn.verifiability AS cn_verifiability,
-                    cn.harm_risk AS cn_harm_risk,
-                    cn.exaggeration AS cn_exaggeration,
-                    cn.evidence_gap AS cn_evidence_gap,
-                    cn.subjectivity AS cn_subjectivity,
-                    cn.issues AS cn_issues,
-                    cn.ask AS cn_ask,
-                    v.title AS vod_title,
-                    v.url AS vod_url,
-                    v.youtube_url AS youtube_url,
+        # created_at ソートかつフィルターなしの場合: サブクエリで comments を先に LIMIT してから JOIN
+        # (idx_comments_user_created_sort を使って filesort を回避)
+        _col_list = """
+                    c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
+                    c.commenter_login_snapshot, c.commenter_display_name_snapshot,
+                    c.body, c.raw_json, c.user_color, c.bits_spent,
+                    c.twicome_likes_count, c.twicome_dislikes_count,
+                    cn.note AS community_note_body, cn.eligible AS cn_eligible,
+                    cn.status AS cn_status, cn.verifiability AS cn_verifiability,
+                    cn.harm_risk AS cn_harm_risk, cn.exaggeration AS cn_exaggeration,
+                    cn.evidence_gap AS cn_evidence_gap, cn.subjectivity AS cn_subjectivity,
+                    cn.issues AS cn_issues, cn.ask AS cn_ask,
+                    v.title AS vod_title, v.url AS vod_url, v.youtube_url AS youtube_url,
                     v.created_at_utc AS vod_created_at_utc,
-                    u.login AS owner_login,
-                    u.display_name AS owner_display_name
-                FROM comments c
-                JOIN vods v ON v.vod_id = c.vod_id
-                JOIN users u ON u.user_id = v.owner_user_id
-                LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-                WHERE {where_sql}
-                {order_sql}
-                LIMIT :limit OFFSET :offset
-            """),
-            {**params, "limit": limit, "offset": offset},
-        ).mappings().all()
+                    u.login AS owner_login, u.display_name AS owner_display_name"""
+        if (
+            sort == "created_at"
+            and vod_id_int is None
+            and owner_user_id_int is None
+            and not q
+            and not exclude_terms
+            and not cursor
+        ):
+            rows = db.execute(
+                text(f"""
+                    SELECT {_col_list}
+                    FROM (
+                        SELECT comment_id, vod_id, offset_seconds, comment_created_at_utc,
+                               commenter_login_snapshot, commenter_display_name_snapshot,
+                               body, raw_json, user_color, bits_spent,
+                               twicome_likes_count, twicome_dislikes_count
+                        FROM comments
+                        WHERE commenter_user_id = :uid
+                        ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC
+                        LIMIT :limit OFFSET :offset
+                    ) c
+                    JOIN vods v ON v.vod_id = c.vod_id
+                    JOIN users u ON u.user_id = v.owner_user_id
+                    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+                """),
+                {"uid": uid, "limit": limit, "offset": offset},
+            ).mappings().all()
+        else:
+            rows = db.execute(
+                text(f"""
+                    SELECT {_col_list}
+                    FROM comments c
+                    JOIN vods v ON v.vod_id = c.vod_id
+                    JOIN users u ON u.user_id = v.owner_user_id
+                    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+                    WHERE {where_sql}
+                    {order_sql}
+                    LIMIT :limit OFFSET :offset
+                """),
+                {**params, "limit": limit, "offset": offset},
+            ).mappings().all()
 
         now = datetime.utcnow()
         comments = [_decorate_comment(r, now) for r in rows]
@@ -817,8 +853,13 @@ def user_comments_api(
             order_sql = "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
 
         # 5) count
+        # community_notes は COUNT に不要。vods は owner_user_id フィルター時のみ必要
+        if owner_user_id_int is not None:
+            count_from = "FROM comments c JOIN vods v ON v.vod_id = c.vod_id"
+        else:
+            count_from = "FROM comments c"
         total = db.execute(
-            text(f"SELECT COUNT(*) AS cnt FROM comments c JOIN vods v ON v.vod_id = c.vod_id LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id WHERE {where_sql}"),
+            text(f"SELECT COUNT(*) AS cnt {count_from} WHERE {where_sql}"),
             params,
         ).mappings().first()["cnt"]
 
@@ -894,47 +935,60 @@ def user_comments_api(
             offset = (page - 1) * page_size
             limit = page_size
 
-        rows = db.execute(
-            text(f"""
-                SELECT
-                    c.comment_id,
-                    c.vod_id,
-                    c.offset_seconds,
-                    c.comment_created_at_utc,
-                    c.commenter_login_snapshot,
-                    c.commenter_display_name_snapshot,
-                    c.body,
-                    c.raw_json,
-                    c.user_color,
-                    c.bits_spent,
-                    c.twicome_likes_count,
-                    c.twicome_dislikes_count,
-                    cn.note AS community_note_body,
-                    cn.eligible AS cn_eligible,
-                    cn.status AS cn_status,
-                    cn.verifiability AS cn_verifiability,
-                    cn.harm_risk AS cn_harm_risk,
-                    cn.exaggeration AS cn_exaggeration,
-                    cn.evidence_gap AS cn_evidence_gap,
-                    cn.subjectivity AS cn_subjectivity,
-                    cn.issues AS cn_issues,
-                    cn.ask AS cn_ask,
-                    v.title AS vod_title,
-                    v.url AS vod_url,
-                    v.youtube_url AS youtube_url,
+        _col_list = """
+                    c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
+                    c.commenter_login_snapshot, c.commenter_display_name_snapshot,
+                    c.body, c.raw_json, c.user_color, c.bits_spent,
+                    c.twicome_likes_count, c.twicome_dislikes_count,
+                    cn.note AS community_note_body, cn.eligible AS cn_eligible,
+                    cn.status AS cn_status, cn.verifiability AS cn_verifiability,
+                    cn.harm_risk AS cn_harm_risk, cn.exaggeration AS cn_exaggeration,
+                    cn.evidence_gap AS cn_evidence_gap, cn.subjectivity AS cn_subjectivity,
+                    cn.issues AS cn_issues, cn.ask AS cn_ask,
+                    v.title AS vod_title, v.url AS vod_url, v.youtube_url AS youtube_url,
                     v.created_at_utc AS vod_created_at_utc,
-                    u.login AS owner_login,
-                    u.display_name AS owner_display_name
-                FROM comments c
-                JOIN vods v ON v.vod_id = c.vod_id
-                JOIN users u ON u.user_id = v.owner_user_id
-                LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-                WHERE {where_sql}
-                {order_sql}
-                LIMIT :limit OFFSET :offset
-            """),
-            {**params, "limit": limit, "offset": offset},
-        ).mappings().all()
+                    u.login AS owner_login, u.display_name AS owner_display_name"""
+        if (
+            sort == "created_at"
+            and vod_id_int is None
+            and owner_user_id_int is None
+            and not q
+            and not exclude_terms
+            and not cursor
+        ):
+            rows = db.execute(
+                text(f"""
+                    SELECT {_col_list}
+                    FROM (
+                        SELECT comment_id, vod_id, offset_seconds, comment_created_at_utc,
+                               commenter_login_snapshot, commenter_display_name_snapshot,
+                               body, raw_json, user_color, bits_spent,
+                               twicome_likes_count, twicome_dislikes_count
+                        FROM comments
+                        WHERE commenter_user_id = :uid
+                        ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC
+                        LIMIT :limit OFFSET :offset
+                    ) c
+                    JOIN vods v ON v.vod_id = c.vod_id
+                    JOIN users u ON u.user_id = v.owner_user_id
+                    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+                """),
+                {"uid": uid, "limit": limit, "offset": offset},
+            ).mappings().all()
+        else:
+            rows = db.execute(
+                text(f"""
+                    SELECT {_col_list}
+                    FROM comments c
+                    JOIN vods v ON v.vod_id = c.vod_id
+                    JOIN users u ON u.user_id = v.owner_user_id
+                    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+                    WHERE {where_sql}
+                    {order_sql}
+                    LIMIT :limit OFFSET :offset
+                """),
+                {**params, "limit": limit, "offset": offset},
+            ).mappings().all()
 
         now = datetime.utcnow()
         comments = [_decorate_comment(r, now) for r in rows]
