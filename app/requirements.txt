@@ -11,3 +11,4 @@ requests
 pandas
 python-dotenv
 scipy
+redis==5.0.8

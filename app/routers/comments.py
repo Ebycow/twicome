@@ -1,4 +1,5 @@
 import math
+import random as _random
 import time
 from datetime import datetime
 from typing import Optional
@@ -7,12 +8,143 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import text
 
+from cache import get_comments_cache, set_comments_cache
 from core.config import DEFAULT_LOGIN, DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
 from core.db import SessionLocal
 from core.templates import templates
 from services.comment_utils import _decorate_comment, _render_comment_body_html, _split_filter_terms
 
 router = APIRouter()
+
+# QUICK_LINK ユーザのコメント全件を取得する SQL（LIMIT なし）
+# owner_user_id / cn_created_at_utc はキャッシュ上でのフィルタ・ソートに使用
+_FULL_COMMENTS_SQL = """
+    SELECT
+        c.comment_id,
+        c.vod_id,
+        c.offset_seconds,
+        c.comment_created_at_utc,
+        c.commenter_login_snapshot,
+        c.commenter_display_name_snapshot,
+        c.body,
+        c.raw_json,
+        c.user_color,
+        c.bits_spent,
+        c.twicome_likes_count,
+        c.twicome_dislikes_count,
+        cn.note AS community_note_body,
+        cn.eligible AS cn_eligible,
+        cn.status AS cn_status,
+        cn.verifiability AS cn_verifiability,
+        cn.harm_risk AS cn_harm_risk,
+        cn.exaggeration AS cn_exaggeration,
+        cn.evidence_gap AS cn_evidence_gap,
+        cn.subjectivity AS cn_subjectivity,
+        cn.issues AS cn_issues,
+        cn.ask AS cn_ask,
+        cn.created_at_utc AS cn_created_at_utc,
+        v.title AS vod_title,
+        v.url AS vod_url,
+        v.youtube_url AS youtube_url,
+        v.created_at_utc AS vod_created_at_utc,
+        v.owner_user_id AS owner_user_id,
+        u.login AS owner_login,
+        u.display_name AS owner_display_name
+    FROM comments c
+    JOIN vods v ON v.vod_id = c.vod_id
+    JOIN users u ON u.user_id = v.owner_user_id
+    LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+    WHERE c.commenter_user_id = :uid
+    ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC
+"""
+
+# ソートキー関数（キャッシュ済みリストに対して Python 側でソート）
+_SORT_KEYS = {
+    "created_at": lambda c: (
+        c.get("comment_created_at_utc") or "",
+        c.get("vod_id") or 0,
+        c.get("offset_seconds") or 0,
+    ),
+    "likes": lambda c: (
+        c.get("twicome_likes_count") or 0,
+        c.get("vod_id") or 0,
+        c.get("offset_seconds") or 0,
+    ),
+    "dislikes": lambda c: (
+        c.get("twicome_dislikes_count") or 0,
+        c.get("vod_id") or 0,
+        c.get("offset_seconds") or 0,
+    ),
+    "community_note": lambda c: (
+        c.get("cn_created_at_utc") or "",
+        c.get("vod_id") or 0,
+        c.get("offset_seconds") or 0,
+    ),
+    "danger": lambda c: (
+        float(c.get("cn_harm_risk") or 0)
+        + float(c.get("cn_exaggeration") or 0)
+        + float(c.get("cn_evidence_gap") or 0)
+        + float(c.get("cn_subjectivity") or 0),
+        c.get("vod_id") or 0,
+        c.get("offset_seconds") or 0,
+    ),
+    # vod_time / その他（デフォルト）
+    "_default": lambda c: (c.get("vod_id") or 0, c.get("offset_seconds") or 0),
+}
+
+
+def _filter_and_sort_cached(
+    all_comments: list,
+    vod_id_int: Optional[int],
+    owner_user_id_int: Optional[int],
+    q: Optional[str],
+    exclude_terms: list,
+    sort: str,
+) -> list:
+    """キャッシュ済みコメントリストにフィルタ・ソートを Python 側で適用する。"""
+    result = all_comments
+
+    if vod_id_int is not None:
+        result = [c for c in result if c.get("vod_id") == vod_id_int]
+
+    if owner_user_id_int is not None:
+        result = [c for c in result if c.get("owner_user_id") == owner_user_id_int]
+
+    if q:
+        q_lower = q.lower()
+        result = [c for c in result if q_lower in (c.get("body") or "").lower()]
+
+    for term in exclude_terms:
+        t_lower = term.lower()
+        result = [c for c in result if t_lower not in (c.get("body") or "").lower()]
+
+    if sort == "random":
+        result = list(result)
+        _random.shuffle(result)
+    else:
+        key_fn = _SORT_KEYS.get(sort, _SORT_KEYS["_default"])
+        result = sorted(result, key=key_fn, reverse=True)
+
+    return result
+
+
+def _load_all_comments(login: str, uid: int, db) -> Optional[list]:
+    """QUICK_LINK ユーザのコメント全件をキャッシュから取得する。
+    キャッシュミス時は DB から取得してキャッシュに保存する。
+    QUICK_LINK 対象外の場合は None を返す。
+    """
+    if login not in QUICK_LINK_LOGINS:
+        return None
+
+    cached = get_comments_cache(login)
+    if cached is not None:
+        return cached
+
+    # キャッシュミス: DB から全件取得
+    rows = db.execute(text(_FULL_COMMENTS_SQL), {"uid": uid}).mappings().all()
+    all_comments = [dict(r) for r in rows]
+    set_comments_cache(login, all_comments)
+    return all_comments
 
 # ホームページの重いクエリ結果をキャッシュ（ユーザー統計・ストリーマー一覧）
 _INDEX_CACHE: dict = {}
@@ -263,6 +395,80 @@ def user_comments_page(
 
         uid = user_row["user_id"]
 
+        # ── キャッシュパス（QUICK_LINK ユーザ かつ カーソルなし）──────────────
+        all_comments = _load_all_comments(login, uid, db)
+        if all_comments is not None and not cursor:
+            filtered = _filter_and_sort_cached(
+                all_comments, vod_id_int, owner_user_id_int, q, exclude_terms, sort
+            )
+            total = len(filtered)
+            pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
+            page = min(page, pages) if pages else 1
+            offset = (page - 1) * page_size
+            now = datetime.utcnow()
+            comments = [
+                _decorate_comment(r, now) for r in filtered[offset : offset + page_size]
+            ]
+
+            # vod_options / owner_options は DB から取得（フィルタドロップダウン用）
+            vod_where_c = "c.commenter_user_id = :uid"
+            vod_params_c: dict = {"uid": uid}
+            if owner_user_id_int is not None:
+                vod_where_c += " AND v.owner_user_id = :owner_user_id"
+                vod_params_c["owner_user_id"] = owner_user_id_int
+            vod_options = db.execute(
+                text(f"""
+ SELECT v.vod_id, v.title, MAX(COALESCE(c.comment_created_at_utc, c.ingested_at)) AS last_commented_at
+ FROM comments c
+ JOIN vods v ON v.vod_id = c.vod_id
+ WHERE {vod_where_c}
+ GROUP BY v.vod_id, v.title
+ ORDER BY last_commented_at DESC
+ LIMIT 300
+                """),
+                vod_params_c,
+            ).mappings().all()
+            owner_options = db.execute(
+                text("""
+ SELECT DISTINCT u.user_id, u.login, u.display_name
+ FROM users u
+ JOIN vods v ON v.owner_user_id = u.user_id
+ JOIN comments c ON c.vod_id = v.vod_id
+ WHERE c.commenter_user_id = :uid
+ ORDER BY u.login
+                """),
+                {"uid": uid},
+            ).mappings().all()
+
+            return templates.TemplateResponse(
+                "user_comments.html",
+                {
+                    "request": request,
+                    "error": None,
+                    "user": dict(user_row),
+                    "comments": comments,
+                    "vod_options": [dict(x) for x in vod_options],
+                    "owner_options": [dict(x) for x in owner_options],
+                    "page": page,
+                    "pages": pages,
+                    "total": total,
+                    "filters": {
+                        "platform": platform,
+                        "vod_id": vod_id_int,
+                        "owner_user_id": owner_user_id_int,
+                        "q": q,
+                        "exclude_q": exclude_q,
+                        "page_size": page_size,
+                        "sort": sort,
+                        "cursor": None,
+                    },
+                    "root_path": request.scope.get("root_path", ""),
+                    "page_title": page_title,
+                    "faiss_enabled": FAISS_ENABLED,
+                },
+            )
+        # ── DB パス（非 QUICK_LINK、またはカーソルモード）──────────────────────
+
         # 2) vod filter options (そのユーザがコメントしたVODのみ、配信者フィルター適用)
         vod_where = "c.commenter_user_id = :uid"
         vod_params = {"uid": uid}
@@ -506,6 +712,27 @@ def user_comments_api(
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
         uid = user_row["user_id"]
+
+        # ── キャッシュパス（QUICK_LINK ユーザ かつ カーソルなし）──────────────
+        all_comments = _load_all_comments(login, uid, db)
+        if all_comments is not None and not cursor:
+            filtered = _filter_and_sort_cached(
+                all_comments, vod_id_int, owner_user_id_int, q, exclude_terms, sort
+            )
+            total = len(filtered)
+            offset = (page - 1) * page_size
+            now = datetime.utcnow()
+            comments = [
+                _decorate_comment(r, now) for r in filtered[offset : offset + page_size]
+            ]
+            return {
+                "user": dict(user_row),
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "items": comments,
+            }
+        # ── DB パス（非 QUICK_LINK、またはカーソルモード）──────────────────────
 
         # 3) build WHERE
         where = ["c.commenter_user_id = :uid"]

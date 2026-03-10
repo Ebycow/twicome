@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY main.py .
 COPY app_factory.py .
 COPY faiss_search.py .
+COPY cache.py .
 COPY core/ ./core/
 COPY services/ ./services/
 COPY routers/ ./routers/

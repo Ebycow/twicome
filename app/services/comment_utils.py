@@ -133,6 +133,12 @@ def decorate_comment(row, now):
     r["body_html"] = render_comment_body_html(raw_json, r.get("body"))
     offset_sec = int(r.get("offset_seconds") or 0)
     created_at = r.get("comment_created_at_utc")
+    # Redis キャッシュから復元した場合は文字列になるため datetime に変換する
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at)
+        except (ValueError, TypeError):
+            created_at = None
     comment_created_at_jst = None
     relative_time = None
     is_recent = False

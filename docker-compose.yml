@@ -34,6 +34,21 @@ services:
     networks:
       - backend
 
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    volumes:
+      - redis_honban_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
   faiss-api:
     profiles: [faiss]
     build:
@@ -72,6 +87,7 @@ services:
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       FAISS_API_URL: "http://faiss-api:8100"
+      REDIS_URL: "redis://redis:6379/0"
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
     volumes:
       # - ./app:/app
@@ -88,6 +104,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     networks:
       - backend
     dns:
@@ -111,6 +129,7 @@ services:
       APP_ENV: honban
       FAISS_API_URL: "http://faiss-api:8100"
       FAISS_CONFIG_PATH: /app/data/honban/faiss_config.json
+      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./data/honban:/app/data/honban
       - ./.env:/app/.env:ro
@@ -131,6 +150,7 @@ services:
 volumes:
   hf-cache:
   mysql8_honban_data:
+  redis_honban_data:
 
 networks:
   backend:
