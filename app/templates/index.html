@@ -1008,8 +1008,16 @@
       }
 
       function syncActionLinksFromInput() {
+        const currentValue = loginInput.value.trim();
+
         if (!usersLoaded) {
-          setActionLinkState(false);
+          // ユーザー一覧未取得時はフォームの値をそのまま信頼して楽観的に有効化
+          if (currentValue) {
+            setActionLinks(currentValue);
+            setActionLinkState(!offlineMode);
+          } else {
+            setActionLinkState(false);
+          }
           return;
         }
 
@@ -1118,20 +1126,6 @@
           void renderCandidates(loginInput.value);
         });
       }
-
-      window.addEventListener('load', () => {
-        if ('requestIdleCallback' in window) {
-          window.requestIdleCallback(() => {
-            void ensureUsersLoaded().catch(() => {});
-            refreshOfflineState();
-          }, { timeout: 2000 });
-        } else {
-          window.setTimeout(() => {
-            void ensureUsersLoaded().catch(() => {});
-            refreshOfflineState();
-          }, 1200);
-        }
-      });
 
       window.addEventListener('pageshow', () => {
         refreshOfflineState({ rerender: true });
