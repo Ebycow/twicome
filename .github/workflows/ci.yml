@@ -95,6 +95,7 @@ jobs:
             app/.coverage.unit
             app/test-reports/unit/junit.xml
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
 
   # ── マイグレーション確認 ────────────────────────────────────────────────────
@@ -221,6 +222,7 @@ jobs:
             app/.coverage.integration
             app/test-reports/integration/junit.xml
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
 
   # ── app-only カバレッジ集計とテストレポート収集 ─────────────────────────────
