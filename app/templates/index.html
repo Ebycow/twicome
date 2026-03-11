@@ -112,19 +112,54 @@
       .search-wrapper {
         position: relative;
       }
-      .search-input {
-        width: 100%;
-        padding: 12px 16px;
-        font-size: 1rem;
+      .search-input-row {
+        display: flex;
+        align-items: center;
         border: 2px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--bg-tertiary);
-        color: var(--text-primary);
         transition: border-color 0.2s;
+      }
+      .search-input-row:focus-within {
+        border-color: var(--accent);
+      }
+      .search-input {
+        flex: 1;
+        min-width: 0;
+        padding: 12px 8px 12px 16px;
+        font-size: 1rem;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .search-input::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+        display: none;
       }
       .search-input:focus {
         outline: none;
-        border-color: var(--accent);
+      }
+      .search-clear-btn {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 1rem;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .search-clear-btn:hover,
+      .search-clear-btn:active {
+        color: var(--text-primary);
       }
       .search-results {
         position: absolute;
@@ -474,6 +509,48 @@
         flex-shrink: 0;
       }
 
+      /* ─── PWA Banner (mobile only) ─── */
+      .pwa-banner {
+        display: none;
+      }
+      .pwa-banner-icon {
+        width: 56px; height: 56px;
+        border-radius: 14px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(145, 71, 255, 0.4);
+        overflow: hidden;
+      }
+      .pwa-banner-icon img {
+        width: 56px; height: 56px;
+        display: block;
+      }
+      .pwa-banner-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .pwa-banner-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .pwa-banner-sub {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 3px;
+        line-height: 1.5;
+      }
+      .pwa-banner--installable {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s;
+      }
+      .pwa-banner--installable:active {
+        opacity: 0.75;
+      }
+      .pwa-banner--installed .pwa-banner-title {
+        color: var(--text-muted);
+      }
+
       /* ─── Responsive ─── */
       @media (max-width: 600px) {
         .hero { padding: 36px 16px 32px; }
@@ -484,6 +561,16 @@
         .btn { justify-content: center; }
         .quick-links { grid-template-columns: 1fr; }
         .quick-link { min-width: unset; }
+        .pwa-banner {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          background: var(--bg-secondary);
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          padding: 16px 18px;
+          margin-top: 20px;
+        }
       }
     </style>
   </head>
@@ -527,17 +614,20 @@
 
           <label class="form-label" for="login-search">Twitch ユーザを検索（login / display_name）</label>
           <div class="search-wrapper" id="login-search-wrapper">
-            <input
-              id="login-search"
-              class="search-input"
-              type="search"
-              name="login"
-              value="{{ selected_login }}"
-              placeholder="login または display_name を入力して候補から選択"
-              autocomplete="off"
-              spellcheck="false"
-              required
-            />
+            <div class="search-input-row">
+              <input
+                id="login-search"
+                class="search-input"
+                type="search"
+                name="login"
+                value="{{ selected_login }}"
+                placeholder="login または display_name を入力して候補から選択"
+                autocomplete="off"
+                spellcheck="false"
+                required
+              />
+              <button type="button" id="login-search-clear" class="search-clear-btn" aria-label="検索をクリア">&#x2715;</button>
+            </div>
             <div id="login-search-results" class="search-results" role="listbox" hidden></div>
           </div>
           <div id="offline-status" class="offline-status" hidden></div>
@@ -581,6 +671,15 @@
         <p class="hint">例: /u/someone?platform=twitch でも直接アクセスできます。</p>
       </div>
 
+      <!-- PWA Banner (mobile only) -->
+      <div id="pwa-banner" class="pwa-banner" role="button" tabindex="0" aria-label="ホーム画面に追加">
+        <div class="pwa-banner-icon"><img src="{{ root_path }}/static/icons/apple-touch-icon-120x120.png" alt="ツイコメ アイコン"></div>
+        <div class="pwa-banner-body">
+          <div class="pwa-banner-title" id="pwa-banner-title">ホーム画面に追加してみよう！</div>
+          <div class="pwa-banner-sub" id="pwa-banner-sub">「共有」→「ホーム画面に追加」でアプリのように使えます</div>
+        </div>
+      </div>
+
       <!-- Ranking -->
       {% if popular_comments %}
       <div class="ranking-card">
@@ -612,7 +711,20 @@
       const loginInput = document.getElementById('login-search');
       const loginSearchWrapper = document.getElementById('login-search-wrapper');
       const loginSearchResults = document.getElementById('login-search-results');
+      const loginSearchClear = document.getElementById('login-search-clear');
       const offlineStatus = document.getElementById('offline-status');
+
+      function updateClearBtn() {
+        loginSearchClear.style.display = loginInput.value ? 'flex' : 'none';
+      }
+      updateClearBtn();
+      loginSearchClear.addEventListener('click', function() {
+        loginInput.value = '';
+        loginInput.focus();
+        void renderCandidates('');
+        syncActionLinksFromInput();
+        updateClearBtn();
+      });
       const statsLink = document.getElementById('stats-link');
       const quizLink = document.getElementById('quiz-link');
       const quickLinkElements = Array.from(document.querySelectorAll('.quick-link[data-prefetch-login]'));
@@ -1174,6 +1286,7 @@
         syncActionLinksFromInput();
         queueCommentPrefetch(login);
         hideCandidates();
+        updateClearBtn();
       }
 
       async function renderCandidates(input) {
@@ -1255,6 +1368,7 @@
         void renderCandidates(this.value);
         syncActionLinksFromInput();
         scheduleResolvedInputPrefetch();
+        updateClearBtn();
       });
 
       loginInput.addEventListener('keydown', function(event) {
@@ -1307,6 +1421,7 @@
           loginInput.value = '';
           loginInput.setCustomValidity('');
           setActionLinkState(false);
+          updateClearBtn();
 
           if (!streamer) {
             streamerFilterSet = null;
@@ -1376,6 +1491,61 @@
       syncActionLinksFromInput();
       primeInitialCommentPrefetches();
       void ensureUsersLoaded().catch(() => {});
+    </script>
+    <script>
+      (function() {
+        const banner = document.getElementById('pwa-banner');
+        const bannerTitle = document.getElementById('pwa-banner-title');
+        const bannerSub = document.getElementById('pwa-banner-sub');
+        if (!banner) return;
+
+        // すでにインストール済み (standalone) なら非表示
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+          banner.style.display = 'none';
+          return;
+        }
+
+        let deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          deferredPrompt = e;
+          // Android: タップでインストールダイアログを出せる状態に
+          banner.classList.add('pwa-banner--installable');
+          bannerSub.textContent = 'タップしてアプリをインストール';
+        });
+
+        banner.addEventListener('click', async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          banner.classList.remove('pwa-banner--installable');
+          if (outcome === 'accepted') {
+            banner.classList.add('pwa-banner--installed');
+            bannerTitle.textContent = 'インストールしました！';
+            bannerSub.textContent = 'ホーム画面からアプリのように起動できます';
+            banner.removeAttribute('role');
+            banner.removeAttribute('tabindex');
+          } else {
+            bannerSub.textContent = '「共有」→「ホーム画面に追加」でもインストールできます';
+          }
+        });
+
+        banner.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') banner.click();
+        });
+
+        window.addEventListener('appinstalled', () => {
+          deferredPrompt = null;
+          banner.classList.remove('pwa-banner--installable');
+          banner.classList.add('pwa-banner--installed');
+          bannerTitle.textContent = 'インストールしました！';
+          bannerSub.textContent = 'ホーム画面からアプリのように起動できます';
+          banner.removeAttribute('role');
+          banner.removeAttribute('tabindex');
+        });
+      })();
     </script>
     <script>
       if ('serviceWorker' in navigator) {

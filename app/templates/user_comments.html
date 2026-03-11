@@ -141,6 +141,44 @@
       }
       @media (max-width: 720px) {
         body { margin: 12px; }
+        .usage-toggle-btn { display: inline-block; }
+        #usage-content { display: none; }
+        #usage-content.open { display: block; }
+        #mobile-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        #side-drawer {
+          position: fixed; top: 0; left: 0;
+          width: min(88vw, 420px); height: 100dvh;
+          overflow-y: auto; overscroll-behavior: contain;
+          background: var(--bg-color); border-right: 1px solid var(--card-border);
+          transform: translateX(-100%); transition: transform 0.3s ease;
+          z-index: 300; padding: 16px; box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        #side-drawer.open { transform: translateX(0); }
+        #drawer-backdrop {
+          display: none; position: fixed; inset: 0;
+          background: rgba(0,0,0,0.5); z-index: 299;
+        }
+        #drawer-backdrop.open { display: block; }
+        #drawer-close-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .fab {
+          position: fixed; bottom: 20px;
+          width: 50px; height: 50px; border-radius: 50%; border: none;
+          font-size: 1.3rem; cursor: pointer; z-index: 200;
+          box-shadow: 0 3px 14px rgba(0,0,0,0.35);
+          display: flex; align-items: center; justify-content: center;
+          background: var(--button-bg); color: var(--button-text); padding: 0;
+        }
+        #fab-menu { left: 16px; }
+        #fab-top { right: 16px; }
+      }
+      @media (min-width: 721px) {
+        .usage-toggle-btn { display: none; }
+        #usage-content { display: block !important; }
+        #mobile-header { display: none; }
+        #side-drawer { display: contents; }
+        #drawer-backdrop { display: none !important; }
+        #drawer-close-row { display: none; }
+        .fab { display: none; }
       }
       .best9-bar { position:fixed; bottom:0; left:0; right:0; background:var(--card-bg); border-top:2px solid #4caf50; padding:12px 24px; z-index:100; flex-direction:column; gap:10px; }
       .best9-bar-controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; width:100%; }
@@ -162,28 +200,41 @@
     </style>
   </head>
   <body>
-    <div class="top">
+    <div id="mobile-header">
       <div>
-        <h1>{{ page_title }}</h1>
+        <strong>{{ page_title }}</strong>
         {% if user %}
-          <div class="meta">
-            {{ filters.platform }}/{{ user.login }}{% if user.display_name %}（{{ user.display_name }}）{% endif %}
-            · total {{ total }}
-          </div>
+          <span class="meta"> · {{ user.login }}{% if user.display_name %}（{{ user.display_name }}）{% endif %} · {{ total }}</span>
         {% endif %}
-      </div>
-      <div style="display:flex; gap:16px; align-items:center;">
-        {% if user %}
-          <button type="button" id="best9-toggle-btn" style="border:1px solid var(--pill-border); background:var(--button-bg); color:var(--button-text);">Best9モード</button>
-        {% endif %}
-        <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}">クイズで遊ぶ</a>
-        <a href="{{ root_path }}/manual">使い方ガイド</a>
-        <a href="{{ root_path }}/">← 検索に戻る</a>
       </div>
     </div>
-
-    <main>
-    <div style="margin:2rem;">
+    <div id="drawer-backdrop"></div>
+    <div id="side-drawer">
+      <div id="drawer-close-row">
+        <button type="button" id="drawer-close-btn">✕ 閉じる</button>
+      </div>
+      <div class="top">
+        <div>
+          <h1>{{ page_title }}</h1>
+          {% if user %}
+            <div class="meta">
+              {{ filters.platform }}/{{ user.login }}{% if user.display_name %}（{{ user.display_name }}）{% endif %}
+              · total {{ total }}
+            </div>
+          {% endif %}
+        </div>
+        <div style="display:flex; gap:16px; align-items:center;">
+          {% if user %}
+            <button type="button" id="best9-toggle-btn" style="border:1px solid var(--pill-border); background:var(--button-bg); color:var(--button-text);">Best9モード</button>
+          {% endif %}
+          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}">クイズで遊ぶ</a>
+          <a href="{{ root_path }}/manual">使い方ガイド</a>
+          <a href="{{ root_path }}/">← 検索に戻る</a>
+        </div>
+      </div>
+    <div style="margin:2rem 2rem 0;">
+      <button class="usage-toggle-btn" type="button" onclick="var c=document.getElementById('usage-content');c.classList.toggle('open');this.textContent=c.classList.contains('open')?'使い方 ▲':'使い方 ▼'" style="margin-bottom:8px;">使い方 ▼</button>
+      <div id="usage-content">
       使い方：<br>
       <ul>
 
@@ -191,6 +242,7 @@
       <li>コメント全体をクリックすると、コメントの個別ページに飛ぶことができ、URLで発言を共有したり、発言の前後関係を見ることができます。検索時のユーザはグレーで強調されます</li>
         <li>各コメントにリアクションをつけることができます。好きなだけつけて問題ありません。下にある「並び」でリアクションが大きい順に並び替えができます</li>
       </ul>
+      </div>
       </div>
 
     {% if error %}
@@ -340,6 +392,10 @@
       </div>
       {% endif %}
 
+    {% endif %}
+    </div><!-- end #side-drawer -->
+
+    {% if user %}
       <div id="load-prev" style="display:none; text-align:center; margin:16px;">
         <button id="load-prev-btn" style="width: 100%; max-width: 400px; padding: 12px; font-size: 16px;">前の投稿も読む</button>
       </div>
@@ -461,6 +517,9 @@
       </div>
     </div>
     {% endif %}
+
+    <button id="fab-menu" class="fab" aria-label="メニューを開く">☰</button>
+    <button id="fab-top" class="fab" aria-label="トップへ戻る">↑</button>
 
     <script type="application/json" id="filters-data">{{ filters | tojson }}</script>
     <script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
@@ -1415,8 +1474,37 @@
 
       emotionClearBtn.addEventListener('click', exitSpecialMode);
       {% endif %}
+
+      // -----------------------
+      // Mobile Drawer & FABs
+      // -----------------------
+      (function() {
+        const drawer = document.getElementById('side-drawer');
+        const backdrop = document.getElementById('drawer-backdrop');
+        const closeBtn = document.getElementById('drawer-close-btn');
+        const fabMenu = document.getElementById('fab-menu');
+        const fabTop = document.getElementById('fab-top');
+        if (!drawer) return;
+        function openDrawer() {
+          drawer.classList.add('open');
+          if (backdrop) backdrop.classList.add('open');
+          document.body.style.overflow = 'hidden';
+        }
+        function closeDrawer() {
+          drawer.classList.remove('open');
+          if (backdrop) backdrop.classList.remove('open');
+          document.body.style.overflow = '';
+        }
+        if (fabMenu) fabMenu.addEventListener('click', () => {
+          drawer.classList.contains('open') ? closeDrawer() : openDrawer();
+        });
+        if (backdrop) backdrop.addEventListener('click', closeDrawer);
+        if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+        if (fabTop) fabTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        const filterForm = document.querySelector('form');
+        if (filterForm) filterForm.addEventListener('submit', closeDrawer);
+      })();
     </script>
-    </main>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
