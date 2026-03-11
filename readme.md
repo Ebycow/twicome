@@ -354,6 +354,290 @@ TEST_DATABASE_URL="mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?cha
 - TwitchDownloaderCLI のサードパーティライセンス: `library/THIRD-PARTY-LICENSES.txt`
 - Python 依存関係: `app/requirements.txt`, `batch/requirements.txt`
 
+## キャッシュ戦略
+
+Redis（`REDIS_URL` 設定時のみ有効）を使った多段キャッシュで、頻繁にアクセスされるページの DB クエリを回避しています。Redis 未設定時はすべての操作が no-op になり、毎回 DB に直接アクセスします。
+
+### キャッシュの種類と役割
+
+| キャッシュ | Redis キー | 内容 | 対象 |
+|---|---|---|---|
+| トップ HTML | `twicome:index:html:{version}` | トップページのレンダリング済み HTML | 全ユーザ共通 |
+| トップ landing データ | `twicome:index:landing` | 人気コメント等の JSON データ | 全ユーザ共通 |
+| ユーザー一覧 | `twicome:index:users` | サジェスト用ユーザーリスト | 全ユーザ共通 |
+| コメントページ HTML | `twicome:comments:html:{version}:{platform}:{login}` | ユーザーコメントページの初期 HTML | 全ユーザ |
+| ユーザーメタ | `twicome:meta:{login}` | VOD 選択肢・配信者選択肢 | `QUICK_LINK_LOGINS` 設定ユーザのみ |
+
+TTL はいずれも `COMMENTS_CACHE_TTL`（デフォルト 14,400秒 = 4時間）です。
+
+### バージョンベースの自動無効化
+
+`data_version` はキャッシュキーに埋め込まれており、バッチ更新後に値が変わると古いキャッシュキーは自然に参照されなくなります（TTL 切れを待つだけで不整合が解消されます）。
+
+`data_version` の合成ルールは `{data_version}:{render_version}` です。
+
+- `data_version`: Redis に保存されたバッチ更新タイムスタンプ
+- `render_version`: `templates/` ・`static/sw.js` ・`routers/comments.py` のうち最も新しい mtime
+
+テンプレートやルーターを更新してデプロイすると `render_version` が変わり、コード変更を含むページが古いキャッシュで返ることを防ぎます。
+
+### コメントページ HTML キャッシュの適用条件
+
+コメントページの HTML は **初期表示リクエスト**（フィルタなし・page=1・page_size=50・sort=created_at・cursor なし）のみキャッシュされます。フィルタや並び替えを変えたリクエストは毎回 DB から取得します。
+
+### バッチ後のキャッシュ更新フロー
+
+```
+insertdb.py 完了
+  → invalidate_cache.py
+      - 古い HTML キャッシュを削除
+      - QUICK_LINK_LOGINS のメタキャッシュを削除
+      - data_version を現在時刻に更新
+  → prewarm_index_cache.py
+      - app の / に内部 GET を送信
+      - 新バージョンのトップ HTML を Redis に事前構築
+      - 次の実ユーザアクセス時はキャッシュヒットで即返却
+```
+
+`prewarm_index_cache.py` はバッチ完了直後にキャッシュを温めておくことで、バッチ直後のアクセスで DB への集中クエリが発生するのを防ぎます。
+
+### Redis 未使用時の動作
+
+`REDIS_URL` を設定しない場合、すべてのキャッシュ関数は no-op です。毎回 DB クエリが走るため、アクセス頻度が低い個人用途であれば Redis なしでも動作します。ただしバッチ直後のトップページ表示など重いクエリは毎回実行されます。
+
+### ブラウザ側の先読み（Service Worker Prefetch）
+
+サーバー側のキャッシュに加え、ブラウザの Service Worker（`static/sw.js`）がページ遷移前にコメントページ HTML を事前取得することで、クリックからページ表示までの待ち時間をほぼゼロにします。
+
+**先読みのトリガー（複数条件）:**
+
+| トリガー | タイミング | 対象 |
+|---|---|---|
+| ページロード時のアイドル処理 | `requestIdleCallback`（未対応環境は 150ms 後）| `QUICK_LINK_LOGINS` に設定された全ユーザ |
+| クイックリンクへのホバー | `pointerenter` イベント | ホバーしたユーザ |
+| クイックリンクへのフォーカス | `focus` イベント | フォーカスしたユーザ |
+| 入力フォームでユーザが解決した時 | `input` / `focus` イベント後に解決できた場合 | 入力値に一致したユーザ |
+| オンライン復帰時 | `online` イベント | `QUICK_LINK_LOGINS` に設定された全ユーザ |
+
+**Service Worker 側のキャッシュ戦略（リクエスト種別ごと）:**
+
+| リクエスト | 戦略 | 挙動 |
+|---|---|---|
+| トップページ (`/`) | キャッシュファースト + バックグラウンド再検証 | キャッシュを即返し、`data_version` が変わっていれば裏でフェッチして差し替え |
+| コメントページ (`/u/{login}`) | キャッシュファースト + バックグラウンド更新 | キャッシュを即返し、裏で最新版を取得してキャッシュを更新 |
+| ユーザー一覧 API | ネットワークファースト + キャッシュ保存 | 常にネットワーク取得し、失敗時はキャッシュ |
+| 静的ファイル / Twitch CDN 画像 | キャッシュファースト | オフラインでも表示 |
+| `/api/` 系 API | キャッシュなし | 常にネットワーク |
+
+**先読みの実行フロー（ページロード時）:**
+
+```
+トップページ表示
+  → Service Worker 登録
+  → requestIdleCallback でプリフェッチキューを積む
+  → Service Worker に twicome-prefetch-comments メッセージを送信
+  → SW が /u/{login} を fetch して Cache API に保存
+  → ユーザがリンクをクリック → Cache API ヒット → 即座に表示
+```
+
+Service Worker が利用できない環境では `server-warm-only` モードに自動フォールバックし（Redis 側のキャッシュのみ活用）、処理は中断しません。
+
+### PWA 対応
+
+`static/manifest.json` と Service Worker の組み合わせにより、モバイル・デスクトップ問わずホーム画面へのインストールが可能です。
+
+| 設定項目 | 値 |
+|---|---|
+| アプリ名 | ツイコメ / Twicome |
+| display | standalone（ブラウザ UI なし） |
+| theme_color | `#9147ff`（Twitch 紫） |
+| background_color | `#0e0e10`（Twitch 黒） |
+| アイコン | 36px〜512px（Android / iOS / Windows タイル用） |
+
+Service Worker の `install` イベントで `offline.html` とトップページを事前キャッシュするため、インストール直後からオフラインフォールバックが機能します。
+
+### オフラインアクセス
+
+一度アクセスしたページは Service Worker の Cache API に保存されるため、ネットワーク不通時でも閲覧できます。さらに「どのユーザのどのページを閲覧済みか」を `localStorage` に記録し、トップページの UI をオフライン状態に合わせて切り替えます。
+
+**訪問履歴の記録（`offline-access.js`）:**
+
+各ページを開くと `TwicomeOfflineAccess.markVisited()` が呼ばれ、ユーザー login とページ種別を `localStorage` に保存します。
+
+| ページ | 保存されるルート種別 |
+|---|---|
+| `/u/{login}` コメント一覧 | `comments` |
+| `/u/{login}/stats` 統計 | `stats` |
+| `/u/{login}/quiz` クイズ | `quiz` |
+
+保存先キー: `twicome:offline-accessible-routes:v1:{rootPath}`
+
+**オフライン時のトップページの挙動:**
+
+- `navigator.onLine === false` または `offline` イベントで `offlineMode = true` に切り替え
+- 入力フォームの候補を「閲覧済みユーザのみ」に絞り込む
+- 閲覧済みユーザ数を「オフライン中です。閲覧済みの N ユーザのみ候補に表示します。」と表示
+- オンライン復帰（`online` イベント）でステータス表示を消してフル候補に戻す
+
+**キャッシュ未ヒット時のフォールバック:**
+
+Cache API にもないページ（一度も開いていないページ）にオフラインでアクセスすると、`static/offline.html` が表示されます。
+
+### 投票カウントの遅延ロード
+
+コメントページ HTML にはいいね・わるいねの件数が含まれており、そのままではキャッシュしたHTMLの内容が古くなります。そこで初期 HTML にはカウントを `0` で埋め込んでキャッシュを有効にしておき、ページ表示後に `POST /api/comments/votes` で現在のカウントを一括取得して DOM を書き換えます。
+
+```
+キャッシュ済みHTML を即返却（カウントは0表示）
+  → DOMContentLoaded 後に /api/comments/votes へ POST（表示コメントIDを一括送信）
+  → 取得した実カウントで DOM を差し替え
+```
+
+これにより「HTML キャッシュは常に有効」かつ「投票数は常に最新」という両立を実現しています。
+
+## 大規模配信者データ取り込み時の考察
+
+### 現在の運用規模（2026年3月時点の実測値）
+
+| 指標 | 実測値 |
+|---|---|
+| 監視対象配信者数 | 31名 |
+| 総 VOD 数 | 1,317本 |
+| 総コメント数 | 約88万件 |
+| comments テーブル（data）| 1,812MB |
+| comments テーブル（index）| 730MB |
+| comments テーブル合計 | **約2.5GB** |
+| 1コメントあたり raw_json | 平均971バイト |
+| 1コメントあたり body | 平均42バイト |
+| 1コメントあたり body_html | 平均190バイト |
+
+**コンテナメモリ使用量（docker stats 実測）:**
+
+| コンテナ | 使用メモリ |
+|---|---|
+| app (FastAPI + Uvicorn) | 159MB |
+| faiss-api (モデル + インデックス含む) | 499MB |
+| db (MySQL 8.0) | 481MB |
+| redis | 15MB |
+
+### Twitch コメント量の目安
+
+配信規模によるコメント数の概算（8時間配信の場合）:
+
+| 同時視聴者数 | 1配信あたりコメント数 | 備考 |
+|---|---|---|
+| 〜500人 | 数千〜1万件 | 本システム監視対象の標準規模 |
+| 1,000〜5,000人 | 1〜5万件 | 中規模 |
+| 1万〜5万人 | 5〜30万件 | 大規模（国内有名配信者） |
+| 10万人以上 | 50万〜数百万件 | 超大規模（海外有名配信者） |
+
+現在の最多コメント保有ユーザは **90,533件**、最多 VOD 保有配信者は **220,228コメント / 118 VOD** です。
+
+### クエリ性能の実測（最多コメンター: 90,533件）
+
+| クエリ | 実測時間 | 判定 |
+|---|---|---|
+| 初期表示（サブクエリ最適化版）| **2ms** | ✅ 問題なし |
+| `COUNT(*)` 単純 | 42ms | ✅ 問題なし |
+| `COUNT(*)` + owner フィルタ | 50ms | ✅ 問題なし |
+| `ORDER BY RAND() LIMIT 1` | 61ms | ✅ 問題なし |
+| `COUNT(*) + LIKE '%草%'` | **2.4秒** | ⚠️ 遅い |
+
+テキスト検索（`LIKE '%q%'`）がボトルネックです。現状90,533件で2.4秒かかるため、コメント数が多い著名配信者のファン（コメント数が数十万件規模）を検索すると、体感できる遅延や HTTP タイムアウトが発生します。
+
+### FAISS インデックスの実測
+
+現在インデックス済みは1ユーザ（13,074件）のみです。
+
+| 指標 | 実測値 |
+|---|---|
+| インデックスファイルサイズ | 52MB / 13,074件（≈4KB/件） |
+| faiss-api 内部の検索レイテンシ | **3〜7ms** |
+
+ファイルサイズから外挿すると、コメント数とインデックスサイズの関係は以下の通りです。
+faiss-api は起動時にインデックスをすべてメモリに展開します。
+
+| コメント数 | インデックスファイルサイズ目安 | faiss-api 追加メモリ目安 |
+|---|---|---|
+| 1万件 | 約40MB | 約40MB |
+| 10万件 | 約400MB | 約400MB |
+| 50万件 | 約2GB | 約2GB |
+| 全ユーザ合計（現在の88万件規模）| 約3.5GB | 約3.5GB |
+
+現在の faiss-api は 499MB（うちモデルが約300MB 程度）で動作しています。インデックス済みユーザが増えるほどメモリ使用量は線形に増加します。
+
+検索レイテンシは `IndexFlatIP` の全件スキャンのため O(n) です。13,074件で 3〜7ms なので、件数が10倍になれば30〜70ms が目安です。
+
+### 有名配信者を追加した場合のシミュレーション
+
+例として「1万同接クラスの配信者を1名追加（1配信10万コメント × 30 VOD = 300万コメント）」を想定すると：
+
+| 影響 | 試算 |
+|---|---|
+| DB 追加容量 | 300万 × 971B ≈ 約3GB |
+| insertdb.py 処理時間（1 VOD 10万件）| 現状 1万件/分の処理速度と仮定すると約10分/VOD |
+| FAISS インデックスサイズ（300万件）| 約12GB（faiss-api に12GB以上の空きメモリが必要） |
+| LIKE テキスト検索レイテンシ | 90,533件で2.4秒 → 300万件で約80秒（タイムアウト） |
+
+この規模になると `LIKE '%q%'` 検索と FAISS の `IndexFlatIP` が現実的に使えなくなります。
+
+### 判断基準と測定方法
+
+定期的に以下を確認することで、限界に近づく前に対処できます。
+
+**DB の状況確認:**
+
+```sql
+-- テーブルサイズと行数
+SELECT table_name,
+  table_rows,
+  ROUND(data_length / 1024 / 1024, 1) AS data_MB,
+  ROUND(index_length / 1024 / 1024, 1) AS index_MB
+FROM information_schema.tables
+WHERE table_schema = 'appdb'
+ORDER BY (data_length + index_length) DESC;
+
+-- コメントが多いユーザー TOP10
+SELECT commenter_login_snapshot, COUNT(*) AS cnt
+FROM comments
+GROUP BY commenter_login_snapshot
+ORDER BY cnt DESC LIMIT 10;
+
+-- LIKE 検索の実測（対象ユーザの user_id を入れて計測）
+SET profiling = 1;
+SELECT COUNT(*) FROM comments
+WHERE commenter_user_id = <uid> AND body LIKE '%草%';
+SHOW PROFILES;
+```
+
+**FAISS の状況確認:**
+
+```bash
+# インデックスファイルサイズ
+docker compose exec faiss-api du -sh /app/data/faiss_data/
+
+# faiss-api のメモリ使用量
+docker stats --no-stream twicome-faiss-api-1
+```
+
+**対処のトリガー目安:**
+
+| 指標 | 閾値 | 対処 |
+|---|---|---|
+| LIKE テキスト検索 | > 3秒 | MySQL 全文検索（FULLTEXT INDEX）への移行を検討 |
+| FAISS 検索レイテンシ | > 200ms | `IndexIVFFlat` への移行を検討 |
+| faiss-api メモリ | > 利用可能 RAM の 60% | インデックス対象ユーザを絞るか、メモリ増強 |
+| comments テーブル合計 | > 20GB | `raw_json` カラムの削除または別テーブル分離を検討 |
+| insertdb.py（1 VOD）| > 4時間 | バッチ間隔の見直しまたは並列化を検討 |
+
+#### 有名配信者を追加する前のチェックリスト
+
+- [ ] 対象配信者の過去 VOD 本数と平均コメント数を事前に把握する
+- [ ] `raw_json` 容量影響をストレージ残量と比較する（1コメント≈1KB として試算）
+- [ ] 全 VOD の初回取り込みは `insertdb.py` を別途手動実行し、完了を確認してからバッチに組み込む
+- [ ] `build_faiss_index.py` 後に faiss-api のメモリ使用量が想定範囲内か `docker stats` で確認する
+- [ ] 追加後に対象コメンターへの LIKE 検索レイテンシを実測する
+
 ## 開発メモ
 
 このプロジェクトは、Kilo / Claude Code / Codex CLI を含む LLM を活用して開発されています。
