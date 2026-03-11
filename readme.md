@@ -270,7 +270,8 @@ docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
 docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration/test_html.py
 
 # カバレッジ付き
-docker compose -f docker-compose.dev.yml run --rm test pytest --cov=. --cov-report=term-missing
+docker compose -f docker-compose.dev.yml run --rm test \
+  pytest --cov=. --cov-config=.coveragerc --cov-report=term-missing
 ```
 
 `appdb_test` は `db` サービスの healthcheck 時に自動作成・権限付与されます。
@@ -296,9 +297,11 @@ TEST_DATABASE_URL="mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?cha
 
 `.github/workflows/ci.yml` で以下を自動実行します。
 
-1. `unit-test` ジョブ：DB 不要。`pytest tests/unit` を高速実行
-2. `migration` ジョブ：MySQL 起動後、`alembic upgrade head` でスキーマ適用
-3. `integration-test` ジョブ：`migration` 完了後、`pytest tests/integration` を実行
+1. `compile-check` ジョブ：全 Python ファイルを syntax compile して軽量な broken code detection を実行
+2. `unit-test` ジョブ：DB 不要。`pytest tests/unit` を JUnit XML / coverage data 付きで実行
+3. `migration` ジョブ：MySQL 起動後、`alembic upgrade head` でスキーマ適用
+4. `integration-test` ジョブ：`migration` 完了後、`pytest tests/integration` を JUnit XML / coverage data 付きで実行
+5. `coverage-summary` ジョブ：unit / integration の coverage data を結合し、app-only の `coverage.xml` と JUnit XML 群を artifact 化
 
 ## Web 画面
 
