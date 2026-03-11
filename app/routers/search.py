@@ -20,6 +20,13 @@ def _faiss_unavailable_response():
     )
 
 
+def _faiss_backend_error_response():
+    return JSONResponse(
+        {"error": "faiss_backend_unavailable", "message": "埋め込み検索バックエンドに接続できません"},
+        status_code=503,
+    )
+
+
 @router.get("/api/u/{login}/similar")
 def similar_search_api(
     login: str,
@@ -50,7 +57,10 @@ def similar_search_api(
             status_code=404,
         )
 
-    results = similar_search(login, q, top_k)
+    try:
+        results = similar_search(login, q, top_k)
+    except RuntimeError:
+        return _faiss_backend_error_response()
 
     if results is None:
         return JSONResponse(
@@ -194,7 +204,10 @@ def centroid_search_api(
     if not is_index_available(login):
         return JSONResponse({"error": "index_not_available"}, status_code=404)
 
-    results = centroid_search(login, position, top_k)
+    try:
+        results = centroid_search(login, position, top_k)
+    except RuntimeError:
+        return _faiss_backend_error_response()
     if results is None:
         return JSONResponse({"error": "index_not_available"}, status_code=404)
 
@@ -233,7 +246,10 @@ def emotion_search_api(
     if all(v == 0 for v in weights.values()):
         return {"user": dict(user_row), "weights": weights, "total": 0, "items": []}
 
-    results = emotion_search(login, weights, top_k)
+    try:
+        results = emotion_search(login, weights, top_k)
+    except RuntimeError:
+        return _faiss_backend_error_response()
     if results is None:
         return JSONResponse({"error": "index_not_available"}, status_code=404)
 

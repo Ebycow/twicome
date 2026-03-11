@@ -348,12 +348,16 @@ def comment_votes_api_post(payload: CommentVotesRequest):
 @router.post("/like/{comment_id}")
 def like_comment(comment_id: str, count: int = Query(1, ge=1, le=100)):
     with SessionLocal() as db:
-        vote_repo.increment_like(db, comment_id, count)
+        updated = vote_repo.increment_like(db, comment_id, count)
+    if not updated:
+        return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}
 
 
 @router.post("/dislike/{comment_id}")
 def dislike_comment(comment_id: str, count: int = Query(1, ge=1, le=100)):
     with SessionLocal() as db:
-        vote_repo.increment_dislike(db, comment_id, count)
+        updated = vote_repo.increment_dislike(db, comment_id, count)
+    if not updated:
+        return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}
