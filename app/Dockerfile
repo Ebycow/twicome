@@ -13,6 +13,7 @@ COPY faiss_search.py .
 COPY cache.py .
 COPY core/ ./core/
 COPY services/ ./services/
+COPY repositories/ ./repositories/
 COPY routers/ ./routers/
 COPY templates/ ./templates/
 COPY static/ ./static/

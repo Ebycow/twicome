@@ -31,6 +31,7 @@ def fetch_user_comment_page(
     login: str,
     platform: str,
     *,
+    user: Optional[dict] = None,
     vod_id: Optional[int] = None,
     owner_user_id: Optional[int] = None,
     q: Optional[str] = None,
@@ -45,9 +46,11 @@ def fetch_user_comment_page(
     ユーザーのコメント一覧ページデータを返す。
     user が存在しない場合は ValueError を raise する。
 
+    user を渡すと find_user クエリをスキップできる（ルーター側で取得済みの場合）。
     load_meta=True のとき vod_options / owner_options を取得する（HTML ページ用）。
     """
-    user = user_repo.find_user(db, login, platform)
+    if user is None:
+        user = user_repo.find_user(db, login, platform)
     if user is None:
         raise ValueError(f"ユーザが見つかりませんでした: {platform}/{login}")
 

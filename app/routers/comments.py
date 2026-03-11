@@ -150,6 +150,7 @@ def user_comments_page(
         try:
             page_data = fetch_user_comment_page(
                 db, login, platform,
+                user=user_row_raw,
                 vod_id=vod_id_int, owner_user_id=owner_user_id_int,
                 q=q, exclude_q=exclude_q, page=page, page_size=page_size,
                 sort=sort, cursor=cursor,

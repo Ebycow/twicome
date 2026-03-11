@@ -1121,6 +1121,7 @@
 
       updateOfflineStatus();
       syncActionLinksFromInput();
+      void ensureUsersLoaded().catch(() => {});
     </script>
     <script>
       if ('serviceWorker' in navigator) {
