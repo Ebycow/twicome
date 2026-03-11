@@ -22,6 +22,8 @@ from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo, vote_repo
 from services.comment_service import fetch_user_comment_page
+from services.rate_limit import InMemoryRateLimiter
+from services.vote_input import MAX_VOTE_BULK_IDS, normalize_comment_ids
 from services.index_service import build_index_context, build_landing_data
 
 router = APIRouter()
@@ -31,6 +33,9 @@ router = APIRouter()
 
 class CommentVotesRequest(BaseModel):
     comment_ids: list[str] = Field(default_factory=list)
+
+
+VOTE_RATE_LIMITER = InMemoryRateLimiter(limit=30, window_seconds=60)
 
 
 def _parse_int(value: Optional[str]) -> Optional[int]:
@@ -106,6 +111,23 @@ def _is_initial_comments_page_request(
         and not cursor
     )
 
+
+
+
+def _client_key(request: Request) -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return (request.client.host if request.client else "unknown").strip() or "unknown"
+
+
+def _check_vote_rate_limit(request: Request):
+    if VOTE_RATE_LIMITER.allow(_client_key(request)):
+        return None
+    return JSONResponse(
+        {"error": "rate_limited", "message": "Too many vote requests. Please retry later."},
+        status_code=429,
+    )
 
 def _build_user_comments_context(
     request: Request,
@@ -331,29 +353,51 @@ def user_comments_api(
 
 @router.get("/api/comments/votes")
 def comment_votes_api(comment_id: list[str] = Query(...)):
+    try:
+        normalized_ids = normalize_comment_ids(comment_id)
+    except ValueError:
+        return JSONResponse({"error": "too_many_comment_ids", "max": MAX_VOTE_BULK_IDS}, status_code=400)
+
     with SessionLocal() as db:
-        counts = comment_repo.fetch_comment_vote_counts(db, comment_id)
+        counts = comment_repo.fetch_comment_vote_counts(db, normalized_ids)
     return {"items": counts}
 
 
 @router.post("/api/comments/votes")
 def comment_votes_api_post(payload: CommentVotesRequest):
+    try:
+        normalized_ids = normalize_comment_ids(payload.comment_ids)
+    except ValueError:
+        return JSONResponse({"error": "too_many_comment_ids", "max": MAX_VOTE_BULK_IDS}, status_code=400)
+
     with SessionLocal() as db:
-        counts = comment_repo.fetch_comment_vote_counts(db, payload.comment_ids)
+        counts = comment_repo.fetch_comment_vote_counts(db, normalized_ids)
     return {"items": counts}
 
 
 # ── 投票 ──────────────────────────────────────────────────────────────────────
 
 @router.post("/like/{comment_id}")
-def like_comment(comment_id: str, count: int = Query(1, ge=1, le=100)):
+def like_comment(request: Request, comment_id: str, count: int = Query(1, ge=1, le=100)):
+    rate_limit_response = _check_vote_rate_limit(request)
+    if rate_limit_response is not None:
+        return rate_limit_response
+
     with SessionLocal() as db:
-        vote_repo.increment_like(db, comment_id, count)
+        updated = vote_repo.increment_like(db, comment_id, count)
+    if not updated:
+        return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}
 
 
 @router.post("/dislike/{comment_id}")
-def dislike_comment(comment_id: str, count: int = Query(1, ge=1, le=100)):
+def dislike_comment(request: Request, comment_id: str, count: int = Query(1, ge=1, le=100)):
+    rate_limit_response = _check_vote_rate_limit(request)
+    if rate_limit_response is not None:
+        return rate_limit_response
+
     with SessionLocal() as db:
-        vote_repo.increment_dislike(db, comment_id, count)
+        updated = vote_repo.increment_dislike(db, comment_id, count)
+    if not updated:
+        return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}

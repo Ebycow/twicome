@@ -9,6 +9,7 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 import requests
+from requests import RequestException
 
 FAISS_API_URL: str = os.getenv("FAISS_API_URL", "").strip().rstrip("/")
 _REQUEST_TIMEOUT = 30
@@ -60,15 +61,18 @@ def similar_search(login: str, query_text: str, top_k: int = 20) -> Optional[Lis
     """
     if not _is_enabled():
         return None
-    resp = requests.post(
-        f"{FAISS_API_URL}/search/similar/{login}",
-        json={"query": query_text, "top_k": top_k},
-        timeout=_REQUEST_TIMEOUT,
-    )
-    if resp.status_code == 404:
-        return None
-    resp.raise_for_status()
-    return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    try:
+        resp = requests.post(
+            f"{FAISS_API_URL}/search/similar/{login}",
+            json={"query": query_text, "top_k": top_k},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    except RequestException as e:
+        raise RuntimeError(f"faiss similar_search failed: {e}") from e
 
 
 def centroid_search(login: str, position: float, top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
@@ -78,15 +82,18 @@ def centroid_search(login: str, position: float, top_k: int = 50) -> Optional[Li
     """
     if not _is_enabled():
         return None
-    resp = requests.post(
-        f"{FAISS_API_URL}/search/centroid/{login}",
-        json={"position": position, "top_k": top_k},
-        timeout=_REQUEST_TIMEOUT,
-    )
-    if resp.status_code == 404:
-        return None
-    resp.raise_for_status()
-    return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    try:
+        resp = requests.post(
+            f"{FAISS_API_URL}/search/centroid/{login}",
+            json={"position": position, "top_k": top_k},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    except RequestException as e:
+        raise RuntimeError(f"faiss centroid_search failed: {e}") from e
 
 
 def emotion_search(login: str, weights: Dict[str, float], top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
@@ -97,12 +104,15 @@ def emotion_search(login: str, weights: Dict[str, float], top_k: int = 50) -> Op
     """
     if not _is_enabled():
         return None
-    resp = requests.post(
-        f"{FAISS_API_URL}/search/emotion/{login}",
-        json={"weights": weights, "top_k": top_k},
-        timeout=_REQUEST_TIMEOUT,
-    )
-    if resp.status_code == 404:
-        return None
-    resp.raise_for_status()
-    return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    try:
+        resp = requests.post(
+            f"{FAISS_API_URL}/search/emotion/{login}",
+            json={"weights": weights, "top_k": top_k},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return [(r["comment_id"], r["score"]) for r in resp.json()["results"]]
+    except RequestException as e:
+        raise RuntimeError(f"faiss emotion_search failed: {e}") from e
