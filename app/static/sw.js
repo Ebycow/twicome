@@ -1,4 +1,4 @@
-const CACHE_NAME = 'twicome-v9';
+const CACHE_NAME = 'twicome-v10';
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -16,6 +16,14 @@ function normalizePath(pathname) {
 
 function isTopPageNavigation(url, request) {
   return request.mode === 'navigate' && normalizePath(url.pathname) === normalizePath(TOP_PAGE_URL);
+}
+
+function isCommentsPageRequest(url) {
+  const path = normalizePath(url.pathname);
+  const commentsBase = normalizePath(`${BASE}/u`);
+  if (!path.startsWith(`${commentsBase}/`)) return false;
+  const remainder = path.slice(commentsBase.length + 1);
+  return Boolean(remainder) && !remainder.includes('/');
 }
 
 async function readTopPageVersion(cache) {
@@ -67,6 +75,36 @@ async function fetchAndCacheUsersIndex(cache, request) {
   if (response.ok) {
     await cache.put(USERS_INDEX_URL, response.clone());
   }
+  return response;
+}
+
+async function fetchAndCacheDocument(cache, request) {
+  const response = await fetch(request);
+  if (response.ok) {
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
+
+async function prefetchCommentsDocument(urlString) {
+  const url = new URL(urlString, self.location.origin);
+  if (url.origin !== self.location.origin || !isCommentsPageRequest(url)) {
+    throw new Error('invalid_prefetch_url');
+  }
+
+  const cache = await caches.open(CACHE_NAME);
+  const fetchRequest = new Request(url.toString(), {
+    headers: {
+      Accept: 'text/html',
+      'X-Twicome-Prefetch': '1',
+    },
+  });
+  const cacheRequest = new Request(url.toString());
+  const response = await fetch(fetchRequest);
+  if (!response.ok) {
+    throw new Error(`prefetch_failed:${response.status}`);
+  }
+  await cache.put(cacheRequest, response.clone());
   return response;
 }
 
@@ -136,6 +174,27 @@ self.addEventListener('activate', (event) => {
         keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type !== 'twicome-prefetch-comments' || !data.url) return;
+
+  const replyPort = event.ports && event.ports[0];
+  event.waitUntil(
+    prefetchCommentsDocument(data.url)
+      .then(() => {
+        if (replyPort) replyPort.postMessage({ ok: true });
+      })
+      .catch((error) => {
+        if (replyPort) {
+          replyPort.postMessage({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      })
   );
 });
 
@@ -214,6 +273,28 @@ self.addEventListener('fetch', (event) => {
           return await fetchAndCacheTopPage(cache, request);
         } catch {
           return offlineFallback(cache, request);
+        }
+      })
+    );
+    return;
+  }
+
+  if (request.method === 'GET' && isCommentsPageRequest(url)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(request);
+        if (cached) {
+          event.waitUntil(fetchAndCacheDocument(cache, request).catch(() => {}));
+          return cached;
+        }
+
+        try {
+          return await fetchAndCacheDocument(cache, request);
+        } catch {
+          if (request.mode === 'navigate') {
+            return offlineFallback(cache, request);
+          }
+          return new Response('', { status: 503, statusText: 'Offline' });
         }
       })
     );

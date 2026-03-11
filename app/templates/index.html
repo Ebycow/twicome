@@ -499,7 +499,7 @@
 
       <!-- Main Card -->
       <div class="main-card">
-        <form method="post" action="{{ root_path }}/go">
+        <form method="post" action="{{ root_path }}/go" data-default-login="{{ selected_login }}">
           <input type="hidden" name="platform" value="twitch">
 
           {% if streamers %}
@@ -553,7 +553,12 @@
         <!-- Quick Links -->
         <div class="quick-links">
           {% for quick_link in quick_links %}
-          <a class="quick-link" href="{{ root_path }}/u/{{ quick_link.login }}?platform={{ quick_link.platform }}">
+          <a
+            class="quick-link"
+            href="{{ root_path }}/u/{{ quick_link.login }}?platform={{ quick_link.platform }}"
+            data-prefetch-login="{{ quick_link.login }}"
+            data-prefetch-platform="{{ quick_link.platform }}"
+          >
             {% if quick_link.profile_image_url %}
             <img class="quick-link-icon" src="{{ quick_link.profile_image_url }}" alt="{{ quick_link.alt }}">
             {% else %}
@@ -610,12 +615,14 @@
       const offlineStatus = document.getElementById('offline-status');
       const statsLink = document.getElementById('stats-link');
       const quizLink = document.getElementById('quiz-link');
+      const quickLinkElements = Array.from(document.querySelectorAll('.quick-link[data-prefetch-login]'));
       const streamerFilter = document.getElementById('streamer-filter');
       const sortSelect = document.getElementById('sort-select');
       const form = loginInput.closest('form');
       const rootPath = {{ root_path | tojson }};
       const currentDataVersion = {{ data_version | tojson }};
       const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
+      const serviceWorkerUrl = `${rootPath}/sw.js`;
       const offlineAccess = window.TwicomeOfflineAccess || {
         createEmpty() {
           return {
@@ -642,6 +649,7 @@
       const statsPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__/stats`;
       const quizPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__/quiz`;
       const commentsPathTemplate = `${rootPath}/u/__LOGIN_PLACEHOLDER__`;
+      const commentPrefetchConcurrency = 2;
 
       let indexedUsers = [];
       let loginMap = new Map();
@@ -653,9 +661,238 @@
       let streamerFilterSet = null;
       let offlineMode = navigator.onLine === false;
       let offlineAccessibleRoutes = offlineAccess.read(rootPath);
+      let activeCommentPrefetchCount = 0;
+      let commentPrefetchFlushScheduled = false;
+      let resolvedInputPrefetchTimer = null;
+      const queuedCommentPrefetches = [];
+      const queuedCommentPrefetchKeys = new Set();
+      const prefetchedCommentPages = new Set();
+      const prefetchingCommentPages = new Set();
+      let commentsPrefetchTransportMode = 'direct-fetch';
+
+      function waitForServiceWorkerControl(timeoutMs = 3000) {
+        if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+        if (navigator.serviceWorker.controller) return Promise.resolve(true);
+
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = (controlled) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timerId);
+            navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+            resolve(controlled);
+          };
+          const onControllerChange = () => finish(Boolean(navigator.serviceWorker.controller));
+          const timerId = window.setTimeout(() => finish(Boolean(navigator.serviceWorker.controller)), timeoutMs);
+          navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+        });
+      }
+
+      const commentsPrefetchTransportReadyPromise = ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.register(serviceWorkerUrl, { scope: `${rootPath}/` })
+          .then(() => navigator.serviceWorker.ready)
+          .then(async () => {
+            const controlled = await waitForServiceWorkerControl();
+            commentsPrefetchTransportMode = controlled ? 'service-worker-cache' : 'server-warm-only';
+            return navigator.serviceWorker.ready;
+          })
+          .catch(() => {
+            commentsPrefetchTransportMode = 'direct-fetch';
+            return null;
+          })
+        : Promise.resolve(null);
 
       function pathForLogin(template, login) {
         return template.replace('__LOGIN_PLACEHOLDER__', encodeURIComponent(login));
+      }
+
+      function buildCommentsUrl(login, platform = 'twitch') {
+        return `${pathForLogin(commentsPathTemplate, login)}?platform=${encodeURIComponent(platform)}`;
+      }
+
+      function normalizePrefetchKey(login, platform = 'twitch') {
+        const normalizedLogin = String(login || '').trim().toLowerCase();
+        const normalizedPlatform = String(platform || 'twitch').trim().toLowerCase() || 'twitch';
+        if (!normalizedLogin) return '';
+        return `${normalizedPlatform}:${normalizedLogin}`;
+      }
+
+      function scheduleCommentPrefetchFlush() {
+        if (commentPrefetchFlushScheduled || offlineMode) return;
+        commentPrefetchFlushScheduled = true;
+        const run = () => {
+          commentPrefetchFlushScheduled = false;
+          flushCommentPrefetchQueue();
+        };
+        if ('requestIdleCallback' in window) {
+          window.requestIdleCallback(run, { timeout: 1200 });
+          return;
+        }
+        window.setTimeout(run, 150);
+      }
+
+      function prefetchCommentPageViaServiceWorker(url) {
+        return commentsPrefetchTransportReadyPromise.then((registration) => {
+          const worker = registration && (registration.active || registration.waiting || registration.installing);
+          if (!worker) {
+            throw new Error('service_worker_unavailable');
+          }
+
+          return new Promise((resolve, reject) => {
+            const channel = new MessageChannel();
+            const timerId = window.setTimeout(() => {
+              reject(new Error('service_worker_prefetch_timeout'));
+            }, 6000);
+
+            channel.port1.onmessage = (event) => {
+              window.clearTimeout(timerId);
+              const data = event.data || {};
+              if (data.ok) {
+                resolve(true);
+                return;
+              }
+              reject(new Error(data.error || 'service_worker_prefetch_failed'));
+            };
+
+            worker.postMessage({ type: 'twicome-prefetch-comments', url }, [channel.port2]);
+          });
+        });
+      }
+
+      async function prefetchCommentPage(login, platform = 'twitch') {
+        const key = normalizePrefetchKey(login, platform);
+        if (!key || offlineMode || prefetchedCommentPages.has(key) || prefetchingCommentPages.has(key)) return;
+
+        const url = buildCommentsUrl(login, platform);
+        prefetchingCommentPages.add(key);
+        try {
+          let usedServiceWorker = false;
+          try {
+            await prefetchCommentPageViaServiceWorker(url);
+            commentsPrefetchTransportMode = 'service-worker-message';
+            usedServiceWorker = true;
+          } catch (swError) {
+            const response = await fetch(url, {
+              credentials: 'same-origin',
+              headers: {
+                Accept: 'text/html',
+                'X-Twicome-Prefetch': '1',
+              },
+            });
+            if (!response.ok) throw new Error(`prefetch_failed:${response.status}`);
+            const responseForCache = response.clone();
+            await response.text();
+            commentsPrefetchTransportMode = 'direct-fetch';
+            if (window.location.hostname === 'localhost' || window.location.protocol === 'https:') {
+              try {
+                const cache = await caches.open('twicome-v10');
+                await cache.put(url, responseForCache);
+                commentsPrefetchTransportMode = 'window-cache-put';
+              } catch {}
+            }
+            if (swError) {
+              console.warn('Service worker prefetch fallback:', swError);
+            }
+          }
+          prefetchedCommentPages.add(key);
+          if (usedServiceWorker && !navigator.serviceWorker.controller) {
+            commentsPrefetchTransportMode = 'service-worker-message';
+          }
+        } catch (error) {
+          console.warn('Failed to prefetch comments page:', login, error);
+        } finally {
+          prefetchingCommentPages.delete(key);
+        }
+      }
+
+      async function flushCommentPrefetchQueue() {
+        if (offlineMode) return;
+
+        while (activeCommentPrefetchCount < commentPrefetchConcurrency && queuedCommentPrefetches.length) {
+          const next = queuedCommentPrefetches.shift();
+          if (!next) break;
+          queuedCommentPrefetchKeys.delete(next.key);
+          if (prefetchedCommentPages.has(next.key) || prefetchingCommentPages.has(next.key)) continue;
+
+          activeCommentPrefetchCount += 1;
+          prefetchCommentPage(next.login, next.platform)
+            .finally(() => {
+              activeCommentPrefetchCount = Math.max(0, activeCommentPrefetchCount - 1);
+              scheduleCommentPrefetchFlush();
+            });
+        }
+
+        if (queuedCommentPrefetches.length) {
+          scheduleCommentPrefetchFlush();
+        }
+      }
+
+      function queueCommentPrefetch(login, platform = 'twitch') {
+        const key = normalizePrefetchKey(login, platform);
+        if (!key || offlineMode) return;
+        if (
+          prefetchedCommentPages.has(key) ||
+          prefetchingCommentPages.has(key) ||
+          queuedCommentPrefetchKeys.has(key)
+        ) {
+          return;
+        }
+
+        queuedCommentPrefetches.push({ key, login, platform });
+        queuedCommentPrefetchKeys.add(key);
+        scheduleCommentPrefetchFlush();
+      }
+
+      window.__twicomeCommentPrefetch = {
+        getState() {
+          return {
+            activeCount: activeCommentPrefetchCount,
+            mode: commentsPrefetchTransportMode,
+            offlineMode,
+            prefetched: [...prefetchedCommentPages],
+            prefetching: [...prefetchingCommentPages],
+            queued: queuedCommentPrefetches.map((item) => item.key),
+            serviceWorkerControlled: Boolean('serviceWorker' in navigator && navigator.serviceWorker.controller),
+          };
+        },
+        queue(login, platform = 'twitch') {
+          queueCommentPrefetch(login, platform);
+        },
+      };
+
+      function scheduleResolvedInputPrefetch() {
+        if (resolvedInputPrefetchTimer) {
+          window.clearTimeout(resolvedInputPrefetchTimer);
+        }
+        if (offlineMode) return;
+
+        resolvedInputPrefetchTimer = window.setTimeout(async () => {
+          try {
+            await ensureUsersLoaded();
+          } catch {
+            return;
+          }
+
+          const resolved = resolveLogin(loginInput.value);
+          if (resolved) {
+            queueCommentPrefetch(resolved);
+          }
+        }, 250);
+      }
+
+      function primeInitialCommentPrefetches() {
+        const defaultLogin = form.dataset.defaultLogin || loginInput.value.trim();
+        if (defaultLogin) {
+          queueCommentPrefetch(defaultLogin);
+        }
+
+        for (const link of quickLinkElements) {
+          const login = link.dataset.prefetchLogin;
+          const platform = link.dataset.prefetchPlatform || 'twitch';
+          if (!login) continue;
+          queueCommentPrefetch(login, platform);
+        }
       }
 
       function setLinkState(link, enabled) {
@@ -758,6 +995,7 @@
             usersLoaded = true;
             updateOfflineStatus();
             syncActionLinksFromInput();
+            scheduleResolvedInputPrefetch();
             return indexedUsers;
           })
           .catch((error) => {
@@ -934,6 +1172,7 @@
         loginInput.setCustomValidity('');
         setActionLinks(login);
         syncActionLinksFromInput();
+        queueCommentPrefetch(login);
         hideCandidates();
       }
 
@@ -1008,12 +1247,14 @@
 
       loginInput.addEventListener('focus', function() {
         void renderCandidates(this.value);
+        scheduleResolvedInputPrefetch();
       });
 
       loginInput.addEventListener('input', function() {
         this.setCustomValidity('');
         void renderCandidates(this.value);
         syncActionLinksFromInput();
+        scheduleResolvedInputPrefetch();
       });
 
       loginInput.addEventListener('keydown', function(event) {
@@ -1040,7 +1281,7 @@
 
         const resolved = resolveLogin(loginInput.value);
         if (resolved) {
-          window.location.href = `${pathForLogin(commentsPathTemplate, resolved)}?platform=twitch`;
+          window.location.href = buildCommentsUrl(resolved);
           return;
         }
 
@@ -1096,6 +1337,16 @@
         });
       }
 
+      for (const link of quickLinkElements) {
+        const login = link.dataset.prefetchLogin;
+        const platform = link.dataset.prefetchPlatform || 'twitch';
+        if (!login) continue;
+
+        const triggerPrefetch = () => queueCommentPrefetch(login, platform);
+        link.addEventListener('pointerenter', triggerPrefetch, { passive: true });
+        link.addEventListener('focus', triggerPrefetch);
+      }
+
       window.addEventListener('pageshow', () => {
         refreshOfflineState({ rerender: true });
       });
@@ -1112,6 +1363,8 @@
       window.addEventListener('online', () => {
         offlineMode = false;
         refreshOfflineState({ rerender: true });
+        primeInitialCommentPrefetches();
+        scheduleResolvedInputPrefetch();
       });
 
       window.addEventListener('offline', () => {
@@ -1121,6 +1374,7 @@
 
       updateOfflineStatus();
       syncActionLinksFromInput();
+      primeInitialCommentPrefetches();
       void ensureUsersLoaded().catch(() => {});
     </script>
     <script>
@@ -1138,10 +1392,6 @@
           } catch {}
 
           window.location.reload();
-        });
-
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
         });
       }
     </script>

@@ -7,6 +7,7 @@ REDIS_URL が設定されていない場合はすべての操作が no-op にな
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
@@ -18,8 +19,39 @@ DATA_VERSION_KEY = "twicome:data_version"
 INDEX_LANDING_CACHE_KEY = "twicome:index:landing"
 INDEX_USERS_CACHE_KEY = "twicome:index:users"
 INDEX_HTML_CACHE_KEY_PREFIX = "twicome:index:html"
+COMMENTS_HTML_CACHE_KEY_PREFIX = "twicome:comments:html"
 
 _startup_data_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+
+
+def _compute_render_version() -> str:
+    explicit = os.getenv("APP_RENDER_VERSION", "").strip()
+    if explicit:
+        return explicit
+
+    app_dir = Path(__file__).resolve().parent
+    candidates = [
+        app_dir / "templates",
+        app_dir / "static" / "sw.js",
+        app_dir / "routers" / "comments.py",
+    ]
+    mtimes: list[int] = []
+    for candidate in candidates:
+        if candidate.is_dir():
+            mtimes.extend(
+                int(path.stat().st_mtime_ns)
+                for path in candidate.rglob("*")
+                if path.is_file()
+            )
+        elif candidate.exists():
+            mtimes.append(int(candidate.stat().st_mtime_ns))
+
+    if mtimes:
+        return str(max(mtimes))
+    return _startup_data_version
+
+
+_render_version = _compute_render_version()
 
 _redis_client = None
 
@@ -72,18 +104,20 @@ def set_user_meta_cache(login: str, meta: dict) -> None:
 
 
 def get_data_version() -> str:
-    """現在のデータバージョンを返す。Redis 未使用時は起動時刻ベース。"""
+    """現在の有効バージョンを返す。データ更新または描画コード更新で変わる。"""
     r = _get_redis()
+    base_version = _startup_data_version
     if not r:
-        return _startup_data_version
+        return f"{base_version}:{_render_version}"
     try:
         version = r.get(DATA_VERSION_KEY)
         if version:
-            return version
-        r.set(DATA_VERSION_KEY, _startup_data_version)
+            base_version = version
+        else:
+            r.set(DATA_VERSION_KEY, _startup_data_version)
     except Exception as e:
         print(f"[cache] get_data_version error: {e}")
-    return _startup_data_version
+    return f"{base_version}:{_render_version}"
 
 
 def set_data_version(version: str) -> str:
@@ -124,6 +158,39 @@ def set_index_html_cache(version: str, html: str) -> None:
         r.setex(key, COMMENTS_CACHE_TTL, html)
     except Exception as e:
         print(f"[cache] set_index_html_cache error: {e}")
+
+
+def _comments_html_cache_key(version: str, platform: str, login: str) -> str:
+    normalized_platform = str(platform or "").strip().lower() or "twitch"
+    normalized_login = str(login or "").strip().lower()
+    return f"{COMMENTS_HTML_CACHE_KEY_PREFIX}:{version}:{normalized_platform}:{normalized_login}"
+
+
+def get_comments_html_cache(version: str, platform: str, login: str) -> Optional[str]:
+    """データバージョンに紐づく初期コメントページ HTML キャッシュを取得する。"""
+    r = _get_redis()
+    if not r:
+        return None
+    key = _comments_html_cache_key(version, platform, login)
+    try:
+        data = r.get(key)
+        if data:
+            return data
+    except Exception as e:
+        print(f"[cache] get_comments_html_cache error: {e}")
+    return None
+
+
+def set_comments_html_cache(version: str, platform: str, login: str, html: str) -> None:
+    """データバージョンに紐づく初期コメントページ HTML キャッシュを保存する。"""
+    r = _get_redis()
+    if not r:
+        return
+    key = _comments_html_cache_key(version, platform, login)
+    try:
+        r.setex(key, COMMENTS_CACHE_TTL, html)
+    except Exception as e:
+        print(f"[cache] set_comments_html_cache error: {e}")
 
 
 def get_index_landing_cache() -> Optional[dict]:

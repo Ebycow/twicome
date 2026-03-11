@@ -4,11 +4,13 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from cache import (
+    get_comments_html_cache,
     get_data_version,
     get_index_html_cache,
     get_index_landing_cache,
     get_index_users_cache,
     get_user_meta_cache,
+    set_comments_html_cache,
     set_index_html_cache,
     set_index_landing_cache,
     set_index_users_cache,
@@ -59,6 +61,10 @@ def _render_index_html(context: dict) -> str:
     return templates.env.get_template("index.html").render(context)
 
 
+def _render_user_comments_html(context: dict) -> str:
+    return templates.env.get_template("user_comments.html").render(context)
+
+
 def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
     if login not in QUICK_LINK_LOGINS:
         return None
@@ -71,6 +77,60 @@ def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
     }
     set_user_meta_cache(login, meta)
     return meta
+
+
+def _is_initial_comments_page_request(
+    *,
+    vod_id: Optional[int],
+    owner_user_id: Optional[int],
+    q: Optional[str],
+    exclude_q: Optional[str],
+    page: int,
+    page_size: int,
+    sort: str,
+    cursor: Optional[str],
+) -> bool:
+    return (
+        vod_id is None
+        and owner_user_id is None
+        and not q
+        and not exclude_q
+        and page == 1
+        and page_size == 50
+        and sort == "created_at"
+        and not cursor
+    )
+
+
+def _build_user_comments_context(
+    request: Request,
+    *,
+    user: dict,
+    comments: list[dict],
+    vod_options: list[dict],
+    owner_options: list[dict],
+    page: int,
+    pages: int,
+    total: int,
+    page_title: str,
+    filters: dict,
+    error: Optional[str],
+) -> dict:
+    return {
+        "request": request,
+        "error": error,
+        "user": user,
+        "comments": comments,
+        "vod_options": vod_options,
+        "owner_options": owner_options,
+        "page": page,
+        "pages": pages,
+        "total": total,
+        "filters": filters,
+        "root_path": request.scope.get("root_path", ""),
+        "page_title": page_title,
+        "faiss_enabled": FAISS_ENABLED,
+    }
 
 
 # ── インデックスページ ────────────────────────────────────────────────────────
@@ -139,6 +199,23 @@ def user_comments_page(
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
+    data_version = get_data_version()
+    headers = {"X-Twicome-Data-Version": data_version, "Cache-Control": "no-store"}
+    can_use_initial_html_cache = _is_initial_comments_page_request(
+        vod_id=vod_id_int,
+        owner_user_id=owner_user_id_int,
+        q=q,
+        exclude_q=exclude_q,
+        page=page,
+        page_size=page_size,
+        sort=sort,
+        cursor=cursor,
+    )
+
+    if can_use_initial_html_cache:
+        cached_html = get_comments_html_cache(data_version, platform, login)
+        if cached_html is not None:
+            return HTMLResponse(cached_html, headers=headers)
 
     with SessionLocal() as db:
         user_row_raw = user_repo.find_user(db, login, platform)
@@ -159,24 +236,29 @@ def user_comments_page(
         except ValueError as e:
             return templates.TemplateResponse(
                 "user_comments.html",
-                {
-                    "request": request,
-                    "error": str(e),
-                    "user": {"login": login, "display_name": None},
-                    "comments": [],
-                    "vod_options": [],
-                    "owner_options": [],
-                    "page": page, "pages": 0, "total": 0,
-                    "page_title": "コメント一覧",
-                    "filters": {
-                        "platform": platform, "vod_id": vod_id_int,
-                        "owner_user_id": owner_user_id_int, "q": q,
-                        "exclude_q": exclude_q, "page_size": page_size, "sort": sort,
+                _build_user_comments_context(
+                    request,
+                    user={"login": login, "display_name": None},
+                    comments=[],
+                    vod_options=[],
+                    owner_options=[],
+                    page=page,
+                    pages=0,
+                    total=0,
+                    page_title="コメント一覧",
+                    filters={
+                        "platform": platform,
+                        "vod_id": vod_id_int,
+                        "owner_user_id": owner_user_id_int,
+                        "q": q,
+                        "exclude_q": exclude_q,
+                        "page_size": page_size,
+                        "sort": sort,
                     },
-                    "root_path": request.scope.get("root_path", ""),
-                    "faiss_enabled": FAISS_ENABLED,
-                },
+                    error=str(e),
+                ),
                 status_code=404,
+                headers=headers,
             )
 
     vod_options = (
@@ -184,25 +266,26 @@ def user_comments_page(
         else page_data.vod_options
     )
     owner_options = cached_meta["owner_options"] if cached_meta else page_data.owner_options
-
-    return templates.TemplateResponse(
-        "user_comments.html",
-        {
-            "request": request,
-            "error": None,
-            "user": page_data.user,
-            "comments": page_data.comments,
-            "vod_options": vod_options,
-            "owner_options": owner_options,
-            "page": page_data.page,
-            "pages": page_data.pages,
-            "total": page_data.total,
-            "filters": page_data.filters,
-            "root_path": request.scope.get("root_path", ""),
-            "page_title": page_data.page_title,
-            "faiss_enabled": FAISS_ENABLED,
-        },
+    context = _build_user_comments_context(
+        request,
+        user=page_data.user,
+        comments=page_data.comments,
+        vod_options=vod_options,
+        owner_options=owner_options,
+        page=page_data.page,
+        pages=page_data.pages,
+        total=page_data.total,
+        page_title=page_data.page_title,
+        filters=page_data.filters,
+        error=None,
     )
+
+    if can_use_initial_html_cache:
+        html = _render_user_comments_html(context)
+        set_comments_html_cache(data_version, platform, page_data.user["login"], html)
+        return HTMLResponse(html, headers=headers)
+
+    return templates.TemplateResponse("user_comments.html", context, headers=headers)
 
 
 @router.get("/api/u/{login}")

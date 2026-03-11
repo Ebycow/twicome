@@ -33,6 +33,15 @@ class TestIndex:
         assert resp.status_code == 200
         assert resp.json()["users"] == []
 
+    def test_index_embeds_default_login_prefetch_marker(self, client, monkeypatch):
+        import services.index_service as index_service
+
+        monkeypatch.setattr(index_service, "DEFAULT_LOGIN", "prefetch_target")
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert 'data-default-login="prefetch_target"' in resp.text
+
 
 class TestUserCommentsPage:
     def test_unknown_user_returns_404(self, client):
@@ -57,6 +66,58 @@ class TestUserCommentsPage:
                      commenter_login_snapshot="viewer", body="ユニークなコメント内容12345")
         resp = client.get("/u/viewer")
         assert "ユニークなコメント内容12345" in resp.text
+
+    def test_initial_comments_page_can_return_cached_html(self, client, monkeypatch):
+        import routers.comments as comments_router
+
+        monkeypatch.setattr(comments_router, "get_data_version", lambda: "20260311000000")
+        monkeypatch.setattr(
+            comments_router,
+            "get_comments_html_cache",
+            lambda version, platform, login: "<!doctype html><html><body>cached comments page</body></html>",
+        )
+
+        resp = client.get("/u/anyone")
+        assert resp.status_code == 200
+        assert "cached comments page" in resp.text
+        assert resp.headers["x-twicome-data-version"] == "20260311000000"
+
+    def test_initial_comments_page_populates_html_cache(self, client, db, monkeypatch):
+        import routers.comments as comments_router
+
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(
+            db,
+            comment_id="c1",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            body="初期キャッシュ確認",
+        )
+
+        saved = {}
+        monkeypatch.setattr(comments_router, "get_data_version", lambda: "20260311000001")
+        monkeypatch.setattr(comments_router, "get_comments_html_cache", lambda version, platform, login: None)
+        monkeypatch.setattr(
+            comments_router,
+            "set_comments_html_cache",
+            lambda version, platform, login, html: saved.update({
+                "version": version,
+                "platform": platform,
+                "login": login,
+                "html": html,
+            }),
+        )
+
+        resp = client.get("/u/viewer")
+        assert resp.status_code == 200
+        assert "初期キャッシュ確認" in resp.text
+        assert saved["version"] == "20260311000001"
+        assert saved["platform"] == "twitch"
+        assert saved["login"] == "viewer"
+        assert "初期キャッシュ確認" in saved["html"]
 
 
 class TestUserCommentsApi:

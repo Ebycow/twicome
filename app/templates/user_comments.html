@@ -175,9 +175,9 @@
         {% if user %}
           <button type="button" id="best9-toggle-btn" style="border:1px solid var(--pill-border); background:var(--button-bg); color:var(--button-text);">Best9モード</button>
         {% endif %}
-        <a href="{{ request.url_for('quiz_page', login=user.login) }}?platform={{ filters.platform }}">クイズで遊ぶ</a>
-        <a href="{{ request.url_for('manual_page') }}">使い方ガイド</a>
-        <a href="{{ request.url_for('index') }}">← 検索に戻る</a>
+        <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}">クイズで遊ぶ</a>
+        <a href="{{ root_path }}/manual">使い方ガイド</a>
+        <a href="{{ root_path }}/">← 検索に戻る</a>
       </div>
     </div>
 
@@ -199,7 +199,7 @@
     {% endif %}
 
     {% if user %}
-      <form class="card" style="margin-top:12px;" method="get" action="{{ request.url_for('user_comments_page', login=user.login) }}">
+      <form class="card" style="margin-top:12px;" method="get" action="{{ root_path }}/u/{{ user.login }}">
         <div class="section-title">フィルター</div>
         <input type="hidden" name="platform" value="{{ filters.platform }}" />
         <div class="filters">
