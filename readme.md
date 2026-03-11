@@ -236,13 +236,69 @@ docker compose exec db mysql -uappuser -p appdb
 COMPOSE_DATABASE_URL="mysql+pymysql://appuser:apppass@host.docker.internal:3306/appdb?charset=utf8mb4" docker compose up --build
 ```
 
-## CI
-<!-- 
+## テスト
+
+### テスト構成
+
+```
+app/tests/
+├── unit/
+│   └── test_comment_utils.py       # 純粋関数テスト（DB 不要・高速）
+└── integration/
+    ├── test_user_repo.py           # user_repo の SQL 検証
+    ├── test_comment_repo.py        # comment_repo の SQL 検証
+    ├── test_http.py                # API の契約テスト（ステータス・JSON 構造）
+    └── test_html.py                # HTML レンダリング・UI 構造テスト
+```
+
+テスト用 DB は `appdb_test`（本番・開発 DB とは別）を使います。
+統合テストは各テスト後に全テーブルを TRUNCATE するため、テスト間の干渉はありません。
+
+### Docker Compose でテストを実行する（推奨）
+
+```bash
+# 全テスト（unit + integration）
+docker compose -f docker-compose.dev.yml run --rm test
+
+# unit テストのみ（DB 不要、高速）
+docker compose -f docker-compose.dev.yml run --rm test pytest tests/unit
+
+# 統合テストのみ
+docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
+
+# HTML レンダリングテストのみ
+docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration/test_html.py
+
+# カバレッジ付き
+docker compose -f docker-compose.dev.yml run --rm test pytest --cov=. --cov-report=term-missing
+```
+
+`appdb_test` は `db` サービスの healthcheck 時に自動作成・権限付与されます。
+`db` サービスが起動済みであれば `test` サービスは即時実行できます。
+
+### ローカル（仮想環境）でテストを実行する
+
+外部 MySQL に `appdb_test` データベースと同等の権限を持つユーザーが存在する場合、
+ホストから直接実行できます。
+
+```bash
+cd app
+TEST_DATABASE_URL="mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?charset=utf8mb4" \
+  pytest tests/unit
+
+TEST_DATABASE_URL="mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?charset=utf8mb4" \
+  pytest tests/integration
+```
+
+`TEST_DATABASE_URL` 未設定時は `127.0.0.1:3306/appdb_test` がデフォルトで使われます。
+
+### CI
+
 `.github/workflows/ci.yml` で以下を自動実行します。
 
-1. MySQL 8 起動
-2. `alembic upgrade head`
-3. 必須テーブル（`users`, `vods`, `comments`, `community_notes`, `vod_ingest_markers`）の存在確認 -->
+1. `unit-test` ジョブ：DB 不要。`pytest tests/unit` を高速実行
+2. `migration` ジョブ：MySQL 起動後、`alembic upgrade head` でスキーマ適用
+3. `integration-test` ジョブ：`migration` 完了後、`pytest tests/integration` を実行
 
 ## Web 画面
 
