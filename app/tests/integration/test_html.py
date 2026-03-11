@@ -132,6 +132,45 @@ class TestFilterForm:
                          "community_note", "danger", "random"):
             assert expected in values, f"sort オプション '{expected}' が見つからない"
 
+    def test_owner_filtered_vod_options_loaded_even_when_quick_link_meta_cached(self, client, db, monkeypatch):
+        import routers.comments as comments_router
+
+        seed_user(db, user_id=1, login="streamer1", platform="twitch")
+        seed_user(db, user_id=2, login="streamer2", platform="twitch")
+        seed_user(db, user_id=3, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1, title="配信1")
+        seed_vod(db, vod_id=101, owner_user_id=2, title="配信2")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=3,
+                     commenter_login_snapshot="viewer")
+        seed_comment(db, comment_id="c2", vod_id=101, commenter_user_id=3,
+                     commenter_login_snapshot="viewer")
+
+        monkeypatch.setattr(comments_router, "QUICK_LINK_LOGINS", ["viewer"])
+        monkeypatch.setattr(
+            comments_router,
+            "get_user_meta_cache",
+            lambda login: {
+                "vod_options": [
+                    {"vod_id": 100, "title": "配信1"},
+                    {"vod_id": 101, "title": "配信2"},
+                ],
+                "owner_options": [
+                    {"user_id": 1, "login": "streamer1", "display_name": None},
+                    {"user_id": 2, "login": "streamer2", "display_name": None},
+                ],
+            },
+        )
+
+        soup = _soup(client.get("/u/viewer?owner_user_id=1"))
+        select = soup.find(id="select-vod")
+        option_values = [o.get("value") for o in select.find_all("option")]
+        option_texts = [o.get_text(strip=True) for o in select.find_all("option")]
+
+        assert "100" in option_values
+        assert "101" not in option_values
+        assert any("配信1" in text for text in option_texts)
+        assert all("配信2" not in text for text in option_texts)
+
 
 # ── コメントカード ────────────────────────────────────────────────────────────
 

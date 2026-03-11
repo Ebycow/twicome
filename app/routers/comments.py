@@ -143,6 +143,9 @@ def user_comments_page(
     with SessionLocal() as db:
         user_row_raw = user_repo.find_user(db, login, platform)
         cached_meta = _load_user_meta(login, user_row_raw["user_id"], db) if user_row_raw else None
+        # owner フィルター時の VOD 選択肢は owner ごとに絞り込む必要があるため、
+        # cached_meta があっても DB から再計算する。
+        should_load_meta = cached_meta is None or owner_user_id_int is not None
 
         try:
             page_data = fetch_user_comment_page(
@@ -150,7 +153,7 @@ def user_comments_page(
                 vod_id=vod_id_int, owner_user_id=owner_user_id_int,
                 q=q, exclude_q=exclude_q, page=page, page_size=page_size,
                 sort=sort, cursor=cursor,
-                load_meta=(cached_meta is None),
+                load_meta=should_load_meta,
             )
         except ValueError as e:
             return templates.TemplateResponse(
