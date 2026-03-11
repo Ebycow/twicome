@@ -1,0 +1,154 @@
+"""
+HTTP 統合テスト（FastAPI TestClient 経由）。
+エンドポイントの振る舞いをエンドツーエンドで確認する。
+"""
+import pytest
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
+
+class TestHealth:
+    def test_health_ok(self, client):
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+
+class TestIndex:
+    def test_index_returns_200(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+
+    def test_data_version_header(self, client):
+        resp = client.get("/")
+        assert "x-twicome-data-version" in resp.headers
+
+    def test_api_data_version(self, client):
+        resp = client.get("/api/meta/data-version")
+        assert resp.status_code == 200
+        assert "data_version" in resp.json()
+
+    def test_api_users_index_empty(self, client):
+        resp = client.get("/api/users/index")
+        assert resp.status_code == 200
+        assert resp.json()["users"] == []
+
+
+class TestUserCommentsPage:
+    def test_unknown_user_returns_404(self, client):
+        resp = client.get("/u/nobody")
+        assert resp.status_code == 404
+
+    def test_known_user_returns_200(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", body="こんにちは")
+        resp = client.get("/u/viewer")
+        assert resp.status_code == 200
+        assert "viewer" in resp.text
+
+    def test_comment_body_in_response(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", body="ユニークなコメント内容12345")
+        resp = client.get("/u/viewer")
+        assert "ユニークなコメント内容12345" in resp.text
+
+
+class TestUserCommentsApi:
+    def test_unknown_user_returns_404(self, client):
+        resp = client.get("/api/u/nobody")
+        assert resp.status_code == 404
+        assert resp.json()["error"] == "user_not_found"
+
+    def test_known_user_returns_comments(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", body="APIテスト")
+        resp = client.get("/api/u/viewer")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["body"] == "APIテスト"
+
+    def test_pagination(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(15):
+            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2,
+                         commenter_login_snapshot="viewer", body=f"コメント{i}",
+                         offset_seconds=i * 10)
+        resp = client.get("/api/u/viewer?page_size=10&page=1")
+        assert resp.status_code == 200
+        assert len(resp.json()["items"]) == 10
+        assert resp.json()["total"] == 15
+
+    def test_keyword_filter(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", body="hello world")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", body="goodbye")
+        resp = client.get("/api/u/viewer?q=hello")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+        assert resp.json()["items"][0]["body"] == "hello world"
+
+    def test_html_and_api_return_same_total(self, client, db):
+        """user_comments_page と user_comments_api が同じ total を返すことを確認。"""
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(7):
+            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2,
+                         commenter_login_snapshot="viewer", body=f"コメント{i}",
+                         offset_seconds=i * 10)
+        api_resp = client.get("/api/u/viewer")
+        assert api_resp.json()["total"] == 7
+
+
+class TestVoting:
+    def test_like_increments_count(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", likes=0)
+
+        resp = client.post("/like/c1", headers={"X-Requested-With": "XMLHttpRequest"})
+        assert resp.status_code == 200
+        assert resp.json()["added"] == 1
+
+        # API で確認
+        data = client.get("/api/u/viewer").json()
+        assert data["items"][0]["twicome_likes_count"] == 1
+
+    def test_dislike_increments_count(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="viewer", dislikes=0)
+
+        resp = client.post("/dislike/c1?count=3", headers={"X-Requested-With": "XMLHttpRequest"})
+        assert resp.status_code == 200
+        assert resp.json()["added"] == 3
+
+    def test_api_users_commenters(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="fan1", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
+                     commenter_login_snapshot="fan1")
+        resp = client.get("/api/users/commenters?streamer=streamer")
+        assert resp.status_code == 200
+        assert "fan1" in resp.json()["logins"]

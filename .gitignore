@@ -24,3 +24,7 @@ logs
 comments
 data/
 
+.coverage
+.coverage.*
+.ci-artifacts/
+test-reports/

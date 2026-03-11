@@ -75,8 +75,11 @@ EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 def normalize_emote_id(raw_emote_id) -> Optional[str]:
     if raw_emote_id is None:
         return None
-    emote_id = str(raw_emote_id).strip()
+    raw_value = str(raw_emote_id)
+    emote_id = raw_value.strip()
     if not emote_id:
+        return None
+    if raw_value != emote_id:
         return None
     if not EMOTE_ID_PATTERN.fullmatch(emote_id):
         return None
@@ -92,6 +95,26 @@ def parse_raw_comment(raw_json):
         return json.loads(raw_json)
     except Exception:
         return None
+
+
+def _sanitize_emote_text(text) -> str:
+    # Emote labels should stay plain text even if raw JSON is malformed or hostile.
+    return html.escape(re.sub(r"<[^>]*>", "", text or ""))
+
+
+def _normalize_utc_datetime(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return pytz.UTC.localize(value)
+    return value.astimezone(pytz.UTC)
 
 
 def render_comment_body_html(raw_json, fallback_body):
@@ -112,7 +135,7 @@ def render_comment_body_html(raw_json, fallback_body):
         emoticon = frag.get("emoticon") or {}
         emote_id = normalize_emote_id(emoticon.get("emoticon_id"))
         if emote_id:
-            escaped = html.escape(text)
+            escaped = _sanitize_emote_text(text)
             emote_id_url = quote(emote_id, safe="")
             url1 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="1.0"), quote=True)
             url2 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="2.0"), quote=True)
@@ -168,20 +191,15 @@ def decorate_comment(row, now):
     r.pop("raw_json", None)
     r.pop("body_html_version", None)
     offset_sec = int(r.get("offset_seconds") or 0)
-    created_at = r.get("comment_created_at_utc")
-    # Redis キャッシュから復元した場合は文字列になるため datetime に変換する
-    if isinstance(created_at, str):
-        try:
-            created_at = datetime.fromisoformat(created_at)
-        except (ValueError, TypeError):
-            created_at = None
+    created_at = _normalize_utc_datetime(r.get("comment_created_at_utc"))
+    now_utc = _normalize_utc_datetime(now) or pytz.UTC.localize(datetime.utcnow())
     comment_created_at_jst = None
     relative_time = None
     is_recent = False
     if created_at:
         jst_dt = utc_to_jst(created_at)
         comment_created_at_jst = jst_dt.strftime("%Y-%m-%d %H:%M:%S")
-        delta = now - created_at
+        delta = now_utc - created_at
         if delta.days == 0:
             hours = delta.seconds // 3600
             minutes = (delta.seconds % 3600) // 60
@@ -207,10 +225,7 @@ def decorate_comment(row, now):
     return r
 
 
-# Backward-compatible aliases to keep route logic unchanged during modularization.
-_split_filter_terms = split_filter_terms
-_parse_raw_comment = parse_raw_comment
-_render_comment_body_html = render_comment_body_html
+# Backward-compatible aliases for routers that still import the old helpers.
 _get_comment_body_html = get_comment_body_html
 _build_comment_body_select_sql = build_comment_body_select_sql
 _decorate_comment = decorate_comment
