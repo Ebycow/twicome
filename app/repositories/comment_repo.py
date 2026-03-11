@@ -213,6 +213,40 @@ def find_comment_by_id(db, comment_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
+def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
+    """コメント ID ごとの like / dislike 件数を返す。"""
+    normalized_ids: list[str] = []
+    seen: set[str] = set()
+    for comment_id in comment_ids:
+        value = str(comment_id or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        normalized_ids.append(value)
+
+    if not normalized_ids:
+        return {}
+
+    placeholders = ", ".join(f":comment_id_{idx}" for idx in range(len(normalized_ids)))
+    params = {f"comment_id_{idx}": comment_id for idx, comment_id in enumerate(normalized_ids)}
+    rows = db.execute(
+        text(f"""
+            SELECT comment_id, twicome_likes_count, twicome_dislikes_count
+            FROM comments
+            WHERE comment_id IN ({placeholders})
+        """),
+        params,
+    ).mappings().all()
+
+    return {
+        row["comment_id"]: {
+            "twicome_likes_count": int(row["twicome_likes_count"] or 0),
+            "twicome_dislikes_count": int(row["twicome_dislikes_count"] or 0),
+        }
+        for row in rows
+    }
+
+
 def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
     """
     指定ソート順でカーソルコメントより前にある行数を返す。

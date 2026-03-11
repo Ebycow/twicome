@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel, Field
 
 from cache import (
     get_comments_html_cache,
@@ -19,7 +20,7 @@ from cache import (
 from core.config import DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
 from core.db import SessionLocal
 from core.templates import templates
-from repositories import user_repo, vote_repo
+from repositories import comment_repo, user_repo, vote_repo
 from services.comment_service import fetch_user_comment_page
 from services.index_service import build_index_context, build_landing_data
 
@@ -27,6 +28,10 @@ router = APIRouter()
 
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
+
+class CommentVotesRequest(BaseModel):
+    comment_ids: list[str] = Field(default_factory=list)
+
 
 def _parse_int(value: Optional[str]) -> Optional[int]:
     if value and value.strip():
@@ -322,6 +327,20 @@ def user_comments_api(
         "page_size": page_size,
         "items": page_data.comments,
     }
+
+
+@router.get("/api/comments/votes")
+def comment_votes_api(comment_id: list[str] = Query(...)):
+    with SessionLocal() as db:
+        counts = comment_repo.fetch_comment_vote_counts(db, comment_id)
+    return {"items": counts}
+
+
+@router.post("/api/comments/votes")
+def comment_votes_api_post(payload: CommentVotesRequest):
+    with SessionLocal() as db:
+        counts = comment_repo.fetch_comment_vote_counts(db, payload.comment_ids)
+    return {"items": counts}
 
 
 # ── 投票 ──────────────────────────────────────────────────────────────────────

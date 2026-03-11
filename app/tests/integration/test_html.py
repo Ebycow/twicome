@@ -197,15 +197,19 @@ class TestCommentCards:
         soup = _soup(client.get("/u/viewer"))
         assert soup.find(id="test_comment_id_abc") is not None
 
-    def test_each_comment_has_two_vote_buttons(self, client, db):
-        """いいね・dislike ボタンが各カードに 2 つある。"""
+    def test_each_comment_has_zeroed_vote_buttons_before_hydration(self, client, db):
+        """初期 HTML は 0/0 の vote ボタンを描画し、後で実数に差し替える。"""
         _setup_viewer(db, n_comments=3)
         soup = _soup(client.get("/u/viewer?page_size=20"))
         cards = soup.find_all(class_="comment")
         for card in cards:
+            deferred = card.find(attrs={"data-vote-controls": "deferred"})
+            assert deferred is not None, f"comment #{card.get('id')} の deferred vote container が見つからない"
             vote_btns = card.find_all(class_="vote-btn")
             assert len(vote_btns) == 2, \
-                f"comment #{card.get('id')} の vote-btn が {len(vote_btns)} 個"
+                f"comment #{card.get('id')} の初期 HTML に vote-btn が {len(vote_btns)} 個ある"
+            assert vote_btns[0].get_text(strip=True) == "😂 0"
+            assert vote_btns[1].get_text(strip=True) == "❓ 0"
 
     def test_no_comments_shows_zero_cards(self, client, db):
         seed_user(db, user_id=1, login="streamer", platform="twitch")

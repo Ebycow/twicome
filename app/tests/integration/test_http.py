@@ -176,6 +176,24 @@ class TestUserCommentsApi:
         api_resp = client.get("/api/u/viewer")
         assert api_resp.json()["total"] == 7
 
+    def test_comment_votes_api_returns_counts(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(
+            db,
+            comment_id="c1",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            likes=4,
+            dislikes=2,
+        )
+        resp = client.post("/api/comments/votes", json={"comment_ids": ["c1"]})
+        assert resp.status_code == 200
+        assert resp.json()["items"]["c1"]["twicome_likes_count"] == 4
+        assert resp.json()["items"]["c1"]["twicome_dislikes_count"] == 2
+
 
 class TestVoting:
     def test_like_increments_count(self, client, db):
