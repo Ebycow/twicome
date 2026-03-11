@@ -194,6 +194,19 @@
         font-size: 0.82rem;
         color: var(--text-muted);
       }
+      .offline-status {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px solid rgba(245, 166, 35, 0.28);
+        border-radius: var(--radius-sm);
+        background: rgba(245, 166, 35, 0.12);
+        color: var(--text-secondary);
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+      .offline-status[hidden] {
+        display: none;
+      }
 
       /* ─── Buttons ─── */
       .actions {
@@ -558,6 +571,7 @@
             />
             <div id="login-search-results" class="search-results" role="listbox" hidden></div>
           </div>
+          <div id="offline-status" class="offline-status" hidden></div>
 
           <div class="actions">
             <button class="btn btn-primary" type="submit">&#9654; コメント一覧を表示</button>
@@ -619,10 +633,12 @@
 
     </div>
 
+    <script src="{{ root_path }}/static/offline-access.js"></script>
     <script>
       const loginInput = document.getElementById('login-search');
       const loginSearchWrapper = document.getElementById('login-search-wrapper');
       const loginSearchResults = document.getElementById('login-search-results');
+      const offlineStatus = document.getElementById('offline-status');
       const statsLink = document.getElementById('stats-link');
       const quizLink = document.getElementById('quiz-link');
       const streamerFilter = document.getElementById('streamer-filter');
@@ -631,6 +647,26 @@
       const rootPath = {{ root_path | tojson }};
       const currentDataVersion = {{ data_version | tojson }};
       const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
+      const offlineAccess = window.TwicomeOfflineAccess || {
+        createEmpty() {
+          return {
+            comments: new Set(),
+            stats: new Set(),
+            quiz: new Set(),
+          };
+        },
+        getStorageKey() {
+          return null;
+        },
+        isAccessible(routes, route, login) {
+          const normalized = String(login || '').trim().toLowerCase();
+          return Boolean(routes && routes[route] && normalized && routes[route].has(normalized));
+        },
+        read() {
+          return this.createEmpty();
+        },
+      };
+      const offlineAccessStorageKey = offlineAccess.getStorageKey(rootPath);
 
       const maxCandidates = 25;
       const usersIndexUrl = `${rootPath}/api/users/index`;
@@ -646,9 +682,15 @@
       let currentSort = 'login';
       // null = フィルターなし, Set = 絞り込み済み, 'loading' = 取得中
       let streamerFilterSet = null;
+      let offlineMode = navigator.onLine === false;
+      let offlineAccessibleRoutes = offlineAccess.read(rootPath);
 
       function pathForLogin(template, login) {
         return template.replace('__LOGIN_PLACEHOLDER__', encodeURIComponent(login));
+      }
+
+      function setLinkState(link, enabled) {
+        link.setAttribute('aria-disabled', String(!enabled));
       }
 
       function setActionLinkState(enabled) {
@@ -665,6 +707,48 @@
       function showCandidateMessage(message) {
         loginSearchResults.innerHTML = `<div class="search-empty">${message}</div>`;
         loginSearchResults.hidden = false;
+      }
+
+      function refreshOfflineAccessibleRoutes() {
+        offlineAccessibleRoutes = offlineAccess.read(rootPath);
+      }
+
+      function hasOfflineRouteAccess(route, login) {
+        if (!offlineMode) return true;
+        return offlineAccess.isAccessible(offlineAccessibleRoutes, route, login);
+      }
+
+      function countOfflineCommentUsers() {
+        if (!usersLoaded) return offlineAccessibleRoutes.comments.size;
+        let count = 0;
+        for (const user of indexedUsers) {
+          if (hasOfflineRouteAccess('comments', user.login)) count += 1;
+        }
+        return count;
+      }
+
+      function updateOfflineStatus() {
+        if (!offlineMode) {
+          offlineStatus.hidden = true;
+          return;
+        }
+
+        const count = countOfflineCommentUsers();
+        if (count > 0) {
+          offlineStatus.textContent = `オフライン中です。閲覧済みの ${count} ユーザのみ候補に表示します。`;
+        } else {
+          offlineStatus.textContent = 'オフライン中です。閲覧済みユーザがまだ見つからないため、候補は表示できません。';
+        }
+        offlineStatus.hidden = false;
+      }
+
+      function refreshOfflineState({ rerender = false } = {}) {
+        refreshOfflineAccessibleRoutes();
+        updateOfflineStatus();
+        syncActionLinksFromInput();
+        if (rerender && !loginSearchResults.hidden) {
+          void renderCandidates(loginInput.value);
+        }
       }
 
       function hydrateUsers(rawUsers) {
@@ -703,6 +787,7 @@
             const data = await response.json();
             hydrateUsers(data.users || []);
             usersLoaded = true;
+            updateOfflineStatus();
             syncActionLinksFromInput();
             return indexedUsers;
           })
@@ -740,8 +825,8 @@
         const normalized = input.trim().toLowerCase();
         if (!normalized) return '';
         const loginMatch = loginMap.get(normalized);
-        if (loginMatch) return loginMatch;
-        const displayMatches = displayMap.get(normalized) || [];
+        if (loginMatch && hasOfflineRouteAccess('comments', loginMatch)) return loginMatch;
+        const displayMatches = (displayMap.get(normalized) || []).filter((login) => hasOfflineRouteAccess('comments', login));
         if (displayMatches.length === 1) return displayMatches[0];
         return '';
       }
@@ -749,7 +834,12 @@
       function applyStreamerFilter(users) {
         if (streamerFilterSet === null) return users;
         if (streamerFilterSet === 'loading') return [];
-        return users.filter(u => streamerFilterSet.has(u.login));
+        return users.filter((user) => streamerFilterSet.has(user.login));
+      }
+
+      function applyOfflineAvailabilityFilter(users) {
+        if (!offlineMode) return users;
+        return users.filter((user) => hasOfflineRouteAccess('comments', user.login));
       }
 
       function applySort(users) {
@@ -766,16 +856,14 @@
             return new Date(b.lastCommentAt) - new Date(a.lastCommentAt);
           });
         }
-        // 'login' はデフォルト（indexedUsers がアルファベット順に並んでいる）
         return sorted;
       }
 
       function getCandidates(input) {
         const q = input.trim().toLowerCase();
-        let pool;
 
         if (!q) {
-          pool = applyStreamerFilter(indexedUsers);
+          const pool = applyOfflineAvailabilityFilter(applyStreamerFilter(indexedUsers));
           return applySort(pool).slice(0, maxCandidates);
         }
 
@@ -784,7 +872,7 @@
         const loginContains = [];
         const displayContains = [];
 
-        const filtered = applyStreamerFilter(indexedUsers);
+        const filtered = applyOfflineAvailabilityFilter(applyStreamerFilter(indexedUsers));
         for (const user of filtered) {
           const matchedLogin = user.loginLower.includes(q);
           const matchedDisplay = user.displayLower.includes(q);
@@ -802,8 +890,7 @@
         }
 
         const groups = [loginStarts, displayStarts, loginContains, displayContains];
-        const sortedGroups = groups.map(g => applySort(g));
-        const ordered = sortedGroups.flat();
+        const ordered = groups.map((group) => applySort(group)).flat();
 
         const deduped = [];
         const seen = new Set();
@@ -822,7 +909,6 @@
         btn.className = 'search-item';
         btn.setAttribute('role', 'option');
 
-        // アバター
         const avatarEl = document.createElement('span');
         avatarEl.className = 'search-item-avatar';
         if (user.profileImageUrl) {
@@ -836,7 +922,6 @@
         }
         btn.appendChild(avatarEl);
 
-        // 本文
         const bodyEl = document.createElement('div');
         bodyEl.className = 'search-item-body';
 
@@ -854,7 +939,6 @@
         }
         btn.appendChild(bodyEl);
 
-        // コメント数バッジ
         if (user.commentCount > 0) {
           const countEl = document.createElement('span');
           countEl.className = 'search-item-count';
@@ -880,7 +964,7 @@
         loginInput.value = login;
         loginInput.setCustomValidity('');
         setActionLinks(login);
-        setActionLinkState(true);
+        syncActionLinksFromInput();
         hideCandidates();
       }
 
@@ -897,10 +981,19 @@
           return;
         }
 
+        if (offlineMode) refreshOfflineAccessibleRoutes();
+
         const candidates = getCandidates(input);
         loginSearchResults.innerHTML = '';
 
         if (!candidates.length) {
+          if (offlineMode) {
+            const message = countOfflineCommentUsers() > 0
+              ? 'オフライン中の閲覧済みユーザでは見つかりません'
+              : 'オフライン中に開ける閲覧済みユーザがありません';
+            showCandidateMessage(message);
+            return;
+          }
           showCandidateMessage('該当するユーザが見つかりません');
           return;
         }
@@ -919,13 +1012,21 @@
           setActionLinkState(false);
           return;
         }
+
         const resolved = resolveLogin(loginInput.value);
-        if (resolved) {
-          setActionLinks(resolved);
-          setActionLinkState(true);
-        } else {
+        if (!resolved) {
           setActionLinkState(false);
+          return;
         }
+
+        setActionLinks(resolved);
+        if (offlineMode) {
+          setLinkState(statsLink, hasOfflineRouteAccess('stats', resolved));
+          setLinkState(quizLink, hasOfflineRouteAccess('quiz', resolved));
+          return;
+        }
+
+        setActionLinkState(true);
       }
 
       loginInput.addEventListener('focus', function() {
@@ -948,6 +1049,7 @@
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+
         try {
           await ensureUsersLoaded();
         } catch {
@@ -956,19 +1058,33 @@
           loginInput.focus();
           return;
         }
+
+        if (offlineMode) refreshOfflineAccessibleRoutes();
+
         const resolved = resolveLogin(loginInput.value);
         if (resolved) {
           window.location.href = `${pathForLogin(commentsPathTemplate, resolved)}?platform=twitch`;
           return;
         }
+
         void renderCandidates(loginInput.value);
-        loginInput.setCustomValidity('候補からTwitchユーザを選択してください');
+        loginInput.setCustomValidity(offlineMode
+          ? 'オフライン中は閲覧済みのユーザのみ開けます'
+          : '候補からTwitchユーザを選択してください');
         loginInput.reportValidity();
         loginInput.focus();
       });
 
       if (streamerFilter) {
         streamerFilter.addEventListener('change', async function() {
+          if (offlineMode) {
+            this.value = '';
+            streamerFilterSet = null;
+            void renderCandidates(loginInput.value);
+            loginInput.focus();
+            return;
+          }
+
           const streamer = this.value;
           loginInput.value = '';
           loginInput.setCustomValidity('');
@@ -981,7 +1097,6 @@
             return;
           }
 
-          // ローディング中は空リストを表示
           streamerFilterSet = 'loading';
           showCandidateMessage('読み込み中...');
 
@@ -1008,14 +1123,40 @@
         if ('requestIdleCallback' in window) {
           window.requestIdleCallback(() => {
             void ensureUsersLoaded().catch(() => {});
+            refreshOfflineState();
           }, { timeout: 2000 });
         } else {
           window.setTimeout(() => {
             void ensureUsersLoaded().catch(() => {});
+            refreshOfflineState();
           }, 1200);
         }
       });
 
+      window.addEventListener('pageshow', () => {
+        refreshOfflineState({ rerender: true });
+      });
+
+      window.addEventListener('focus', () => {
+        refreshOfflineState({ rerender: true });
+      });
+
+      window.addEventListener('storage', (event) => {
+        if (offlineAccessStorageKey && event.key && event.key !== offlineAccessStorageKey) return;
+        refreshOfflineState({ rerender: true });
+      });
+
+      window.addEventListener('online', () => {
+        offlineMode = false;
+        refreshOfflineState({ rerender: true });
+      });
+
+      window.addEventListener('offline', () => {
+        offlineMode = true;
+        refreshOfflineState({ rerender: true });
+      });
+
+      updateOfflineStatus();
       syncActionLinksFromInput();
     </script>
     <script>

@@ -6,6 +6,7 @@ const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
 const OFFLINE_URL = `${BASE}/static/offline.html`;
 const TOP_PAGE_URL = `${BASE}/`;
 const DATA_VERSION_URL = `${BASE}/api/meta/data-version`;
+const USERS_INDEX_URL = `${BASE}/api/users/index`;
 const TOP_PAGE_VERSION_CACHE_URL = `${BASE}/__sw/top-page-version`;
 
 function normalizePath(pathname) {
@@ -61,6 +62,14 @@ async function fetchAndCacheTopPage(cache, request, fallbackVersion) {
   return cacheTopPageResponse(cache, request, response, fallbackVersion);
 }
 
+async function fetchAndCacheUsersIndex(cache, request) {
+  const response = await fetch(request);
+  if (response.ok) {
+    await cache.put(USERS_INDEX_URL, response.clone());
+  }
+  return response;
+}
+
 async function notifyTopPageUpdated(dataVersion) {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   for (const client of clients) {
@@ -113,6 +122,7 @@ self.addEventListener('install', (event) => {
         Promise.all([
           cache.add(OFFLINE_URL).catch(() => {}),
           precacheTopPage(cache),
+          cache.add(USERS_INDEX_URL).catch(() => {}),
         ])
       )
       .then(() => self.skipWaiting())
@@ -132,6 +142,23 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  if (normalizePath(url.pathname) === normalizePath(USERS_INDEX_URL)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        try {
+          return await fetchAndCacheUsersIndex(cache, request);
+        } catch {
+          const cached = await cache.match(USERS_INDEX_URL);
+          return cached || new Response(JSON.stringify({ error: 'offline_users_index_unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          });
+        }
+      })
+    );
+    return;
+  }
 
   // API リクエストはキャッシュしない（常にネットワーク）
   if (url.pathname.startsWith(`${BASE}/api/`)) return;

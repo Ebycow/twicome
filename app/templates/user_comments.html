@@ -491,6 +491,12 @@
     <script type="application/json" id="page-data">{{ page | tojson }}</script>
     <script type="application/json" id="pages-data">{{ pages | tojson }}</script>
     <script type="application/json" id="user-data">{{ user.login | tojson }}</script>
+    <script src="{{ root_path }}/static/offline-access.js"></script>
+    <script>
+      if (window.TwicomeOfflineAccess) {
+        window.TwicomeOfflineAccess.markVisited({{ root_path | tojson }}, 'comments', {{ user.login | tojson }});
+      }
+    </script>
     <script>
       // XSS対策: HTMLエスケープ関数
       function escapeHtml(str) {

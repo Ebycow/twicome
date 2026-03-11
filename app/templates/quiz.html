@@ -643,6 +643,12 @@
         "root_path": {{ request.scope.get('root_path', '') | tojson }}
       }
     </script>
+    <script src="{{ root_path }}/static/offline-access.js"></script>
+    <script>
+      if (window.TwicomeOfflineAccess) {
+        window.TwicomeOfflineAccess.markVisited({{ root_path | tojson }}, 'quiz', {{ user.login | tojson }});
+      }
+    </script>
 
     <script>
     (function() {

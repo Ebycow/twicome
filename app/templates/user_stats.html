@@ -482,6 +482,12 @@
     <script type="application/json" id="stats-data">{{ stats | tojson }}</script>
     <script type="application/json" id="weekday-stats-data">{{ weekday_stats | tojson }}</script>
     <script type="application/json" id="impact-stats-data">{{ impact_stats | tojson }}</script>
+    <script src="{{ root_path }}/static/offline-access.js"></script>
+    <script>
+      if (window.TwicomeOfflineAccess) {
+        window.TwicomeOfflineAccess.markVisited({{ root_path | tojson }}, 'stats', {{ user.login | tojson }});
+      }
+    </script>
     <script>
       const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const textColor = isDarkMode ? '#e0e0e0' : '#666';
