@@ -206,6 +206,17 @@ docker compose -f docker-compose.dev.yml up --build
 
 - `db`: ホストへは公開しない（`app`/`batch`/`migrate` から `db:3306` で接続）
 - `app`: `http://localhost:8011/`（healthcheck: `GET /health` を30秒ごとに確認）
+- `test`: 通常の `up` では起動しない（`test` profile 扱い）
+
+開発 compose 上でテストを実行する場合:
+
+```bash
+docker compose -f docker-compose.dev.yml run --rm test
+docker compose -f docker-compose.dev.yml run --rm test pytest tests/unit
+docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
+```
+
+- `appdb_test` は `db` の healthcheck 時に自動作成・権限付与されます
 
 `batch` / `library` のコード変更を反映するには `batch` イメージ再ビルド（`docker compose build batch`）が必要です。
 

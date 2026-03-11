@@ -22,10 +22,10 @@ from core.db import SessionLocal
 from core.templates import templates
 from services.comment_utils import (
     BODY_HTML_RENDER_VERSION,
-    _build_comment_body_select_sql,
-    _decorate_comment,
-    _get_comment_body_html,
-    _split_filter_terms,
+    build_comment_body_select_sql as _build_comment_body_select_sql,
+    decorate_comment as _decorate_comment,
+    get_comment_body_html as _get_comment_body_html,
+    split_filter_terms as _split_filter_terms,
 )
 
 router = APIRouter()

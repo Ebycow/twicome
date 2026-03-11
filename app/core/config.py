@@ -1,9 +1,15 @@
 import os
 
 # 例: mysql+pymysql://user:password@dbhost:3306/appdb?charset=utf8mb4
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set. Set DATABASE_URL in .env or environment variables.")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+
+def get_database_url() -> str:
+    """DATABASE_URL を返す。未設定の場合は RuntimeError。"""
+    url = os.getenv("DATABASE_URL", DATABASE_URL)
+    if not url:
+        raise RuntimeError("DATABASE_URL is not set. Set DATABASE_URL in .env or environment variables.")
+    return url
 
 DEFAULT_PLATFORM = os.getenv("DEFAULT_PLATFORM", "twitch")
 ROOT_PATH = os.getenv("ROOT_PATH", "/twicome").rstrip("/")

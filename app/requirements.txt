@@ -12,3 +12,6 @@ pandas
 python-dotenv
 scipy
 redis==5.0.8
+pytest==8.3.5
+pytest-cov==6.0.0
+httpx==0.27.2

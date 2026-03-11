@@ -13,8 +13,11 @@ EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 def normalize_emote_id(raw_emote_id) -> Optional[str]:
     if raw_emote_id is None:
         return None
-    emote_id = str(raw_emote_id).strip()
+    raw_value = str(raw_emote_id)
+    emote_id = raw_value.strip()
     if not emote_id:
+        return None
+    if raw_value != emote_id:
         return None
     if not EMOTE_ID_PATTERN.fullmatch(emote_id):
         return None
@@ -30,6 +33,10 @@ def parse_raw_comment(raw_json):
         return json.loads(raw_json)
     except Exception:
         return None
+
+
+def _sanitize_emote_text(text) -> str:
+    return html.escape(re.sub(r"<[^>]*>", "", text or ""))
 
 
 def render_comment_body_html(raw_json, fallback_body):
@@ -50,7 +57,7 @@ def render_comment_body_html(raw_json, fallback_body):
         emoticon = frag.get("emoticon") or {}
         emote_id = normalize_emote_id(emoticon.get("emoticon_id"))
         if emote_id:
-            escaped = html.escape(text)
+            escaped = _sanitize_emote_text(text)
             emote_id_url = quote(emote_id, safe="")
             url1 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="1.0"), quote=True)
             url2 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="2.0"), quote=True)

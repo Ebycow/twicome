@@ -8,13 +8,22 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb_dev}"
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+      TEST_MYSQL_DATABASE: "${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}"
     # DB はホストへ公開せず、同一 Compose ネットワーク内から参照する
     expose:
       - "3306"
     volumes:
       - mysql8_dev_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      test:
+        - CMD-SHELL
+        - >
+          mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent &&
+          mysql -uroot -p$$MYSQL_ROOT_PASSWORD -e "
+          CREATE DATABASE IF NOT EXISTS \`$$TEST_MYSQL_DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          GRANT ALL PRIVILEGES ON \`$$TEST_MYSQL_DATABASE\`.* TO '$$MYSQL_USER'@'%';
+          FLUSH PRIVILEGES;
+          "
       interval: 10s
       timeout: 5s
       retries: 20
@@ -145,6 +154,35 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
+
+  # ── テスト実行用サービス ────────────────────────────────────────────────────
+  # 使い方:
+  #   全テスト:        docker compose -f docker-compose.dev.yml run --rm test
+  #   ユニットのみ:    docker compose -f docker-compose.dev.yml run --rm test pytest tests/unit
+  #   統合テストのみ:  docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
+  test:
+    profiles: [test]
+    build: ./app
+    environment:
+      TEST_DATABASE_URL: "mysql+pymysql://${COMPOSE_MYSQL_USER:-appuser}:${COMPOSE_MYSQL_PASSWORD:-apppass}@db:3306/${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}?charset=utf8mb4"
+      MYSQL_HOST: "db"
+      MYSQL_PORT: "3306"
+      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
+      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+      REDIS_URL: ""
+      FAISS_API_URL: ""
+      HOST_CHECK_ENABLED: "false"
+      ROOT_PATH: ""
+    volumes:
+      - ./app:/app
+      - ./migrate:/migrate:ro
+    working_dir: /app
+    command: ["pytest"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
 
 volumes:
   hf-cache:
