@@ -95,7 +95,7 @@
       .pager { display:flex; gap: 10px; align-items:center; justify-content: center; margin-top: 14px; }
       .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--pill-border); font-size: 0.85rem; }
       .recent { color: #c00000; }
-      .vote-btn { margin-right: 8px; padding: 4px 8px; border: 1px solid var(--vote-btn-border); border-radius: 4px; background: var(--vote-btn-bg); cursor: pointer; color: var(--text-color); }
+      .vote-btn { margin-right: 8px; padding: 4px 8px; border: 1px solid var(--vote-btn-border); border-radius: 4px; background: var(--vote-btn-bg); cursor: pointer; color: var(--text-color); touch-action: manipulation; }
       .vote-btn:hover { background: var(--vote-btn-hover); }
       .vote-controls { display:inline-flex; align-items:center; gap:8px; min-height:30px; }
       .highlighted { background-color: var(--highlighted-bg); border-color: var(--highlighted-border); }
@@ -114,8 +114,11 @@
       }
       .slider-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
       .slider-row label { min-width:100px; margin:0; font-size:0.9rem; }
-      .slider-row input[type="range"] { flex:1; padding:0; border:none; background:transparent; }
+      .slider-row input[type="range"] { flex:1; min-width:0; padding:0; border:none; background:transparent; }
       .slider-row .slider-val { min-width:32px; text-align:right; font-size:0.85rem; color:var(--meta-color); }
+      @media (max-width: 480px) {
+        .slider-row label { min-width:60px; font-size:0.8rem; }
+      }
       .centroid-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e3f2fd; border:1px solid #2196f3; color:#1565c0; }
       @media (prefers-color-scheme: dark) {
         .centroid-badge { background:#1a2a3a; border-color:#2196f3; color:#64b5f6; }
