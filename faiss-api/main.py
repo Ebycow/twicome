@@ -24,7 +24,8 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "512"))
 CONFIG_PATH = Path(os.getenv("FAISS_CONFIG_PATH", "/app/faiss_config.json"))
 
 # faiss_config.json から感情アンカーを読み込む
-_emotion_anchors_config: Dict[str, str] = {}
+# 形式: {"joy": {"positive": [...], "negative": [...]}, ...}
+_emotion_anchors_config: Dict[str, Dict[str, List[str]]] = {}
 if CONFIG_PATH.is_file():
     with open(CONFIG_PATH) as _f:
         _cfg = json.load(_f)
@@ -52,16 +53,34 @@ _emotion_lock = threading.Lock()
 
 
 def get_emotion_embeddings() -> Dict[str, np.ndarray]:
+    """
+    各感情の双極軸ベクトルを返す。
+    positive - negative の方向を正規化したベクトル。
+    """
     global _emotion_embeddings
     if _emotion_embeddings is None:
         with _emotion_lock:
             if _emotion_embeddings is None:
                 model = get_model()
                 _emotion_embeddings = {}
-                for key, anchor_text in _emotion_anchors_config.items():
-                    vec = model.encode([anchor_text], normalize_embeddings=True)
-                    _emotion_embeddings[key] = np.array(vec[0], dtype=np.float32)
-                print(f"[faiss-api] 感情アンカー埋め込み計算完了: {list(_emotion_embeddings.keys())}")
+                for key, anchors in _emotion_anchors_config.items():
+                    pos_texts = anchors.get("positive", [])
+                    neg_texts = anchors.get("negative", [])
+                    if not pos_texts:
+                        continue
+                    pos_vecs = model.encode(pos_texts, normalize_embeddings=True)
+                    pos_centroid = np.mean(pos_vecs, axis=0)
+                    if neg_texts:
+                        neg_vecs = model.encode(neg_texts, normalize_embeddings=True)
+                        neg_centroid = np.mean(neg_vecs, axis=0)
+                        direction = pos_centroid - neg_centroid
+                    else:
+                        direction = pos_centroid
+                    norm = np.linalg.norm(direction)
+                    if norm > 1e-8:
+                        direction = direction / norm
+                    _emotion_embeddings[key] = np.array(direction, dtype=np.float32)
+                print(f"[faiss-api] 感情双極軸ベクトル計算完了: {list(_emotion_embeddings.keys())}")
     return _emotion_embeddings
 
 
@@ -73,8 +92,7 @@ class UserIndex:
         self.login = login
         self.index: Optional[faiss.Index] = None
         self.comment_ids: List[str] = []
-        self.centroid: Optional[np.ndarray] = None
-        self.centroid_similarities: Optional[List[float]] = None
+        self.knn_densities: Optional[List[float]] = None  # k近傍平均類似度（典型度スライダー用）
         self.lock = threading.Lock()
 
     @property
@@ -94,8 +112,8 @@ class UserIndex:
         with open(self.meta_path) as f:
             meta = json.load(f)
         self.comment_ids = meta["comment_ids"]
-        self.centroid = np.array(meta["centroid"], dtype=np.float32) if "centroid" in meta else None
-        self.centroid_similarities = meta.get("centroid_similarities")
+        # knn_densities が無い古いファイルは centroid_similarities にフォールバック
+        self.knn_densities = meta.get("knn_densities") or meta.get("centroid_similarities")
         print(f"[faiss-api] インデックス読み込み [{self.login}]: {len(self.comment_ids)} 件")
 
     def ensure_loaded(self):
@@ -127,17 +145,20 @@ class UserIndex:
             self.index.add(new_embeddings)
             self.comment_ids.extend(new_ids)
 
-            # 重心と各コメントのコサイン類似度を再計算
+            # KNN密度を再計算（典型度スライダー用）
+            # 各コメントについて、k近傍のコサイン類似度の平均を密度とする
+            # 密度が高い = 似たコメントが多い = 典型的
             n_total = self.index.ntotal
-            all_vectors = np.zeros((n_total, dim), dtype=np.float32)
-            for i in range(n_total):
-                all_vectors[i] = self.index.reconstruct(i)
-            centroid = np.mean(all_vectors, axis=0)
-            centroid_norm = np.linalg.norm(centroid)
-            if centroid_norm > 0:
-                centroid = centroid / centroid_norm
-            self.centroid = centroid
-            self.centroid_similarities = (all_vectors @ centroid).tolist()
+            k = min(20, n_total - 1)
+            if k > 0:
+                all_vectors = np.empty((n_total, dim), dtype=np.float32)
+                for i in range(n_total):
+                    all_vectors[i] = self.index.reconstruct(i)
+                D, _ = self.index.search(all_vectors, k + 1)  # +1 は自分自身を含む
+                # D[:, 0] ≈ 1.0（自分自身）を除いて平均
+                self.knn_densities = D[:, 1:k + 1].mean(axis=1).tolist()
+            else:
+                self.knn_densities = [1.0] * n_total
 
             # アトミック書き込み
             tmp_index = str(self.index_path) + ".tmp"
@@ -147,8 +168,7 @@ class UserIndex:
                 "comment_ids": self.comment_ids,
                 "total_comments": len(self.comment_ids),
                 "embedding_dim": dim,
-                "centroid": self.centroid.tolist(),
-                "centroid_similarities": self.centroid_similarities,
+                "knn_densities": self.knn_densities,
             }
             with open(tmp_meta, "w") as f:
                 json.dump(meta, f, ensure_ascii=False)
@@ -170,10 +190,11 @@ class UserIndex:
         return results
 
     def search_centroid(self, position: float, top_k: int) -> List[Tuple[str, float]]:
-        """重心距離検索。position=0.0→典型的, 1.0→珍しい"""
-        if self.centroid_similarities is None:
+        """典型度検索。position=0.0→典型的(密度高), 1.0→珍しい(密度低)"""
+        if self.knn_densities is None:
             return []
-        pairs = list(enumerate(self.centroid_similarities))
+        pairs = list(enumerate(self.knn_densities))
+        # 密度降順: index 0 が最も典型的
         pairs.sort(key=lambda x: x[1], reverse=True)
         total = len(pairs)
         max_offset = max(0, total - top_k)
@@ -294,6 +315,44 @@ def update_index(login: str, req: IndexUpdateRequest):
     return {"status": "ok", "added": added, "total": len(ui.comment_ids), "login": login}
 
 
+@app.post("/index/rebuild_densities/{login}")
+def rebuild_densities(login: str):
+    """既存インデックスのKNN密度を再計算してmeta.jsonを更新する。再埋め込みは不要。"""
+    ui = get_user_index(login)
+    if not ui.is_available():
+        raise HTTPException(status_code=404, detail="index_not_available")
+
+    with ui.lock:
+        if ui.index is None:
+            ui.load()
+
+        n_total = ui.index.ntotal
+        dim = ui.index.d
+        k = min(20, n_total - 1)
+        if k > 0:
+            all_vectors = np.empty((n_total, dim), dtype=np.float32)
+            for i in range(n_total):
+                all_vectors[i] = ui.index.reconstruct(i)
+            D, _ = ui.index.search(all_vectors, k + 1)
+            ui.knn_densities = D[:, 1:k + 1].mean(axis=1).tolist()
+        else:
+            ui.knn_densities = [1.0] * n_total
+
+        tmp_meta = str(ui.meta_path) + ".tmp"
+        meta = {
+            "comment_ids": ui.comment_ids,
+            "total_comments": len(ui.comment_ids),
+            "embedding_dim": dim,
+            "knn_densities": ui.knn_densities,
+        }
+        with open(tmp_meta, "w") as f:
+            json.dump(meta, f, ensure_ascii=False)
+        os.replace(tmp_meta, str(ui.meta_path))
+
+    print(f"[faiss-api] KNN密度再計算完了 [{login}]: {n_total} 件")
+    return {"status": "ok", "login": login, "total": n_total}
+
+
 @app.post("/search/similar/{login}")
 def search_similar(login: str, req: SimilarSearchRequest):
     ui = get_user_index(login)
@@ -313,7 +372,7 @@ def search_similar(login: str, req: SimilarSearchRequest):
 @app.post("/search/centroid/{login}")
 def search_centroid(login: str, req: CentroidSearchRequest):
     ui = get_user_index(login)
-    if not ui.is_available() or ui.centroid_similarities is None:
+    if not ui.is_available() or ui.knn_densities is None:
         raise HTTPException(status_code=404, detail="index_not_available")
 
     with ui.lock:
