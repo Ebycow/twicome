@@ -117,6 +117,48 @@ def get_clusters(login: str, n_clusters: int = 8) -> Optional[List[Dict]]:
         raise RuntimeError(f"faiss get_clusters failed: {e}") from e
 
 
+def get_cluster_members(login: str, centroid: List[float], n_members: int) -> Optional[List[str]]:
+    """
+    クラスタの重心に近い上位 n_members 件のコメントIDを返す。
+    Returns: [comment_id, ...] または None
+    """
+    if not _is_enabled():
+        return None
+    try:
+        resp = requests.post(
+            f"{FAISS_API_URL}/index/cluster_members/{login}",
+            json={"centroid": centroid, "n_members": n_members},
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()["comment_ids"]
+    except RequestException as e:
+        raise RuntimeError(f"faiss get_cluster_members failed: {e}") from e
+
+
+def get_subclusters(login: str, centroid: List[float], n_members: int, n_clusters: int = 4) -> Optional[List[Dict]]:
+    """
+    親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+    Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "centroid": [...]}, ...] または None
+    """
+    if not _is_enabled():
+        return None
+    try:
+        resp = requests.post(
+            f"{FAISS_API_URL}/index/subcluster/{login}",
+            json={"centroid": centroid, "n_members": n_members, "n_clusters": n_clusters},
+            timeout=120,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()["subclusters"]
+    except RequestException as e:
+        raise RuntimeError(f"faiss get_subclusters failed: {e}") from e
+
+
 def emotion_search(login: str, weights: Dict[str, float], top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
     """
     感情アンカー検索。各感情の重みを合成したベクトルで検索。

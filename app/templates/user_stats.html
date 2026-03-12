@@ -309,6 +309,9 @@
           {% endif %}
         </div>
         <div class="top-links">
+          {% if user %}
+          <a href="{{ request.url_for('cluster_explorer', login=user.login) }}{% if platform != 'twitch' %}?platform={{ platform }}{% endif %}">発言パターン探索</a>
+          {% endif %}
           <a href="{{ request.url_for('manual_page') }}">使い方ガイド</a>
           <a href="{{ request.url_for('index') }}">← 検索に戻る</a>
         </div>

@@ -245,6 +245,17 @@ class EmotionSearchRequest(BaseModel):
     top_k: int = 50
 
 
+class SubclusterRequest(BaseModel):
+    centroid: List[float]        # 親クラスタの正規化済み重心ベクトル
+    n_members: int               # 親クラスタのサイズ（検索上限として使用）
+    n_clusters: int = 4          # サブクラスタ数
+
+
+class ClusterMembersRequest(BaseModel):
+    centroid: List[float]        # クラスタの正規化済み重心ベクトル
+    n_members: int               # 取得する件数
+
+
 # --- 起動時処理 ---
 @app.on_event("startup")
 def startup():
@@ -348,7 +359,7 @@ def get_clusters(login: str, n_clusters: int = 8):
             if len(mask) == 0:
                 continue
             cluster_vecs = all_vectors[mask]
-            centroid = kmeans.centroids[c]
+            centroid = kmeans.centroids[c].copy()
             norm = np.linalg.norm(centroid)
             if norm > 1e-8:
                 centroid = centroid / norm
@@ -360,12 +371,86 @@ def get_clusters(login: str, n_clusters: int = 8):
                 "cluster_id": int(c),
                 "size": int(len(mask)),
                 "representative_ids": rep_ids,
+                "centroid": centroid.tolist(),  # サブクラスタリング用
             })
 
         # 件数の多い順にソート
         clusters.sort(key=lambda x: x["size"], reverse=True)
 
     return {"clusters": clusters, "total": n_total}
+
+
+@app.post("/index/subcluster/{login}")
+def subcluster(login: str, req: SubclusterRequest):
+    """
+    親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+    重心に近い上位 n_members 件を取得し、その中でさらに K-means を実行する。
+    """
+    ui = get_user_index(login)
+    if not ui.is_available() or ui.index is None:
+        raise HTTPException(status_code=404, detail="index_not_available")
+
+    centroid = np.array(req.centroid, dtype=np.float32).reshape(1, -1)
+    n_members = min(req.n_members, ui.index.ntotal)
+    actual_k = min(req.n_clusters, n_members)
+
+    with ui.lock:
+        dim = ui.index.d
+        # 親クラスタの重心に近い上位 n_members 件を取得
+        D, I = ui.index.search(centroid, n_members)
+        member_indices = I[0]
+
+        member_vecs = np.empty((len(member_indices), dim), dtype=np.float32)
+        for i, idx in enumerate(member_indices):
+            member_vecs[i] = ui.index.reconstruct(int(idx))
+
+        # メンバーの中でさらにK-means
+        kmeans = faiss.Kmeans(dim, actual_k, niter=20, seed=42, spherical=True)
+        kmeans.train(member_vecs)
+
+        _, assignments = kmeans.index.search(member_vecs, 1)
+        assignments = assignments.reshape(-1)
+
+        subclusters = []
+        for c in range(actual_k):
+            sub_mask = np.where(assignments == c)[0]
+            if len(sub_mask) == 0:
+                continue
+            sub_vecs = member_vecs[sub_mask]
+            sub_centroid = kmeans.centroids[c].copy()
+            norm = np.linalg.norm(sub_centroid)
+            if norm > 1e-8:
+                sub_centroid = sub_centroid / norm
+            sims = sub_vecs @ sub_centroid
+            top_local = np.argsort(sims)[::-1][:10]
+            rep_ids = [ui.comment_ids[member_indices[sub_mask[i]]] for i in top_local]
+            subclusters.append({
+                "cluster_id": int(c),
+                "size": int(len(sub_mask)),
+                "representative_ids": rep_ids,
+                "centroid": sub_centroid.tolist(),
+            })
+
+        subclusters.sort(key=lambda x: x["size"], reverse=True)
+
+    return {"subclusters": subclusters}
+
+
+@app.post("/index/cluster_members/{login}")
+def cluster_members(login: str, req: ClusterMembersRequest):
+    """クラスタの重心に近い上位 n_members 件のコメントIDを返す。"""
+    ui = get_user_index(login)
+    if not ui.is_available() or ui.index is None:
+        raise HTTPException(status_code=404, detail="index_not_available")
+
+    centroid = np.array(req.centroid, dtype=np.float32).reshape(1, -1)
+    n_members = min(req.n_members, ui.index.ntotal)
+
+    with ui.lock:
+        _, I = ui.index.search(centroid, n_members)
+        member_ids = [ui.comment_ids[int(idx)] for idx in I[0] if 0 <= int(idx) < len(ui.comment_ids)]
+
+    return {"comment_ids": member_ids}
 
 
 @app.post("/index/rebuild_densities/{login}")

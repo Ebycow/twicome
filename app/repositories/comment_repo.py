@@ -296,6 +296,32 @@ def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
     return int(row["pos"]) if row else 0
 
 
+def fetch_comments_by_ids(db, comment_ids: list[str]) -> list[dict]:
+    """コメントIDリストに対応するコメント詳細（本文・VOD・日時）を返す。"""
+    if not comment_ids:
+        return []
+    placeholders = ", ".join(f":id_{i}" for i in range(len(comment_ids)))
+    params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
+    params["body_html_version"] = BODY_HTML_RENDER_VERSION
+    _body = build_comment_body_select_sql("c")
+    rows = db.execute(
+        text(f"""
+            SELECT c.comment_id, {_body},
+                   c.comment_created_at_utc, c.offset_seconds,
+                   c.vod_id,
+                   v.title AS vod_title, v.url AS vod_url,
+                   u.login AS owner_login, u.display_name AS owner_display_name
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            JOIN users u ON u.user_id = v.owner_user_id
+            WHERE c.comment_id IN ({placeholders})
+            ORDER BY c.comment_created_at_utc DESC
+        """),
+        params,
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 def fetch_comment_bodies_by_ids(db, comment_ids: list[str]) -> dict[str, str]:
     """コメントIDリストに対応する body テキストを {comment_id: body} で返す。"""
     if not comment_ids:
