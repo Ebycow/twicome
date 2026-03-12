@@ -3,3 +3,5 @@ uvicorn[standard]==0.24.0
 sentence-transformers
 faiss-cpu
 numpy
+fugashi[unidic-lite]
+protobuf

@@ -332,10 +332,53 @@ TEST_DATABASE_URL="mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?cha
 
 ## FAISS 検索について
 
-- モデルは `hotchpotch/static-embedding-japanese` を使用
+- モデルは `cl-nagoya/sup-simcse-ja-base` を使用
 - `build_faiss_index.py` がユーザ別に `.faiss` / `.meta.json` を生成
 - アプリ側は `app/faiss_data` を参照
 - Docker 利用時は `app/faiss_data` へインデックスディレクトリをマウントして整合を取ってください
+
+### 埋め込みモデルの変更手順
+
+埋め込みモデルを変更する際は、`faiss_config.json` の `embedding_model` フィールドを書き換えるだけでは**反映されません**（このフィールドは現在記録用途のみ）。以下の4箇所を変更する必要があります。
+
+**1. `faiss-api/Dockerfile`** — ビルド時の事前ダウンロード
+
+```dockerfile
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('新モデル名', device='cpu')"
+```
+
+**2. `docker-compose.yml` および `docker-compose.dev.yml`** — faiss-api サービスの環境変数
+
+```yaml
+faiss-api:
+  environment:
+    EMBEDDING_MODEL: 新モデル名
+```
+
+**3. `faiss_config.json` / `faiss_config.dev.json`** — 記録として更新
+
+```json
+"embedding_model": "新モデル名"
+```
+
+**4. 既存インデックスを削除してから再インデックス**
+
+旧モデルで生成したインデックスは新モデルと互換性がないため、削除してから再生成が必要です。
+
+```bash
+# 旧インデックスを削除（本番の例）
+rm data/honban/faiss_data/*.faiss
+rm data/honban/faiss_data/*.meta.json
+
+# イメージ再ビルド（モデルのダウンロードが走るため数分かかる）
+docker compose --profile faiss build faiss-api
+
+# 起動
+docker compose --profile faiss up -d
+
+# 再インデックス（バッチ実行）
+docker compose run --rm batch python batch/scripts/build_faiss_index.py
+```
 
 ## 補助スクリプト（util）
 

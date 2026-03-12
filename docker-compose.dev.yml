@@ -66,6 +66,7 @@ services:
     environment:
       DATA_DIR: /app/data/faiss_data
       FAISS_CONFIG_PATH: /app/data/faiss_config.json
+      EMBEDDING_MODEL: cl-nagoya/sup-simcse-ja-base
     volumes:
       - ./data/development:/app/data
       - hf-cache:/root/.cache/huggingface
