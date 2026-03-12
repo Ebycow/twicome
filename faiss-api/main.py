@@ -315,6 +315,59 @@ def update_index(login: str, req: IndexUpdateRequest):
     return {"status": "ok", "added": added, "total": len(ui.comment_ids), "login": login}
 
 
+@app.get("/index/clusters/{login}")
+def get_clusters(login: str, n_clusters: int = 8):
+    """
+    K-means クラスタリングで発言パターンを分類する。
+    各クラスタの件数と代表コメントID (重心に近い上位3件) を返す。
+    """
+    ui = get_user_index(login)
+    if not ui.is_available() or ui.index is None:
+        raise HTTPException(status_code=404, detail="index_not_available")
+
+    with ui.lock:
+        n_total = ui.index.ntotal
+        dim = ui.index.d
+        actual_k = min(n_clusters, n_total)
+
+        all_vectors = np.empty((n_total, dim), dtype=np.float32)
+        for i in range(n_total):
+            all_vectors[i] = ui.index.reconstruct(i)
+
+        # 正規化ベクトルに対して球面K-means（内積最大化）
+        kmeans = faiss.Kmeans(dim, actual_k, niter=20, seed=42, spherical=True)
+        kmeans.train(all_vectors)
+
+        # 各コメントのクラスタ割り当てを取得
+        _, assignments = kmeans.index.search(all_vectors, 1)
+        assignments = assignments.reshape(-1)
+
+        clusters = []
+        for c in range(actual_k):
+            mask = np.where(assignments == c)[0]
+            if len(mask) == 0:
+                continue
+            cluster_vecs = all_vectors[mask]
+            centroid = kmeans.centroids[c]
+            norm = np.linalg.norm(centroid)
+            if norm > 1e-8:
+                centroid = centroid / norm
+            # 重心との内積（コサイン類似度）でソートして上位10件
+            sims = cluster_vecs @ centroid
+            top_local = np.argsort(sims)[::-1][:10]
+            rep_ids = [ui.comment_ids[mask[i]] for i in top_local]
+            clusters.append({
+                "cluster_id": int(c),
+                "size": int(len(mask)),
+                "representative_ids": rep_ids,
+            })
+
+        # 件数の多い順にソート
+        clusters.sort(key=lambda x: x["size"], reverse=True)
+
+    return {"clusters": clusters, "total": n_total}
+
+
 @app.post("/index/rebuild_densities/{login}")
 def rebuild_densities(login: str):
     """既存インデックスのKNN密度を再計算してmeta.jsonを更新する。再埋め込みは不要。"""

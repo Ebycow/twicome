@@ -96,6 +96,27 @@ def centroid_search(login: str, position: float, top_k: int = 50) -> Optional[Li
         raise RuntimeError(f"faiss centroid_search failed: {e}") from e
 
 
+def get_clusters(login: str, n_clusters: int = 8) -> Optional[List[Dict]]:
+    """
+    K-means クラスタリングで発言パターンを分類する。
+    Returns: [{"cluster_id": int, "size": int, "representative_ids": [str, ...]}, ...] または None
+    """
+    if not _is_enabled():
+        return None
+    try:
+        resp = requests.get(
+            f"{FAISS_API_URL}/index/clusters/{login}",
+            params={"n_clusters": n_clusters},
+            timeout=120,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()["clusters"]
+    except RequestException as e:
+        raise RuntimeError(f"faiss get_clusters failed: {e}") from e
+
+
 def emotion_search(login: str, weights: Dict[str, float], top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
     """
     感情アンカー検索。各感情の重みを合成したベクトルで検索。

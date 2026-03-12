@@ -238,6 +238,45 @@
         text-align: right;
       }
 
+      .clusters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .cluster-card {
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 12px;
+        background: var(--bg-color);
+      }
+      .cluster-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .cluster-rank {
+        font-weight: bold;
+        font-size: 0.9rem;
+        color: var(--meta-color);
+      }
+      .cluster-size {
+        font-size: 0.85rem;
+        color: var(--meta-color);
+      }
+      .cluster-examples {
+        margin: 0;
+        padding: 0 0 0 1.2em;
+        font-size: 0.88rem;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .cluster-examples li {
+        word-break: break-all;
+      }
+
       @media (max-width: 960px) {
         body {
           padding: 16px;
@@ -439,6 +478,28 @@
                 {% endif %}
               </tbody>
             </table>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if comment_clusters %}
+        <div class="card">
+          <h2>発言パターンマップ</h2>
+          <p class="meta">全コメントを意味的に {{ comment_clusters | length }} グループに自動分類した結果です。各グループの代表的な発言を表示しています。</p>
+          <div class="clusters-grid">
+            {% for cl in comment_clusters %}
+            <div class="cluster-card">
+              <div class="cluster-header">
+                <span class="cluster-rank">#{{ loop.index }}</span>
+                <span class="cluster-size">{{ cl.size }} 件</span>
+              </div>
+              <ul class="cluster-examples">
+                {% for text in cl.representatives %}
+                <li>{{ text }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endfor %}
           </div>
         </div>
         {% endif %}

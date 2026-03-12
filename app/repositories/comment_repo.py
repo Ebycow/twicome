@@ -296,6 +296,19 @@ def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
     return int(row["pos"]) if row else 0
 
 
+def fetch_comment_bodies_by_ids(db, comment_ids: list[str]) -> dict[str, str]:
+    """コメントIDリストに対応する body テキストを {comment_id: body} で返す。"""
+    if not comment_ids:
+        return {}
+    placeholders = ", ".join(f":id_{i}" for i in range(len(comment_ids)))
+    params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
+    rows = db.execute(
+        text(f"SELECT comment_id, body FROM comments WHERE comment_id IN ({placeholders})"),
+        params,
+    ).mappings().all()
+    return {row["comment_id"]: row["body"] for row in rows}
+
+
 def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
     """いいね・dislike の合計が多い順でコメントを取得（トップページ用）。"""
     from services.comment_utils import build_comment_body_select_sql

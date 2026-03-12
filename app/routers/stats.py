@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
+import faiss_search
 from core.config import DEFAULT_PLATFORM
 from core.db import SessionLocal
 from core.templates import templates
-from repositories import stats_repo, user_repo
+from repositories import comment_repo, stats_repo, user_repo
 from services import stats_service
 
 router = APIRouter()
@@ -46,6 +47,23 @@ def user_stats_page(
         cn_status_dist = stats_repo.fetch_cn_status_distribution(db, uid)
         impact_stats, impact_total = stats_service.build_impact_stats(db, uid)
 
+        # FAISSクラスタ（インデックスがない場合はNone）
+        comment_clusters = None
+        try:
+            raw_clusters = faiss_search.get_clusters(login, n_clusters=8)
+            if raw_clusters:
+                all_rep_ids = [cid for cl in raw_clusters for cid in cl["representative_ids"]]
+                bodies = comment_repo.fetch_comment_bodies_by_ids(db, all_rep_ids)
+                comment_clusters = [
+                    {
+                        "size": cl["size"],
+                        "representatives": [bodies[cid] for cid in cl["representative_ids"] if cid in bodies],
+                    }
+                    for cl in raw_clusters
+                ]
+        except Exception:
+            pass
+
     return templates.TemplateResponse(
         "user_stats.html",
         {
@@ -61,5 +79,6 @@ def user_stats_page(
             "cn_scores": cn_scores,
             "cn_status_dist": cn_status_dist,
             "platform": platform,
+            "comment_clusters": comment_clusters,
         },
     )
