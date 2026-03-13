@@ -1,3 +1,5 @@
+"""アプリケーション設定・環境変数"""
+
 import os
 
 # 例: mysql+pymysql://user:password@dbhost:3306/appdb?charset=utf8mb4

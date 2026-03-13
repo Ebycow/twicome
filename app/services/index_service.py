@@ -1,4 +1,5 @@
 """トップページのデータ組み立てロジック。
+
 comments.py ルーターから抽出したもの。
 """
 from core.config import DEFAULT_LOGIN, QUICK_LINK_LOGINS, SERVICE_WORKER_CACHE_NAME

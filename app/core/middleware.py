@@ -1,4 +1,7 @@
+"""カスタム HTTP ミドルウェア"""
+
 import re
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from fastapi.responses import JSONResponse
@@ -8,10 +11,13 @@ from core.config import HOST_CHECK_ENABLED
 
 
 def is_ip_address(host: str) -> bool:
+    """ホスト文字列が IP アドレスかどうかを判定する。"""
     return re.match(r"^\d+\.\d+\.\d+\.\d+$", host) is not None
 
 
 class HostCheckMiddleware(BaseHTTPMiddleware):
+    """IP アドレスによる直接アクセスを拒否するミドルウェア。"""
+
     async def dispatch(self, request, call_next):
         if not HOST_CHECK_ENABLED:
             return await call_next(request)
@@ -45,12 +51,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class CSRFProtectionMiddleware(BaseHTTPMiddleware):
-    """CSRF保護ミドルウェア
+    """CSRF保護ミドルウェア。
+
     - フォーム送信（Content-Type: application/x-www-form-urlencoded）の場合はRefererチェック
     - AJAX（Content-Type: application/json または X-Requested-With ヘッダー）は許可
     """
 
-    SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+    SAFE_METHODS: ClassVar[set[str]] = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
     async def dispatch(self, request, call_next):
         if request.method in self.SAFE_METHODS:

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # extract_twitch_comments.py
+"""Twitch コメント抽出ユーティリティ"""
+
 import argparse
 import csv
 import json
@@ -23,11 +25,13 @@ def iter_comments(root: Any) -> Iterator[dict[str, Any]]:
     raise ValueError("Unsupported JSON shape: expected {'comments':[...]} or [...]")
 
 def normalize_name(s: str | None, ignore_case: bool) -> str | None:
+    """名前文字列を正規化する。ignore_case=True の場合は小文字に変換。"""
     if s is None:
         return None
     return s.lower() if ignore_case else s
 
 def to_row(c: dict[str, Any]) -> dict[str, Any]:
+    """コメント dict を CSV/テキスト出力用の行 dict に変換する。"""
     commenter = c.get("commenter") or {}
     message = c.get("message") or {}
     return {
@@ -40,6 +44,7 @@ def to_row(c: dict[str, Any]) -> dict[str, Any]:
     }
 
 def main() -> None:
+    """コメント抽出コマンドのエントリーポイント。"""
     p = argparse.ArgumentParser(
         description="Extract Twitch VOD comments by commenter.name from comments.json"
     )

@@ -1,4 +1,5 @@
 """stats ページ用のデータアクセス層。
+
 stats.py ルーターから SQL を抽出したもの。
 """
 
@@ -6,6 +7,7 @@ from sqlalchemy import text
 
 
 def count_user_comments(db, uid: int) -> int:
+    """ユーザーの総コメント数を返す。"""
     row = db.execute(
         text("SELECT COUNT(*) AS cnt FROM comments WHERE commenter_user_id = :uid"),
         {"uid": uid},
@@ -111,6 +113,7 @@ def fetch_owner_activity(db, uid: int) -> list[dict]:
 
 
 def count_user_vods(db, uid: int) -> int:
+    """ユーザーがコメントした VOD の総数を返す。"""
     row = db.execute(
         text("SELECT COUNT(DISTINCT vod_id) AS cnt FROM comments WHERE commenter_user_id = :uid"),
         {"uid": uid},

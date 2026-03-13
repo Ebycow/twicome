@@ -1,4 +1,5 @@
 """stats ページの業務ロジック。
+
 stats.py ルーターから統計計算を抽出したもの。
 """
 from collections import defaultdict
@@ -104,6 +105,7 @@ def build_cn_scores(db, uid: int) -> dict | None:
 
 def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
     """コメント影響度分析。VOD 数が多すぎる場合は空を返す。
+
     Returns (impact_stats, impact_total)
     """
     vod_count = stats_repo.count_user_vods(db, uid)
@@ -141,7 +143,7 @@ def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
             all_inactive_unique.append(ou)
 
     impact_stats = []
-    for oid, d in sorted(owner_buckets.items(), key=lambda x: len(x[1]["active_comments"]), reverse=True):
+    for _oid, d in sorted(owner_buckets.items(), key=lambda x: len(x[1]["active_comments"]), reverse=True):
         if len(d["active_comments"]) < 3 or len(d["inactive_comments"]) < 3:
             continue
         avg_a, avg_i, c_change, c_p = _calc_impact(d["active_comments"], d["inactive_comments"])

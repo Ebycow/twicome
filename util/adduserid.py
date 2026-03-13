@@ -1,3 +1,5 @@
+"""ユーザーID追加ユーティリティ"""
+
 import sys
 from pathlib import Path
 
@@ -6,6 +8,7 @@ import requests
 
 
 def load_env(path: Path) -> dict[str, str]:
+    """.env ファイルを読み込んで key-value dict を返す。"""
     env: dict[str, str] = {}
     if not path.exists():
         return env
@@ -28,6 +31,7 @@ CLIENT_ID = ENV.get("CLIENT_ID", "").strip()
 ACCESS_TOKEN = ENV.get("ACCESS_TOKEN", "").strip()
 
 def get_user_id(username):
+    """Twitch API でユーザー名からユーザー ID を取得する。"""
     url = f"https://api.twitch.tv/helix/users?login={username}"
     headers = {
         "Client-ID": CLIENT_ID,

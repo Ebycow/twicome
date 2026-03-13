@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Twitch リフレッシュトークン管理"""
 
 import fcntl
 import os
@@ -9,7 +10,8 @@ import requests
 
 
 def parse_env_lines(lines: list[str]) -> tuple[dict[str, str], list[tuple[str, str]]]:
-    """Returns:
+    """env ファイルの行リストをパースして kv マップと再構築用リストを返す。
+
     - kv: parsed key/value map (only for KEY=VALUE lines)
     - parsed: list of tuples (kind, content) where kind in {"raw", "kv"} for reconstruction
     """
@@ -46,7 +48,7 @@ def parse_env_lines(lines: list[str]) -> tuple[dict[str, str], list[tuple[str, s
 
 
 def render_env(lines_parsed: list[tuple[str, str]], existing_kv: dict[str, str], updates: dict[str, str]) -> list[str]:
-    """Reconstruct env file lines, updating keys in-place, preserving comments and unknown raw lines."""
+    """env ファイルの行を再構築する。キーはインプレースで更新し、コメントや未知の行は保持する。"""
     merged = dict(existing_kv)
     merged.update(updates)
 
@@ -75,10 +77,11 @@ def render_env(lines_parsed: list[tuple[str, str]], existing_kv: dict[str, str],
         out.append(f'{key}="{val_escaped}"')
 
     # Ensure trailing newline
-    return [l + "\n" for l in out]
+    return [line + "\n" for line in out]
 
 
 def atomic_write(path: str, content_lines: list[str], mode: int = 0o600) -> None:
+    """ファイルをアトミックに書き込む（テンポラリファイル経由）。"""
     directory = os.path.dirname(os.path.abspath(path)) or "."
     fd, tmppath = tempfile.mkstemp(prefix=".tokenenv.", dir=directory)
     try:
@@ -98,6 +101,7 @@ def atomic_write(path: str, content_lines: list[str], mode: int = 0o600) -> None
 
 
 def refresh_token(client_id: str, client_secret: str, scope: str) -> dict[str, str]:
+    """Twitch client credentials でアクセストークンを取得して返す。"""
     url = "https://id.twitch.tv/oauth2/token"
     data = {
         "client_id": client_id,
@@ -126,6 +130,7 @@ def refresh_token(client_id: str, client_secret: str, scope: str) -> dict[str, s
 
 
 def main() -> int:
+    """Twitch アクセストークンをリフレッシュして .env を更新するエントリーポイント。"""
     import argparse
 
     parser = argparse.ArgumentParser(description="Refresh Twitch access token and update .env")

@@ -1,4 +1,5 @@
 """コメント関連のデータアクセス層。
+
 WHERE 句・ORDER BY 句の構築を含む SQL を封じ込める。
 """
 from datetime import datetime
@@ -139,6 +140,7 @@ def fetch_comments(
     date_to_utc: datetime | None = None,
 ) -> list[dict]:
     """フィルタ・ソート・ページネーションを適用してコメントを取得する。
+
     sort=created_at かつフィルタなしの場合、サブクエリ最適化を使用する。
     """
     where_sql, params = _build_where(
@@ -274,6 +276,7 @@ def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
 
 def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
     """指定ソート順でカーソルコメントより前にある行数を返す。
+
     offset = max(0, cursor_pos - page_size // 2) の計算に使う。
     """
     c_created_at = cursor_row.get("comment_created_at_utc")

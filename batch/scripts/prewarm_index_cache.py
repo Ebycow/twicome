@@ -37,6 +37,7 @@ def _fetch_expected_version(session: requests.Session, url: str) -> str | None:
 
 
 def main() -> int:
+    """トップページ HTML キャッシュを事前生成するエントリーポイント。"""
     if not os.getenv("REDIS_URL", "").strip():
         print("REDIS_URL が設定されていません。トップHTML prewarm をスキップします。")
         return 0

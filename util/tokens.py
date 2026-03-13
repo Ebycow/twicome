@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Twitch トークン管理"""
 
 import argparse
 from pathlib import Path
@@ -7,6 +8,7 @@ import requests
 
 
 def load_env(path: Path) -> dict[str, str]:
+    """.env ファイルを読み込んで key-value dict を返す。"""
     env: dict[str, str] = {}
     if not path.exists():
         return env
@@ -25,6 +27,7 @@ def load_env(path: Path) -> dict[str, str]:
 
 
 def main() -> int:
+    """Twitch アクセストークンを取得するエントリーポイント。"""
     parser = argparse.ArgumentParser(description="Get Twitch access token with client credentials")
     parser.add_argument(
         "--env-file",

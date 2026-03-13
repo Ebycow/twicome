@@ -1,3 +1,5 @@
+"""コメントデータ加工ユーティリティ"""
+
 import html
 import json
 import re
@@ -10,6 +12,7 @@ BODY_HTML_RENDER_VERSION = 1
 
 
 def seconds_to_hms(total: int) -> str:
+    """秒数を HH:MM:SS または MM:SS 形式に変換する。"""
     h = total // 3600
     m = (total % 3600) // 60
     s = total % 60
@@ -19,6 +22,7 @@ def seconds_to_hms(total: int) -> str:
 
 
 def seconds_to_twitch_t(total: int) -> str:
+    """秒数を Twitch の時刻パラメータ形式（例: 1h2m3s）に変換する。"""
     # Twitch: ?t=1h2m3s
     h = total // 3600
     m = (total % 3600) // 60
@@ -33,6 +37,7 @@ def seconds_to_twitch_t(total: int) -> str:
 
 
 def utc_to_jst(dt: datetime) -> datetime:
+    """UTC の datetime を JST に変換する。"""
     utc_tz = pytz.timezone("UTC")
     jst_tz = pytz.timezone("Asia/Tokyo")
     if dt.tzinfo is None:
@@ -41,6 +46,7 @@ def utc_to_jst(dt: datetime) -> datetime:
 
 
 def build_vod_link(url: str | None, offset_seconds: int) -> str | None:
+    """VOD URL にオフセット秒のタイムスタンプパラメータを付与する。"""
     if not url:
         return None
     # 既に ? がある場合も想定（必要なら厳密化）
@@ -49,6 +55,7 @@ def build_vod_link(url: str | None, offset_seconds: int) -> str | None:
 
 
 def build_youtube_link(url: str | None, offset_seconds: int) -> str | None:
+    """YouTube URL にオフセット秒のタイムスタンプパラメータを付与する。"""
     if not url:
         return None
     try:
@@ -62,6 +69,7 @@ def build_youtube_link(url: str | None, offset_seconds: int) -> str | None:
 
 
 def split_filter_terms(raw: str | None):
+    """カンマ・スペース・読点区切りのフィルタ文字列をリストに分割する。"""
     if not raw:
         return []
     return [term for term in re.split(r"[\s,、]+", raw.strip()) if term]
@@ -72,6 +80,7 @@ EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def normalize_emote_id(raw_emote_id) -> str | None:
+    """エモート ID を正規化して返す。無効な場合は None。"""
     if raw_emote_id is None:
         return None
     raw_value = str(raw_emote_id)
@@ -86,6 +95,7 @@ def normalize_emote_id(raw_emote_id) -> str | None:
 
 
 def parse_raw_comment(raw_json):
+    """raw_json フィールドを dict にパースして返す。"""
     if not raw_json:
         return None
     if isinstance(raw_json, dict):
@@ -117,6 +127,7 @@ def _normalize_utc_datetime(value) -> datetime | None:
 
 
 def render_comment_body_html(raw_json, fallback_body):
+    """コメントの raw_json からエモート付き HTML を生成する。"""
     data = parse_raw_comment(raw_json)
     fragments = None
     if isinstance(data, dict):
@@ -161,6 +172,7 @@ def _normalize_body_html_version(value) -> int | None:
 
 
 def get_comment_body_html(row) -> str:
+    """コメント行から body_html を取得または生成して返す。"""
     stored_body_html = row.get("body_html")
     if (
         stored_body_html is not None
@@ -171,6 +183,7 @@ def get_comment_body_html(row) -> str:
 
 
 def build_comment_body_select_sql(alias: str = "c") -> str:
+    """コメント本文 HTML 取得用の SELECT カラム断片 SQL を返す。"""
     return f"""
                     {alias}.body,
                     {alias}.body_html,
@@ -185,6 +198,7 @@ def build_comment_body_select_sql(alias: str = "c") -> str:
 
 
 def decorate_comment(row, now):
+    """コメント行に body_html・時刻表示・VOD リンク等の装飾フィールドを追加する。"""
     r = dict(row)
     r["body_html"] = get_comment_body_html(r)
     r.pop("raw_json", None)

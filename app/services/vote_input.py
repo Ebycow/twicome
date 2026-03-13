@@ -1,7 +1,10 @@
+"""投票入力バリデーション"""
+
 MAX_VOTE_BULK_IDS = 200
 
 
 def normalize_comment_ids(comment_ids: list[str]) -> list[str]:
+    """コメント ID リストを正規化・重複排除して返す。件数超過時は ValueError。"""
     normalized_ids: list[str] = []
     seen = set()
     for comment_id in comment_ids:

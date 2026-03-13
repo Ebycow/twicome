@@ -54,6 +54,7 @@ def get_emotion_axes() -> list[dict[str, str]]:
 
 def similar_search(login: str, query_text: str, top_k: int = 20) -> list[tuple[str, float]] | None:
     """意味的類似検索。
+
     Returns: [(comment_id, score), ...] または None (インデックス未作成)
     """
     if not _is_enabled():
@@ -74,6 +75,7 @@ def similar_search(login: str, query_text: str, top_k: int = 20) -> list[tuple[s
 
 def centroid_search(login: str, position: float, top_k: int = 50) -> list[tuple[str, float]] | None:
     """重心距離検索。position: 0.0=典型的, 1.0=珍しい
+
     Returns: [(comment_id, centroid_similarity), ...] または None
     """
     if not _is_enabled():
@@ -94,6 +96,7 @@ def centroid_search(login: str, position: float, top_k: int = 50) -> list[tuple[
 
 def get_clusters(login: str, n_clusters: int = 8) -> list[dict] | None:
     """K-means クラスタリングで発言パターンを分類する。
+
     Returns: [{"cluster_id": int, "size": int, "representative_ids": [str, ...]}, ...] または None
     """
     if not _is_enabled():
@@ -114,6 +117,7 @@ def get_clusters(login: str, n_clusters: int = 8) -> list[dict] | None:
 
 def get_cluster_members(login: str, centroid: list[float], n_members: int) -> list[str] | None:
     """クラスタの重心に近い上位 n_members 件のコメントIDを返す。
+
     Returns: [comment_id, ...] または None
     """
     if not _is_enabled():
@@ -134,6 +138,7 @@ def get_cluster_members(login: str, centroid: list[float], n_members: int) -> li
 
 def get_subclusters(login: str, centroid: list[float], n_members: int, n_clusters: int = 4) -> list[dict] | None:
     """親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+
     Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "centroid": [...]}, ...] または None
     """
     if not _is_enabled():
@@ -154,6 +159,7 @@ def get_subclusters(login: str, centroid: list[float], n_members: int, n_cluster
 
 def emotion_search(login: str, weights: dict[str, float], top_k: int = 50) -> list[tuple[str, float]] | None:
     """感情アンカー検索。各感情の重みを合成したベクトルで検索。
+
     weights: {"joy": 0.8, "surprise": 0.5, ...}
     Returns: [(comment_id, score), ...] または None
     """

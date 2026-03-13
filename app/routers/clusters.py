@@ -15,6 +15,8 @@ router = APIRouter()
 
 
 class SubclusterRequest(BaseModel):
+    """サブクラスタリングリクエスト（クラスタ探索ページ用）。"""
+
     centroid: list[float]
     n_members: int
     n_clusters: int = 4

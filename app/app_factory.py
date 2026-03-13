@@ -1,3 +1,5 @@
+"""FastAPI アプリケーションファクトリ"""
+
 import json
 from pathlib import Path
 
@@ -31,6 +33,7 @@ def _render_service_worker_script() -> str:
 
 @app.get("/sw.js", include_in_schema=False)
 def service_worker():
+    """Service Worker JS を返す。"""
     response = Response(_render_service_worker_script(), media_type="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache"
@@ -39,11 +42,13 @@ def service_worker():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
+    """favicon を返す。"""
     return FileResponse("static/icons/favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/manifest.json", include_in_schema=False)
 def pwa_manifest():
+    """PWA マニフェスト JSON を返す。"""
     base = ROOT_PATH  # e.g. "" (dev) or "/twicome" (prod)
     icons_base = f"{base}/static/icons"
     sizes = [36, 48, 72, 96, 128, 144, 152, 192, 256, 384, 512]
@@ -73,6 +78,7 @@ def pwa_manifest():
 
 @app.get("/health")
 def health():
+    """ヘルスチェックエンドポイント。"""
     return JSONResponse({"status": "ok"})
 
 

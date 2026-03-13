@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Twitch ユーザーID 取得ユーティリティ"""
 
 import argparse
 from pathlib import Path
@@ -7,6 +8,7 @@ import requests
 
 
 def load_env(path: Path) -> dict[str, str]:
+    """.env ファイルを読み込んで key-value dict を返す。"""
     env: dict[str, str] = {}
     if not path.exists():
         return env
@@ -25,6 +27,7 @@ def load_env(path: Path) -> dict[str, str]:
 
 
 def get_user_id(username: str, client_id: str, access_token: str) -> str | None:
+    """Twitch API でユーザー名からユーザー ID を取得する。"""
     url = "https://api.twitch.tv/helix/users"
     headers = {
         "Client-ID": client_id,
@@ -41,6 +44,7 @@ def get_user_id(username: str, client_id: str, access_token: str) -> str | None:
 
 
 def main() -> int:
+    """Twitch ユーザー ID を取得するエントリーポイント。"""
     parser = argparse.ArgumentParser(description="Get Twitch user ID from username")
     parser.add_argument("username", help="取得したいTwitchチャンネルのユーザー名")
     parser.add_argument(

@@ -1,3 +1,5 @@
+"""コメント本文 HTML レンダリングユーティリティ（バッチ用）。"""
+
 import html
 import json
 import re
@@ -10,6 +12,7 @@ EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def normalize_emote_id(raw_emote_id) -> str | None:
+    """エモート ID を正規化して返す。無効な場合は None。"""
     if raw_emote_id is None:
         return None
     raw_value = str(raw_emote_id)
@@ -24,6 +27,7 @@ def normalize_emote_id(raw_emote_id) -> str | None:
 
 
 def parse_raw_comment(raw_json):
+    """raw_json フィールドを dict にパースして返す。"""
     if not raw_json:
         return None
     if isinstance(raw_json, dict):
@@ -39,6 +43,7 @@ def _sanitize_emote_text(text) -> str:
 
 
 def render_comment_body_html(raw_json, fallback_body):
+    """コメントの raw_json からエモート付き HTML を生成する。"""
     data = parse_raw_comment(raw_json)
     fragments = None
     if isinstance(data, dict):

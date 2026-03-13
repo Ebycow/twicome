@@ -35,6 +35,8 @@ router = APIRouter()
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
 
 class CommentVotesRequest(BaseModel):
+    """コメント投票数一括取得リクエスト。"""
+
     comment_ids: list[str] = Field(default_factory=list)
 
 

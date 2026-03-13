@@ -1,3 +1,5 @@
+"""Twitch VOD リスト取得バッチスクリプト。"""
+
 import os
 from pathlib import Path
 
@@ -40,6 +42,7 @@ def get_live_user_ids(user_ids, access_token, client_id):
 
 # ✅ VODデータを取得する関数（ページネーション対応）
 def get_all_vods(user_id, access_token, client_id):
+    """指定ユーザーの全 VOD データをページネーションで取得して返す。"""
     url = f"https://api.twitch.tv/helix/videos?user_id={user_id}&first=100"
     headers = {
         "Client-ID": client_id,
@@ -75,6 +78,7 @@ def get_all_vods(user_id, access_token, client_id):
 
 
 def main():
+    """VOD リスト取得バッチのエントリーポイント。"""
     access_token = os.getenv("ACCESS_TOKEN")
     client_id = os.getenv("CLIENT_ID")
     target_users_csv = Path(os.getenv("TARGET_USERS_CSV", str(DEFAULT_DATA_DIR / "targetusers.csv")))

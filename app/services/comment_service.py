@@ -1,7 +1,6 @@
 """コメント閲覧・ページネーションの業務ロジック。
 
-user_comments_page（HTML）と user_comments_api（JSON）の両ハンドラが
-fetch_user_comment_page() を共有する。
+user_comments_page（HTML）と user_comments_api（JSON）の両ハンドラが fetch_user_comment_page() を共有する。
 """
 import math
 from dataclasses import dataclass, field
@@ -41,6 +40,8 @@ def _parse_jst_date_to_utc_range(
 
 @dataclass
 class CommentPage:
+    """コメント一覧ページのデータを保持するデータクラス。"""
+
     user: dict
     comments: list[dict]
     total: int
@@ -71,8 +72,8 @@ def fetch_user_comment_page(
     load_meta: bool = False,
 ) -> CommentPage:
     """ユーザーのコメント一覧ページデータを返す。
-    user が存在しない場合は ValueError を raise する。
 
+    user が存在しない場合は ValueError を raise する。
     user を渡すと find_user クエリをスキップできる（ルーター側で取得済みの場合）。
     load_meta=True のとき vod_options / owner_options を取得する（HTML ページ用）。
     """
@@ -182,6 +183,7 @@ def export_user_comments(
     vod_id: int | None = None,
 ) -> list[dict]:
     """エクスポート用にコメントを最大 _EXPORT_LIMIT 件取得する。
+
     date を指定すると date_from/date_to より優先して単日フィルタになる。
     """
     user = user_repo.find_user(db, login, platform)

@@ -52,6 +52,7 @@ _emotion_lock = threading.Lock()
 
 def get_emotion_embeddings() -> dict[str, np.ndarray]:
     """各感情の双極軸ベクトルを返す。
+
     positive - negative の方向を正規化したベクトル。
     """
     global _emotion_embeddings
@@ -218,37 +219,51 @@ def get_user_index(login: str) -> UserIndex:
 
 # --- リクエスト/レスポンスモデル ---
 class EmbedRequest(BaseModel):
+    """テキスト埋め込みリクエスト。"""
+
     texts: list[str]
     normalize: bool = True
 
 
 class IndexUpdateRequest(BaseModel):
+    """インデックス更新リクエスト。"""
+
     comment_ids: list[str]
     texts: list[str]
 
 
 class SimilarSearchRequest(BaseModel):
+    """意味的類似検索リクエスト。"""
+
     query: str
     top_k: int = 20
 
 
 class CentroidSearchRequest(BaseModel):
+    """重心距離検索リクエスト。"""
+
     position: float = 0.5
     top_k: int = 50
 
 
 class EmotionSearchRequest(BaseModel):
+    """感情アンカー検索リクエスト。"""
+
     weights: dict[str, float]
     top_k: int = 50
 
 
 class SubclusterRequest(BaseModel):
+    """サブクラスタリングリクエスト。"""
+
     centroid: list[float]        # 親クラスタの正規化済み重心ベクトル
     n_members: int               # 親クラスタのサイズ（検索上限として使用）
     n_clusters: int = 4          # サブクラスタ数
 
 
 class ClusterMembersRequest(BaseModel):
+    """クラスタメンバー取得リクエスト。"""
+
     centroid: list[float]        # クラスタの正規化済み重心ベクトル
     n_members: int               # 取得する件数
 
@@ -326,6 +341,7 @@ def update_index(login: str, req: IndexUpdateRequest):
 @app.get("/index/clusters/{login}")
 def get_clusters(login: str, n_clusters: int = 8):
     """K-means クラスタリングで発言パターンを分類する。
+
     各クラスタの件数と代表コメントID (重心に近い上位3件) を返す。
     """
     ui = get_user_index(login)
@@ -379,6 +395,7 @@ def get_clusters(login: str, n_clusters: int = 8):
 @app.post("/index/subcluster/{login}")
 def subcluster(login: str, req: SubclusterRequest):
     """親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+
     重心に近い上位 n_members 件を取得し、その中でさらに K-means を実行する。
     """
     ui = get_user_index(login)
@@ -392,8 +409,8 @@ def subcluster(login: str, req: SubclusterRequest):
     with ui.lock:
         dim = ui.index.d
         # 親クラスタの重心に近い上位 n_members 件を取得
-        D, I = ui.index.search(centroid, n_members)
-        member_indices = I[0]
+        D, index = ui.index.search(centroid, n_members)
+        member_indices = index[0]
 
         member_vecs = np.empty((len(member_indices), dim), dtype=np.float32)
         for i, idx in enumerate(member_indices):
@@ -442,8 +459,8 @@ def cluster_members(login: str, req: ClusterMembersRequest):
     n_members = min(req.n_members, ui.index.ntotal)
 
     with ui.lock:
-        _, I = ui.index.search(centroid, n_members)
-        member_ids = [ui.comment_ids[int(idx)] for idx in I[0] if 0 <= int(idx) < len(ui.comment_ids)]
+        _, index = ui.index.search(centroid, n_members)
+        member_ids = [ui.comment_ids[int(idx)] for idx in index[0] if 0 <= int(idx) < len(ui.comment_ids)]
 
     return {"comment_ids": member_ids}
 

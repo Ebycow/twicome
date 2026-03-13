@@ -69,6 +69,7 @@ BACKUP_DIR = os.getenv("COMMUNITY_NOTE_BACKUP_DIR", str(PROJECT_ROOT / "data" / 
 
 
 def get_db_connection():
+    """MySQL データベース接続を返す。"""
     return mysql.connector.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
@@ -239,6 +240,7 @@ def save_community_note(cur, comment_id: str, note_data: dict):
 
 
 def main():
+    """コミュニティノート生成バッチのエントリーポイント。"""
     parser = argparse.ArgumentParser(description="コミュニティノート生成バッチ")
     parser.add_argument("-f", "--force", action="store_true",
                         help="生成済みのコミュニティノートも含めて全件再生成する")

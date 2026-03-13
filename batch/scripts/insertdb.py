@@ -1,3 +1,5 @@
+"""VOD コメント JSON ファイルを MySQL にインポートするスクリプト。"""
+
 import argparse
 import hashlib
 import json
@@ -51,6 +53,7 @@ def parse_dt_utc(dt_str: str | None) -> datetime | None:
 
 def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: str | None,
                 profile_image_url: str | None, platform: str) -> None:
+    """users テーブルにユーザーを upsert する。"""
     sql = """
     INSERT INTO users (user_id, login, display_name, profile_image_url, platform, created_at, updated_at)
     VALUES (%s, %s, %s, %s, %s, NOW(6), NOW(6))
@@ -65,6 +68,7 @@ def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: str | 
 
 
 def upsert_vod(cur: MySQLCursor, vod: dict[str, Any], streamer: dict[str, Any], platform: str) -> int:
+    """vods テーブルに VOD を upsert して vod_id を返す。"""
     vod_id = int(vod["id"])
     owner_user_id = int(streamer["id"])
 
@@ -111,6 +115,7 @@ def upsert_vod(cur: MySQLCursor, vod: dict[str, Any], streamer: dict[str, Any], 
 
 
 def insert_comment(cur: MySQLCursor, vod_id: int, c: dict[str, Any], platform: str) -> None:
+    """comments テーブルにコメントを upsert する。"""
     comment_id = c["_id"]
     offset_seconds = int(c.get("content_offset_seconds", 0))
     created_at_utc = parse_dt_utc(c.get("created_at"))
@@ -175,6 +180,7 @@ def vod_already_ingested(cur: MySQLCursor, vod_id: int) -> bool:
 
 
 def compute_sha256(path: str) -> str:
+    """ファイルの SHA-256 ハッシュ値を返す。"""
     hasher = hashlib.sha256()
     with open(path, "rb") as f:
         while True:
@@ -186,6 +192,7 @@ def compute_sha256(path: str) -> str:
 
 
 def get_vod_ingest_marker(cur: MySQLCursor, vod_id: int) -> tuple[str, int] | None:
+    """vod_ingest_markers テーブルから取り込み完了マーカーを取得する。"""
     try:
         cur.execute(
             """
@@ -218,6 +225,7 @@ def upsert_vod_ingest_marker(
     source_file_size: int,
     comments_ingested: int,
 ) -> None:
+    """vod_ingest_markers テーブルに取り込み完了マーカーを upsert する。"""
     cur.execute(
         """
         INSERT INTO vod_ingest_markers
@@ -237,6 +245,7 @@ def upsert_vod_ingest_marker(
 
 
 def list_comment_json_files(dir_path: str) -> list[tuple[str, str, int]]:
+    """ディレクトリ内のコメント JSON ファイル一覧を返す。"""
     items: list[tuple[str, str, int]] = []
     for name in sorted(os.listdir(dir_path)):
         m = VOD_JSON_RE.match(name)
@@ -250,6 +259,7 @@ def list_comment_json_files(dir_path: str) -> list[tuple[str, str, int]]:
 
 
 def resolve_input_dir(raw_path: str) -> str:
+    """入力ディレクトリパスを絶対パスに解決する。"""
     path = Path(raw_path)
     if not path.is_absolute():
         path = PROJECT_ROOT / path
@@ -257,6 +267,7 @@ def resolve_input_dir(raw_path: str) -> str:
 
 
 def parse_args() -> argparse.Namespace:
+    """コマンドライン引数をパースして返す。"""
     parser = argparse.ArgumentParser(
         description="Import VOD comment JSON files into MySQL."
     )
@@ -274,6 +285,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -> tuple[int, int]:
+    """1 つの VOD JSON ファイルを DB に取り込む。(vod_id, comment_count) を返す。"""
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
@@ -317,6 +329,7 @@ def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -
 
 
 def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
+    """ディレクトリ内の全 VOD JSON ファイルを DB に取り込む。"""
     if not os.path.isdir(dir_path):
         raise FileNotFoundError(f"COMMENTS_DIR not found: {dir_path}")
 

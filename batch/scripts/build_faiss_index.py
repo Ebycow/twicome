@@ -131,6 +131,7 @@ def update_index_for_user(conn, login: str):
 
 
 def main():
+    """FAISS インデックス構築のエントリーポイント。"""
     # 対象ユーザの決定
     if len(sys.argv) > 1:
         target_users = sys.argv[1:]
