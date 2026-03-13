@@ -2,6 +2,7 @@
 コメント関連のデータアクセス層。
 WHERE 句・ORDER BY 句の構築を含む SQL を封じ込める。
 """
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import text
@@ -29,8 +30,15 @@ _COL_LIST = f"""
 """
 
 
-def _build_where(uid: int, vod_id: Optional[int], owner_user_id: Optional[int],
-                 q: Optional[str], exclude_terms: list[str]) -> tuple[str, dict]:
+def _build_where(
+    uid: int,
+    vod_id: Optional[int],
+    owner_user_id: Optional[int],
+    q: Optional[str],
+    exclude_terms: list[str],
+    date_from_utc: Optional[datetime] = None,
+    date_to_utc: Optional[datetime] = None,
+) -> tuple[str, dict]:
     """WHERE 句の SQL 文字列とパラメータを返す。"""
     where = ["c.commenter_user_id = :uid"]
     params: dict = {"uid": uid}
@@ -51,6 +59,14 @@ def _build_where(uid: int, vod_id: Optional[int], owner_user_id: Optional[int],
         key = f"exclude_q_like_{idx}"
         where.append(f"c.body NOT LIKE :{key}")
         params[key] = f"%{term}%"
+
+    if date_from_utc is not None:
+        where.append("c.comment_created_at_utc >= :date_from_utc")
+        params["date_from_utc"] = date_from_utc
+
+    if date_to_utc is not None:
+        where.append("c.comment_created_at_utc < :date_to_utc")
+        params["date_to_utc"] = date_to_utc
 
     return " AND ".join(where), params
 
@@ -80,9 +96,14 @@ def count_comments(
     owner_user_id: Optional[int] = None,
     q: Optional[str] = None,
     exclude_terms: Optional[list[str]] = None,
+    date_from_utc: Optional[datetime] = None,
+    date_to_utc: Optional[datetime] = None,
 ) -> int:
     """フィルタ条件に合うコメント数を返す。"""
-    where_sql, params = _build_where(uid, vod_id, owner_user_id, q, exclude_terms or [])
+    where_sql, params = _build_where(
+        uid, vod_id, owner_user_id, q, exclude_terms or [],
+        date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+    )
     # owner_user_id フィルター時のみ vods JOIN が必要
     count_from = (
         "FROM comments c JOIN vods v ON v.vod_id = c.vod_id"
@@ -116,12 +137,17 @@ def fetch_comments(
     sort: str = "created_at",
     limit: int = 50,
     offset: int = 0,
+    date_from_utc: Optional[datetime] = None,
+    date_to_utc: Optional[datetime] = None,
 ) -> list[dict]:
     """
     フィルタ・ソート・ページネーションを適用してコメントを取得する。
     sort=created_at かつフィルタなしの場合、サブクエリ最適化を使用する。
     """
-    where_sql, params = _build_where(uid, vod_id, owner_user_id, q, exclude_terms or [])
+    where_sql, params = _build_where(
+        uid, vod_id, owner_user_id, q, exclude_terms or [],
+        date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+    )
     order_sql = _build_order(sort)
     params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
 
@@ -131,6 +157,8 @@ def fetch_comments(
         and owner_user_id is None
         and not q
         and not (exclude_terms or [])
+        and date_from_utc is None
+        and date_to_utc is None
     )
 
     if use_subquery:

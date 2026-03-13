@@ -6,11 +6,40 @@ fetch_user_comment_page() を共有する。
 """
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from repositories import comment_repo, user_repo
 from services.comment_utils import decorate_comment, split_filter_terms
+
+JST = timezone(timedelta(hours=9))
+_EXPORT_LIMIT = 5000
+
+
+def _parse_jst_date_to_utc_range(
+    date_from: Optional[str],
+    date_to: Optional[str],
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """
+    YYYY-MM-DD (JST) の日付文字列を UTC datetime の範囲に変換する。
+    date_from → その日の 00:00:00 JST (= UTC -9h)
+    date_to   → 翌日の 00:00:00 JST (exclusive, = UTC -9h)
+    """
+    date_from_utc: Optional[datetime] = None
+    date_to_utc: Optional[datetime] = None
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=JST)
+            date_from_utc = d.astimezone(timezone.utc).replace(tzinfo=None)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=JST)
+            date_to_utc = (d + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+        except ValueError:
+            pass
+    return date_from_utc, date_to_utc
 
 
 @dataclass
@@ -36,6 +65,8 @@ def fetch_user_comment_page(
     owner_user_id: Optional[int] = None,
     q: Optional[str] = None,
     exclude_q: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     sort: str = "created_at",
@@ -57,6 +88,7 @@ def fetch_user_comment_page(
     uid = user["user_id"]
     exclude_terms = split_filter_terms(exclude_q)
     page_title = "コメント一覧"
+    date_from_utc, date_to_utc = _parse_jst_date_to_utc_range(date_from, date_to)
 
     # ── メタ情報（HTML ページのみ）───────────────────────────────────────────
     vod_options: list[dict] = []
@@ -86,6 +118,7 @@ def fetch_user_comment_page(
             total = comment_repo.count_comments(
                 db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
                 q=q, exclude_terms=exclude_terms,
+                date_from_utc=date_from_utc, date_to_utc=date_to_utc,
             )
             offset = 0
             pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
@@ -93,12 +126,14 @@ def fetch_user_comment_page(
                 db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
                 q=q, exclude_terms=exclude_terms, sort=sort,
                 limit=page_size, offset=offset,
+                date_from_utc=date_from_utc, date_to_utc=date_to_utc,
             )
     else:
         # ── 通常ページネーション ─────────────────────────────────────────────
         total = comment_repo.count_comments(
             db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
             q=q, exclude_terms=exclude_terms,
+            date_from_utc=date_from_utc, date_to_utc=date_to_utc,
         )
         pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
         page = min(page, pages) if pages else 1
@@ -107,6 +142,7 @@ def fetch_user_comment_page(
             db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
             q=q, exclude_terms=exclude_terms, sort=sort,
             limit=page_size, offset=offset,
+            date_from_utc=date_from_utc, date_to_utc=date_to_utc,
         )
 
     now = datetime.now(timezone.utc)
@@ -127,8 +163,55 @@ def fetch_user_comment_page(
             "owner_user_id": owner_user_id,
             "q": q,
             "exclude_q": exclude_q,
+            "date_from": date_from,
+            "date_to": date_to,
             "page_size": page_size,
             "sort": sort,
             "cursor": cursor,
         },
     )
+
+
+def export_user_comments(
+    db,
+    login: str,
+    platform: str,
+    *,
+    date: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    q: Optional[str] = None,
+    exclude_q: Optional[str] = None,
+    owner_user_id: Optional[int] = None,
+    vod_id: Optional[int] = None,
+) -> list[dict]:
+    """
+    エクスポート用にコメントを最大 _EXPORT_LIMIT 件取得する。
+    date を指定すると date_from/date_to より優先して単日フィルタになる。
+    """
+    user = user_repo.find_user(db, login, platform)
+    if user is None:
+        raise ValueError(f"ユーザが見つかりませんでした: {platform}/{login}")
+
+    uid = user["user_id"]
+    exclude_terms = split_filter_terms(exclude_q)
+
+    # date は単日指定 → date_from/to に展開
+    effective_from = date if date else date_from
+    effective_to = date if date else date_to
+    date_from_utc, date_to_utc = _parse_jst_date_to_utc_range(effective_from, effective_to)
+
+    rows = comment_repo.fetch_comments(
+        db, uid,
+        vod_id=vod_id,
+        owner_user_id=owner_user_id,
+        q=q,
+        exclude_terms=exclude_terms,
+        sort="created_at",
+        limit=_EXPORT_LIMIT,
+        offset=0,
+        date_from_utc=date_from_utc,
+        date_to_utc=date_to_utc,
+    )
+    now = datetime.now(timezone.utc)
+    return [decorate_comment(row, now) for row in rows]

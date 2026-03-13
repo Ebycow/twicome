@@ -289,6 +289,14 @@
             <label>除外ワード</label>
             <input name="exclude_q" value="{{ filters.exclude_q or '' }}" placeholder="含まれると除外（空白/カンマ区切り）" />
           </div>
+          <div class="wide">
+            <label>日付(JST)</label>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="date" name="date_from" value="{{ filters.date_from or '' }}" style="flex:1; min-width:0;" />
+              <span style="color:var(--label-color); white-space:nowrap;">〜</span>
+              <input type="date" name="date_to" value="{{ filters.date_to or '' }}" style="flex:1; min-width:0;" />
+            </div>
+          </div>
           <div>
             <label for="select-sort">並び</label>
             <select id="select-sort" name="sort">
@@ -394,6 +402,53 @@
         </details>
       </div>
       {% endif %}
+
+      <div class="card" style="margin-top:12px;">
+        <details id="export-details">
+          <summary>エクスポート</summary>
+          <div id="export-data-version" class="meta" style="margin:8px 0 12px; font-size:0.85rem;"></div>
+
+          <div style="margin-bottom:14px;">
+            <div class="section-title" style="font-size:0.85rem; margin-bottom:6px;">今日の投稿</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="export-today-btn" data-format="csv">CSV</button>
+              <button type="button" class="export-today-btn" data-format="json">JSON</button>
+              <button type="button" class="export-today-btn" data-format="txt">テキスト</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div class="section-title" style="font-size:0.85rem; margin-bottom:6px;">昨日の投稿</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="export-yesterday-btn" data-format="csv">CSV</button>
+              <button type="button" class="export-yesterday-btn" data-format="json">JSON</button>
+              <button type="button" class="export-yesterday-btn" data-format="txt">テキスト</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div class="section-title" style="font-size:0.85rem; margin-bottom:6px;">日付範囲指定</div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+              <input type="date" id="export-date-from" style="flex:1; min-width:120px;" />
+              <span style="color:var(--label-color); white-space:nowrap;">〜</span>
+              <input type="date" id="export-date-to" style="flex:1; min-width:120px;" />
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="export-range-btn" data-format="csv">CSV</button>
+              <button type="button" class="export-range-btn" data-format="json">JSON</button>
+              <button type="button" class="export-range-btn" data-format="txt">テキスト</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title" style="font-size:0.85rem; margin-bottom:6px;">現在のフィルター条件で全件取得</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="export-current-btn" data-format="csv">CSV</button>
+              <button type="button" class="export-current-btn" data-format="json">JSON</button>
+            </div>
+          </div>
+        </details>
+      </div>
 
     {% endif %}
     </div><!-- end #side-drawer -->
@@ -1506,6 +1561,86 @@
         if (fabTop) fabTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
         const filterForm = document.querySelector('form');
         if (filterForm) filterForm.addEventListener('submit', closeDrawer);
+      })();
+    </script>
+    <script>
+      (function () {
+        // ── エクスポート機能 ─────────────────────────────────────────────────
+        const exportDetails = document.getElementById('export-details');
+        if (!exportDetails) return;
+
+        // data-version 表示
+        const dvEl = document.getElementById('export-data-version');
+        if (dvEl) {
+          fetch(`${rootPath}/api/meta/data-version`)
+            .then(r => r.json())
+            .then(data => {
+              const base = (data.data_version || '').split(':')[0];
+              if (base && base.length >= 14) {
+                const y = base.slice(0, 4), mo = base.slice(4, 6), d = base.slice(6, 8);
+                const h = base.slice(8, 10), mi = base.slice(10, 12);
+                dvEl.textContent = `データ更新: ${y}/${mo}/${d} ${h}:${mi}`;
+              }
+            })
+            .catch(() => {});
+        }
+
+        // JST 今日の日付を YYYY-MM-DD で返す
+        function todayJST() {
+          const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+          return now.toISOString().slice(0, 10);
+        }
+
+        // エクスポート URL を組み立てて遷移
+        function doExport(params) {
+          const url = new URL(`${location.origin}${rootPath}/u/${encodeURIComponent(userLogin)}/export`);
+          Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
+          location.href = url.toString();
+        }
+
+        // 今日
+        exportDetails.querySelectorAll('.export-today-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            doExport({ format: btn.dataset.format, date: todayJST() });
+          });
+        });
+
+        // 昨日
+        function yesterdayJST() {
+          const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+          now.setUTCDate(now.getUTCDate() - 1);
+          return now.toISOString().slice(0, 10);
+        }
+        exportDetails.querySelectorAll('.export-yesterday-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            doExport({ format: btn.dataset.format, date: yesterdayJST() });
+          });
+        });
+
+        // 日付範囲
+        exportDetails.querySelectorAll('.export-range-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const from = document.getElementById('export-date-from').value;
+            const to = document.getElementById('export-date-to').value;
+            if (!from && !to) { alert('日付を入力してください'); return; }
+            doExport({ format: btn.dataset.format, date_from: from, date_to: to });
+          });
+        });
+
+        // 現在フィルター
+        exportDetails.querySelectorAll('.export-current-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            doExport({
+              format: btn.dataset.format,
+              date_from: filters.date_from || '',
+              date_to: filters.date_to || '',
+              q: filters.q || '',
+              exclude_q: filters.exclude_q || '',
+              owner_user_id: filters.owner_user_id || '',
+              vod_id: filters.vod_id || '',
+            });
+          });
+        });
       })();
     </script>
     <script>

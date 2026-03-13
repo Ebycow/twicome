@@ -1,7 +1,12 @@
+import csv
+import io
+import json
+import re
+from datetime import date as date_type
 from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from cache import (
@@ -21,7 +26,7 @@ from core.config import DEFAULT_PLATFORM, FAISS_ENABLED, QUICK_LINK_LOGINS
 from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo, vote_repo
-from services.comment_service import fetch_user_comment_page
+from services.comment_service import export_user_comments, fetch_user_comment_page
 from services.rate_limit import InMemoryRateLimiter
 from services.vote_input import MAX_VOTE_BULK_IDS, normalize_comment_ids
 from services.index_service import build_index_context, build_landing_data
@@ -95,6 +100,8 @@ def _is_initial_comments_page_request(
     owner_user_id: Optional[int],
     q: Optional[str],
     exclude_q: Optional[str],
+    date_from: Optional[str],
+    date_to: Optional[str],
     page: int,
     page_size: int,
     sort: str,
@@ -105,6 +112,8 @@ def _is_initial_comments_page_request(
         and owner_user_id is None
         and not q
         and not exclude_q
+        and not date_from
+        and not date_to
         and page == 1
         and page_size == 50
         and sort == "created_at"
@@ -219,6 +228,8 @@ def user_comments_page(
     owner_user_id: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     exclude_q: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
@@ -233,6 +244,8 @@ def user_comments_page(
         owner_user_id=owner_user_id_int,
         q=q,
         exclude_q=exclude_q,
+        date_from=date_from,
+        date_to=date_to,
         page=page,
         page_size=page_size,
         sort=sort,
@@ -256,7 +269,9 @@ def user_comments_page(
                 db, login, platform,
                 user=user_row_raw,
                 vod_id=vod_id_int, owner_user_id=owner_user_id_int,
-                q=q, exclude_q=exclude_q, page=page, page_size=page_size,
+                q=q, exclude_q=exclude_q,
+                date_from=date_from, date_to=date_to,
+                page=page, page_size=page_size,
                 sort=sort, cursor=cursor,
                 load_meta=should_load_meta,
             )
@@ -279,6 +294,8 @@ def user_comments_page(
                         "owner_user_id": owner_user_id_int,
                         "q": q,
                         "exclude_q": exclude_q,
+                        "date_from": date_from,
+                        "date_to": date_to,
                         "page_size": page_size,
                         "sort": sort,
                     },
@@ -323,6 +340,8 @@ def user_comments_api(
     owner_user_id: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     exclude_q: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
@@ -336,7 +355,9 @@ def user_comments_api(
             page_data = fetch_user_comment_page(
                 db, login, platform,
                 vod_id=vod_id_int, owner_user_id=owner_user_id_int,
-                q=q, exclude_q=exclude_q, page=page, page_size=page_size,
+                q=q, exclude_q=exclude_q,
+                date_from=date_from, date_to=date_to,
+                page=page, page_size=page_size,
                 sort=sort, cursor=cursor,
             )
         except ValueError:
@@ -373,6 +394,121 @@ def comment_votes_api_post(payload: CommentVotesRequest):
     with SessionLocal() as db:
         counts = comment_repo.fetch_comment_vote_counts(db, normalized_ids)
     return {"items": counts}
+
+
+# ── エクスポート ───────────────────────────────────────────────────────────────
+
+_RE_TAGS = re.compile(r"<[^>]+>")
+_RE_IMG_ALT = re.compile(r'<img\b[^>]*\balt="([^"]*)"[^>]*>', re.IGNORECASE)
+_EXPORT_CSV_HEADERS = ["投稿日時(JST)", "配信者", "VODタイトル", "VOD内時刻", "コメント本文", "bits消費"]
+
+
+def _strip_html(text: str) -> str:
+    # <img alt="Kappa"> をエモート名に置換してからタグ除去
+    text = _RE_IMG_ALT.sub(r"\1", text or "")
+    return _RE_TAGS.sub("", text).strip()
+
+
+def _comments_to_csv(comments: list[dict]) -> str:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_EXPORT_CSV_HEADERS)
+    for c in comments:
+        writer.writerow([
+            c.get("comment_created_at_jst", ""),
+            c.get("owner_login", ""),
+            c.get("vod_title", ""),
+            c.get("offset_hms", ""),
+            _strip_html(c.get("body_html", "")),
+            c.get("bits_spent") or "",
+        ])
+    return buf.getvalue()
+
+
+def _comments_to_txt(comments: list[dict]) -> str:
+    lines = []
+    for c in comments:
+        lines.append(
+            f"[{c.get('comment_created_at_jst', '')}] "
+            f"@{c.get('owner_login', '')} / {c.get('vod_title', '')} ({c.get('offset_hms', '')})\n"
+            f"{_strip_html(c.get('body_html', ''))}\n"
+        )
+    return "\n".join(lines)
+
+
+@router.get("/u/{login}/export")
+def user_comments_export(
+    login: str,
+    platform: str = Query(DEFAULT_PLATFORM),
+    format: str = Query("csv"),
+    date: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    exclude_q: Optional[str] = Query(None),
+    owner_user_id: Optional[str] = Query(None),
+    vod_id: Optional[str] = Query(None),
+):
+    vod_id_int = _parse_int(vod_id)
+    owner_user_id_int = _parse_int(owner_user_id)
+    format = format.lower()
+    if format not in ("csv", "json", "txt"):
+        format = "csv"
+
+    with SessionLocal() as db:
+        try:
+            comments = export_user_comments(
+                db, login, platform,
+                date=date,
+                date_from=date_from,
+                date_to=date_to,
+                q=q,
+                exclude_q=exclude_q,
+                owner_user_id=owner_user_id_int,
+                vod_id=vod_id_int,
+            )
+        except ValueError:
+            return JSONResponse({"error": "user_not_found"}, status_code=404)
+
+    # ファイル名: {login}_{date_range}.{ext}
+    label = date or (f"{date_from or ''}-{date_to or ''}".strip("-")) or "all"
+    filename = f"{login}_{label}.{format}"
+
+    if format == "csv":
+        content = _comments_to_csv(comments)
+        return Response(
+            content=content.encode("utf-8-sig"),  # BOM付きでExcelでも文字化けしない
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    if format == "json":
+        safe_comments = [
+            {
+                "comment_created_at_jst": c.get("comment_created_at_jst"),
+                "owner_login": c.get("owner_login"),
+                "vod_title": c.get("vod_title"),
+                "vod_id": c.get("vod_id"),
+                "offset_hms": c.get("offset_hms"),
+                "body": _strip_html(c.get("body_html", "")),
+                "bits_spent": c.get("bits_spent"),
+                "twicome_likes_count": c.get("twicome_likes_count"),
+                "twicome_dislikes_count": c.get("twicome_dislikes_count"),
+            }
+            for c in comments
+        ]
+        return Response(
+            content=json.dumps({"user": login, "total": len(safe_comments), "items": safe_comments},
+                               ensure_ascii=False, indent=2).encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    # txt
+    content = _comments_to_txt(comments)
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── 投票 ──────────────────────────────────────────────────────────────────────
