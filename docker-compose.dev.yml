@@ -185,6 +185,19 @@ services:
     networks:
       - backend
 
+  # ── Lint 実行用サービス（repo ルート全体を対象）─────────────────────────────
+  # 使い方:
+  #   lint:           docker compose -f docker-compose.dev.yml run --rm lint
+  #   format 確認:    docker compose -f docker-compose.dev.yml run --rm lint ruff format . --check
+  #   自動修正:       docker compose -f docker-compose.dev.yml run --rm lint ruff check . --fix
+  lint:
+    profiles: [lint]
+    build: ./app
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: ["ruff", "check", "."]
+
   # ── UI テスト実行用サービス（Playwright / Chromium）─────────────────────────
   # 使い方:
   #   UI テスト全体:   docker compose -f docker-compose.dev.yml run --rm test-ui
