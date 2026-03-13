@@ -21,7 +21,6 @@
 import re
 from datetime import datetime, timezone
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from tests.integration.helpers import seed_comment, seed_user, seed_vod

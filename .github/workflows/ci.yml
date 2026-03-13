@@ -291,18 +291,25 @@ jobs:
           FAISS_API_URL: ""
           HOST_CHECK_ENABLED: "false"
           ROOT_PATH: ""
+          COVERAGE_FILE: .coverage.ui
         run: |
           mkdir -p test-reports/ui
           pytest tests/ui -v \
-            --junitxml=test-reports/ui/junit.xml
+            --junitxml=test-reports/ui/junit.xml \
+            --cov=. \
+            --cov-config=.coveragerc \
+            --cov-report=
 
       - name: Upload UI test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-artifacts
-          path: app/test-reports/ui/junit.xml
+          path: |
+            app/.coverage.ui
+            app/test-reports/ui/junit.xml
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
 
   # ── app-only カバレッジ集計とテストレポート収集 ─────────────────────────────
@@ -341,11 +348,17 @@ jobs:
           name: integration-test-artifacts
           path: app/.ci-artifacts/integration
 
+      - name: Download UI test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-test-artifacts
+          path: app/.ci-artifacts/ui
+
       - name: Combine coverage and build reports
         working-directory: app
         run: |
           mkdir -p test-reports/combined
-          coverage combine .ci-artifacts/unit .ci-artifacts/integration
+          coverage combine .ci-artifacts/unit .ci-artifacts/integration .ci-artifacts/ui
           coverage report | tee test-reports/combined/coverage.txt
           coverage xml -o test-reports/combined/coverage.xml
           cp .ci-artifacts/unit/test-reports/unit/junit.xml test-reports/combined/junit-unit.xml
