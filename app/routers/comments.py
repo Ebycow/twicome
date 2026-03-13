@@ -151,6 +151,7 @@ def _build_user_comments_context(
     page_title: str,
     filters: dict,
     error: Optional[str],
+    data_version: str,
 ) -> dict:
     return {
         "request": request,
@@ -166,6 +167,7 @@ def _build_user_comments_context(
         "root_path": request.scope.get("root_path", ""),
         "page_title": page_title,
         "faiss_enabled": FAISS_ENABLED,
+        "data_version": data_version,
     }
 
 
@@ -300,6 +302,7 @@ def user_comments_page(
                         "sort": sort,
                     },
                     error=str(e),
+                    data_version=data_version,
                 ),
                 status_code=404,
                 headers=headers,
@@ -322,6 +325,7 @@ def user_comments_page(
         page_title=page_data.page_title,
         filters=page_data.filters,
         error=None,
+        data_version=data_version,
     )
 
     if can_use_initial_html_cache:

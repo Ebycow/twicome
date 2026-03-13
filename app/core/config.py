@@ -14,6 +14,7 @@ def get_database_url() -> str:
 DEFAULT_PLATFORM = os.getenv("DEFAULT_PLATFORM", "twitch")
 ROOT_PATH = os.getenv("ROOT_PATH", "/twicome").rstrip("/")
 DEFAULT_LOGIN = os.getenv("DEFAULT_LOGIN", "").strip()
+SERVICE_WORKER_CACHE_NAME = "twicome-v11"
 
 
 def _parse_bool_env(name: str, default: bool) -> bool:

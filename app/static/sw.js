@@ -1,4 +1,4 @@
-const CACHE_NAME = 'twicome-v10';
+const CACHE_NAME = __TWICOME_CACHE_NAME__;
 
 // SW のスコープから BASE パスを取得 (例: "" または "/twicome")
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -124,6 +124,36 @@ async function prefetchCommentsDocument(urlString) {
   return response;
 }
 
+async function refreshCommentsDocument(urlString) {
+  const url = new URL(urlString, self.location.origin);
+  if (url.origin !== self.location.origin || !isCommentsPageRequest(url)) {
+    throw new Error('invalid_refresh_url');
+  }
+
+  const cache = await caches.open(CACHE_NAME);
+  const cacheRequest = new Request(url.toString());
+  const headers = new Headers({
+    Accept: 'text/html',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    'X-Twicome-Refresh': '1',
+  });
+  const response = await fetchNavigate(url.toString(), headers, 'same-origin');
+
+  if (response.type === 'opaqueredirect') {
+    await cache.delete(cacheRequest);
+    await notifyAuthRedirect(url.toString());
+    return { authRedirect: true };
+  }
+  if (!response.ok) {
+    throw new Error(`refresh_failed:${response.status}`);
+  }
+
+  await cache.delete(cacheRequest);
+  await cache.put(cacheRequest, response.clone());
+  return { dataVersion: response.headers.get('X-Twicome-Data-Version') || null };
+}
+
 async function notifyTopPageUpdated(dataVersion) {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   for (const client of clients) {
@@ -195,23 +225,41 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   const data = event.data || {};
-  if (data.type !== 'twicome-prefetch-comments' || !data.url) return;
-
   const replyPort = event.ports && event.ports[0];
-  event.waitUntil(
-    prefetchCommentsDocument(data.url)
-      .then(() => {
-        if (replyPort) replyPort.postMessage({ ok: true });
-      })
-      .catch((error) => {
-        if (replyPort) {
-          replyPort.postMessage({
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      })
-  );
+  if (data.type === 'twicome-prefetch-comments' && data.url) {
+    event.waitUntil(
+      prefetchCommentsDocument(data.url)
+        .then(() => {
+          if (replyPort) replyPort.postMessage({ ok: true });
+        })
+        .catch((error) => {
+          if (replyPort) {
+            replyPort.postMessage({
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })
+    );
+    return;
+  }
+
+  if (data.type === 'twicome-refresh-comments' && data.url) {
+    event.waitUntil(
+      refreshCommentsDocument(data.url)
+        .then((result) => {
+          if (replyPort) replyPort.postMessage({ ok: true, ...result });
+        })
+        .catch((error) => {
+          if (replyPort) {
+            replyPort.postMessage({
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {

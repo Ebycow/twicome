@@ -733,6 +733,7 @@
       const form = loginInput.closest('form');
       const rootPath = {{ root_path | tojson }};
       const currentDataVersion = {{ data_version | tojson }};
+      const serviceWorkerCacheName = {{ service_worker_cache_name | tojson }};
       const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
       const serviceWorkerUrl = `${rootPath}/sw.js`;
       const offlineAccess = window.TwicomeOfflineAccess || {
@@ -898,7 +899,7 @@
             commentsPrefetchTransportMode = 'direct-fetch';
             if (window.location.hostname === 'localhost' || window.location.protocol === 'https:') {
               try {
-                const cache = await caches.open('twicome-v10');
+                const cache = await caches.open(serviceWorkerCacheName);
                 await cache.put(url, responseForCache);
                 commentsPrefetchTransportMode = 'window-cache-put';
               } catch {}

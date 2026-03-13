@@ -42,6 +42,18 @@ class TestIndex:
         assert resp.status_code == 200
         assert 'data-default-login="prefetch_target"' in resp.text
 
+    def test_index_embeds_service_worker_cache_name(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert 'const serviceWorkerCacheName = "twicome-v11";' in resp.text
+
+    def test_service_worker_script_embeds_cache_name(self, client):
+        resp = client.get("/sw.js")
+        assert resp.status_code == 200
+        assert "application/javascript" in resp.headers["content-type"]
+        assert "__TWICOME_CACHE_NAME__" not in resp.text
+        assert 'const CACHE_NAME = "twicome-v11";' in resp.text
+
 
 class TestUserCommentsPage:
     def test_unknown_user_returns_404(self, client):
@@ -118,6 +130,32 @@ class TestUserCommentsPage:
         assert saved["platform"] == "twitch"
         assert saved["login"] == "viewer"
         assert "初期キャッシュ確認" in saved["html"]
+        assert 'id="data-version-data"' in saved["html"]
+        assert "20260311000001" in saved["html"]
+
+    def test_user_comments_page_embeds_data_version_for_stale_cache_notice(self, client, db, monkeypatch):
+        import routers.comments as comments_router
+
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(
+            db,
+            comment_id="c1",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            body="更新通知テスト",
+        )
+
+        monkeypatch.setattr(comments_router, "get_data_version", lambda: "20260311000002:render")
+        monkeypatch.setattr(comments_router, "get_comments_html_cache", lambda version, platform, login: None)
+
+        resp = client.get("/u/viewer")
+        assert resp.status_code == 200
+        assert 'id="data-version-data"' in resp.text
+        assert "20260311000002:render" in resp.text
+        assert "最新のデータがあります" in resp.text
 
 
 class TestUserCommentsApi:

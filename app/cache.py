@@ -33,6 +33,7 @@ def _compute_render_version() -> str:
     candidates = [
         app_dir / "templates",
         app_dir / "static" / "sw.js",
+        app_dir / "core" / "config.py",
         app_dir / "routers" / "comments.py",
     ]
     mtimes: list[int] = []

@@ -1,8 +1,11 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+import json
+from pathlib import Path
+
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from core.config import FAISS_API_URL, ROOT_PATH
+from core.config import FAISS_API_URL, ROOT_PATH, SERVICE_WORKER_CACHE_NAME
 from core.middleware import CSRFProtectionMiddleware, HostCheckMiddleware, SecurityHeadersMiddleware
 from faiss_search import ping_faiss_api
 from routers import ALL_ROUTERS
@@ -14,10 +17,21 @@ app.add_middleware(HostCheckMiddleware)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+SERVICE_WORKER_CACHE_NAME_PLACEHOLDER = "__TWICOME_CACHE_NAME__"
+
+
+def _render_service_worker_script() -> str:
+    sw_path = Path(__file__).resolve().parent / "static" / "sw.js"
+    script = sw_path.read_text(encoding="utf-8")
+    return script.replace(
+        SERVICE_WORKER_CACHE_NAME_PLACEHOLDER,
+        json.dumps(SERVICE_WORKER_CACHE_NAME),
+    )
+
 
 @app.get("/sw.js", include_in_schema=False)
 def service_worker():
-    response = FileResponse("static/sw.js", media_type="application/javascript")
+    response = Response(_render_service_worker_script(), media_type="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache"
     return response

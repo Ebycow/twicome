@@ -2,7 +2,7 @@
 トップページのデータ組み立てロジック。
 comments.py ルーターから抽出したもの。
 """
-from core.config import DEFAULT_LOGIN, QUICK_LINK_LOGINS
+from core.config import DEFAULT_LOGIN, QUICK_LINK_LOGINS, SERVICE_WORKER_CACHE_NAME
 from repositories import comment_repo, user_repo
 from services.comment_utils import get_comment_body_html
 
@@ -62,4 +62,5 @@ def build_index_context(db, data_version: str) -> dict:
         "quick_links": landing["quick_links"],
         "streamers": landing["streamers"],
         "data_version": data_version,
+        "service_worker_cache_name": SERVICE_WORKER_CACHE_NAME,
     }
