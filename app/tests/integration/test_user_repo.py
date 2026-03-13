@@ -21,6 +21,17 @@ class TestFindUser:
         result = user_repo.find_user(db, "alice", "youtube")
         assert result is None
 
+    def test_returns_profile_image_url(self, db):
+        seed_user(db, user_id=1, login="alice", platform="twitch",
+                  profile_image_url="https://example.com/alice.png")
+        result = user_repo.find_user(db, "alice", "twitch")
+        assert result["profile_image_url"] == "https://example.com/alice.png"
+
+    def test_profile_image_url_none_when_not_set(self, db):
+        seed_user(db, user_id=1, login="alice", platform="twitch", profile_image_url=None)
+        result = user_repo.find_user(db, "alice", "twitch")
+        assert result["profile_image_url"] is None
+
 
 class TestFetchIndexUsers:
     def test_returns_users_with_comment_count(self, db):

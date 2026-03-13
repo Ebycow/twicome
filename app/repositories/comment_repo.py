@@ -363,6 +363,47 @@ def fetch_comment_bodies_by_ids(db, comment_ids: list[str]) -> dict[str, str]:
     return {row["comment_id"]: row["body"] for row in rows}
 
 
+_QUIZ_COL_LIST = (
+    f"{_BODY_SELECT}, c.commenter_login_snapshot, c.commenter_display_name_snapshot,"
+    " c.user_color, v.title AS vod_title"
+)
+
+
+def fetch_quiz_target_comments(db, uid: int, limit: int) -> list[dict]:
+    """クイズ用：指定ユーザーのコメントをランダムに取得。"""
+    rows = db.execute(
+        text(f"""
+            SELECT {_QUIZ_COL_LIST}
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            WHERE c.commenter_user_id = :uid
+              AND CHAR_LENGTH(c.body) >= 3
+            ORDER BY RAND()
+            LIMIT :lim
+        """),
+        {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
+    """クイズ用：指定ユーザーが参加した VOD の他ユーザーコメントをランダムに取得。"""
+    rows = db.execute(
+        text(f"""
+            SELECT {_QUIZ_COL_LIST}
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            WHERE c.commenter_user_id != :uid
+              AND c.vod_id IN (SELECT DISTINCT vod_id FROM comments WHERE commenter_user_id = :uid)
+              AND CHAR_LENGTH(c.body) >= 3
+            ORDER BY RAND()
+            LIMIT :lim
+        """),
+        {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
     """いいね・dislike の合計が多い順でコメントを取得（トップページ用）。"""
     from services.comment_utils import build_comment_body_select_sql

@@ -11,7 +11,7 @@ def find_user(db, login: str, platform: str) -> Optional[dict]:
     """login + platform でユーザーを1件取得。存在しなければ None。"""
     row = db.execute(
         text("""
-            SELECT user_id, login, display_name
+            SELECT user_id, login, display_name, profile_image_url
             FROM users
             WHERE platform = :platform AND login = :login
             LIMIT 1

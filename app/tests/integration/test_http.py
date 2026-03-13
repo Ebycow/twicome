@@ -233,6 +233,76 @@ class TestUserCommentsApi:
         assert resp.json()["items"]["c1"]["twicome_dislikes_count"] == 2
 
 
+class TestQuizPage:
+    def test_unknown_user_returns_404(self, client):
+        resp = client.get("/u/nobody/quiz")
+        assert resp.status_code == 404
+
+    def test_known_user_returns_200(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        resp = client.get("/u/viewer/quiz")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+
+
+class TestQuizStartApi:
+    def test_unknown_user_returns_404(self, client):
+        resp = client.get("/api/u/nobody/quiz/start")
+        assert resp.status_code == 404
+        assert resp.json()["error"] == "user_not_found"
+
+    def test_returns_questions(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(10):
+            seed_comment(db, comment_id=f"t{i}", vod_id=100, commenter_user_id=2,
+                         body=f"ターゲットコメント{i}", offset_seconds=i * 10)
+        for i in range(10):
+            seed_comment(db, comment_id=f"o{i}", vod_id=100, commenter_user_id=3,
+                         body=f"他ユーザーコメント{i}", offset_seconds=i * 10 + 1)
+        resp = client.get("/api/u/viewer/quiz/start?count=10")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 10
+        assert len(data["questions"]) == 10
+
+    def test_is_target_flag_is_correct(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(10):
+            seed_comment(db, comment_id=f"t{i}", vod_id=100, commenter_user_id=2,
+                         body=f"ターゲットコメント{i}", offset_seconds=i * 10)
+        for i in range(10):
+            seed_comment(db, comment_id=f"o{i}", vod_id=100, commenter_user_id=3,
+                         body=f"他ユーザーコメント{i}", offset_seconds=i * 10 + 1)
+        resp = client.get("/api/u/viewer/quiz/start?count=10")
+        questions = resp.json()["questions"]
+        target_qs = [q for q in questions if q["is_target"]]
+        other_qs = [q for q in questions if not q["is_target"]]
+        assert len(target_qs) == 5
+        assert len(other_qs) == 5
+
+    def test_count_param_respected(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(30):
+            seed_comment(db, comment_id=f"t{i}", vod_id=100, commenter_user_id=2,
+                         body=f"ターゲットコメント{i}", offset_seconds=i * 10)
+        for i in range(30):
+            seed_comment(db, comment_id=f"o{i}", vod_id=100, commenter_user_id=3,
+                         body=f"他ユーザーコメント{i}", offset_seconds=i * 10 + 1)
+        resp = client.get("/api/u/viewer/quiz/start?count=20")
+        data = resp.json()
+        assert data["total"] == 20
+
+
 class TestVoting:
     def test_like_increments_count(self, client, db):
         seed_user(db, user_id=1, login="streamer", platform="twitch")
