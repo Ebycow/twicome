@@ -1513,6 +1513,11 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
         });
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'twicome-auth-redirect') {
+            window.location.reload();
+          }
+        });
       }
     </script>
   </body>

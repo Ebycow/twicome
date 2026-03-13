@@ -86,6 +86,22 @@ async function fetchAndCacheDocument(cache, request) {
   return response;
 }
 
+// navigate 用フェッチ: redirect: 'manual' で認証リダイレクト（Cloudflare Access 等）を検出・通過させる
+async function fetchNavigate(url, headers, credentials) {
+  return fetch(url, {
+    headers,
+    credentials: credentials || 'same-origin',
+    redirect: 'manual',
+  });
+}
+
+async function notifyAuthRedirect(requestUrl) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    client.postMessage({ type: 'twicome-auth-redirect', url: requestUrl });
+  }
+}
+
 async function prefetchCommentsDocument(urlString) {
   const url = new URL(urlString, self.location.origin);
   if (url.origin !== self.location.origin || !isCommentsPageRequest(url)) {
@@ -283,6 +299,46 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(request);
+
+        if (request.mode === 'navigate') {
+          if (cached) {
+            // キャッシュを即座に返しつつ、バックグラウンドで認証状態と新鮮度を確認
+            event.waitUntil(
+              (async () => {
+                try {
+                  const response = await fetchNavigate(request.url, request.headers, 'same-origin');
+                  if (response.type === 'opaqueredirect') {
+                    // Cloudflare Access 等の認証リダイレクト検出: キャッシュ削除 → クライアントにリロード要求
+                    await cache.delete(request);
+                    await notifyAuthRedirect(request.url);
+                  } else if (response.ok) {
+                    await cache.put(request, response.clone());
+                  }
+                } catch {
+                  // ネットワークエラーはキャッシュを維持
+                }
+              })()
+            );
+            return cached;
+          }
+
+          // キャッシュなし: redirect: 'manual' で取得（認証リダイレクトはブラウザに通す）
+          try {
+            const response = await fetchNavigate(request.url, request.headers, 'same-origin');
+            if (response.type === 'opaqueredirect') {
+              // 認証リダイレクト: キャッシュせずそのまま返す → ブラウザが CF Access へ遷移
+              return response;
+            }
+            if (response.ok) {
+              await cache.put(request, response.clone());
+            }
+            return response;
+          } catch {
+            return offlineFallback(cache, request);
+          }
+        }
+
+        // 非ナビゲーション（プリフェッチ等）: キャッシュファースト
         if (cached) {
           event.waitUntil(fetchAndCacheDocument(cache, request).catch(() => {}));
           return cached;
@@ -291,9 +347,6 @@ self.addEventListener('fetch', (event) => {
         try {
           return await fetchAndCacheDocument(cache, request);
         } catch {
-          if (request.mode === 'navigate') {
-            return offlineFallback(cache, request);
-          }
           return new Response('', { status: 503, statusText: 'Offline' });
         }
       })
