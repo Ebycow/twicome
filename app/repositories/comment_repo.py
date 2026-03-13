@@ -1,9 +1,7 @@
-"""
-コメント関連のデータアクセス層。
+"""コメント関連のデータアクセス層。
 WHERE 句・ORDER BY 句の構築を含む SQL を封じ込める。
 """
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import text
 
@@ -32,12 +30,12 @@ _COL_LIST = f"""
 
 def _build_where(
     uid: int,
-    vod_id: Optional[int],
-    owner_user_id: Optional[int],
-    q: Optional[str],
+    vod_id: int | None,
+    owner_user_id: int | None,
+    q: str | None,
     exclude_terms: list[str],
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> tuple[str, dict]:
     """WHERE 句の SQL 文字列とパラメータを返す。"""
     where = ["c.commenter_user_id = :uid"]
@@ -92,12 +90,12 @@ def count_comments(
     db,
     uid: int,
     *,
-    vod_id: Optional[int] = None,
-    owner_user_id: Optional[int] = None,
-    q: Optional[str] = None,
-    exclude_terms: Optional[list[str]] = None,
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    vod_id: int | None = None,
+    owner_user_id: int | None = None,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> int:
     """フィルタ条件に合うコメント数を返す。"""
     where_sql, params = _build_where(
@@ -130,18 +128,17 @@ def fetch_comments(
     db,
     uid: int,
     *,
-    vod_id: Optional[int] = None,
-    owner_user_id: Optional[int] = None,
-    q: Optional[str] = None,
-    exclude_terms: Optional[list[str]] = None,
+    vod_id: int | None = None,
+    owner_user_id: int | None = None,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
     sort: str = "created_at",
     limit: int = 50,
     offset: int = 0,
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> list[dict]:
-    """
-    フィルタ・ソート・ページネーションを適用してコメントを取得する。
+    """フィルタ・ソート・ページネーションを適用してコメントを取得する。
     sort=created_at かつフィルタなしの場合、サブクエリ最適化を使用する。
     """
     where_sql, params = _build_where(
@@ -227,7 +224,7 @@ def fetch_comments_in_vod(
     return [dict(row) for row in rows]
 
 
-def find_comment_by_id(db, comment_id: str) -> Optional[dict]:
+def find_comment_by_id(db, comment_id: str) -> dict | None:
     """コメント ID でコメントを1件取得。カーソル解決用。"""
     row = db.execute(
         text("""
@@ -276,8 +273,7 @@ def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
 
 
 def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
-    """
-    指定ソート順でカーソルコメントより前にある行数を返す。
+    """指定ソート順でカーソルコメントより前にある行数を返す。
     offset = max(0, cursor_pos - page_size // 2) の計算に使う。
     """
     c_created_at = cursor_row.get("comment_created_at_utc")

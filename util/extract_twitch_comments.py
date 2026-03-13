@@ -5,9 +5,11 @@ import csv
 import json
 import sys
 from collections import Counter
-from typing import Any, Dict, Iterable, Iterator, Optional
+from collections.abc import Iterator
+from typing import Any
 
-def iter_comments(root: Any) -> Iterator[Dict[str, Any]]:
+
+def iter_comments(root: Any) -> Iterator[dict[str, Any]]:
     """comments.json の中のコメント配列を取り出して順に返す。"""
     if isinstance(root, dict) and isinstance(root.get("comments"), list):
         yield from root["comments"]
@@ -20,12 +22,12 @@ def iter_comments(root: Any) -> Iterator[Dict[str, Any]]:
         return
     raise ValueError("Unsupported JSON shape: expected {'comments':[...]} or [...]")
 
-def normalize_name(s: Optional[str], ignore_case: bool) -> Optional[str]:
+def normalize_name(s: str | None, ignore_case: bool) -> str | None:
     if s is None:
         return None
     return s.lower() if ignore_case else s
 
-def to_row(c: Dict[str, Any]) -> Dict[str, Any]:
+def to_row(c: dict[str, Any]) -> dict[str, Any]:
     commenter = c.get("commenter") or {}
     message = c.get("message") or {}
     return {
@@ -52,7 +54,7 @@ def main() -> None:
     p.add_argument("--top", type=int, default=50, help="--list-names の表示上位件数 (default: 50)")
     args = p.parse_args()
 
-    with open(args.input, "r", encoding="utf-8") as f:
+    with open(args.input, encoding="utf-8") as f:
         root = json.load(f)
 
     comments = list(iter_comments(root))

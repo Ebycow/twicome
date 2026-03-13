@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, Form, Query, Request
@@ -16,11 +15,11 @@ def manual_page(request: Request):
 
 
 @router.get("/add_user", response_class=HTMLResponse)
-def add_user_page(request: Request, message: Optional[str] = Query(None), error: Optional[str] = Query(None)):
+def add_user_page(request: Request, message: str | None = Query(None), error: str | None = Query(None)):
     try:
         df = pd.read_csv("/host/targetusers.csv")
         users = df.to_dict('records')
-    except Exception as e:
+    except Exception:
         users = []
     return templates.TemplateResponse("add_user.html", {"request": request, "message": message, "error": error, "users": users})
 
@@ -58,7 +57,7 @@ def add_user(request: Request, username: str = Form(...)):
         # CSV に保存
         df.to_csv("/host/targetusers.csv", index=False)
         return RedirectResponse(url=str(request.url_for("add_user_page")) + f"?message=ユーザ {username} (ID: {user_id}) を追加しました", status_code=303)
-    except Exception as e:
+    except Exception:
         import logging
         logging.exception("CSV書き込みエラー")
         return RedirectResponse(url=str(request.url_for("add_user_page")) + "?error=ユーザの追加に失敗しました。しばらく経ってから再度お試しください", status_code=303)

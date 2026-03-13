@@ -1,14 +1,12 @@
-"""
-ユーザー関連のデータアクセス層。
+"""ユーザー関連のデータアクセス層。
 SQL を封じ込め、呼び出し元には dict / list[dict] / str のリストを返す。
 """
-from typing import Optional
 
 from sqlalchemy import text
 
 
-def find_user(db, login: str, platform: str) -> Optional[dict]:
-    """login + platform でユーザーを1件取得。存在しなければ None。"""
+def find_user(db, login: str, platform: str) -> dict | None:
+    """Login + platform でユーザーを1件取得。存在しなければ None。"""
     row = db.execute(
         text("""
             SELECT user_id, login, display_name, profile_image_url
@@ -95,7 +93,7 @@ def fetch_commenters_for_streamer(db, streamer_login: str) -> list[str]:
     return [r[0] for r in rows]
 
 
-def fetch_user_vod_options(db, uid: int, owner_user_id: Optional[int]) -> list[dict]:
+def fetch_user_vod_options(db, uid: int, owner_user_id: int | None) -> list[dict]:
     """ユーザーがコメントした VOD の選択肢（owner でフィルタ可能）。"""
     if owner_user_id is None:
         rows = db.execute(

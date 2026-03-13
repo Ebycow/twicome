@@ -88,8 +88,9 @@ def client(db_engine):
         bind=db_engine, autoflush=False, autocommit=False, future=True
     )
 
-    from app_factory import app
     from fastapi.testclient import TestClient
+
+    from app_factory import app
 
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c

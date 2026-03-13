@@ -2,7 +2,6 @@
 HTTP 統合テスト（FastAPI TestClient 経由）。
 エンドポイントの振る舞いをエンドツーエンドで確認する。
 """
-import pytest
 from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 

@@ -72,7 +72,7 @@ def similar_search_api(
         return {"user": dict(user_row), "query": q, "total": 0, "items": []}
 
     comment_ids = [r[0] for r in results]
-    scores_map = {r[0]: r[1] for r in results}
+    {r[0]: r[1] for r in results}
 
     placeholders = ",".join([f":id_{i}" for i in range(len(comment_ids))])
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}

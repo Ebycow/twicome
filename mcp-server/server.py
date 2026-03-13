@@ -9,7 +9,6 @@ Twicome の HTTP API を MCP ツールとして公開する。
 """
 
 import os
-from typing import Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -79,10 +78,10 @@ def _format_comment(item: dict) -> str:
 @mcp.tool()
 def get_user_comments(
     login: str,
-    q: Optional[str] = None,
-    exclude_q: Optional[str] = None,
-    vod_id: Optional[str] = None,
-    owner_user_id: Optional[str] = None,
+    q: str | None = None,
+    exclude_q: str | None = None,
+    vod_id: str | None = None,
+    owner_user_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
     sort: str = "created_at",

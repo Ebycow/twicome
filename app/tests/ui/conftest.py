@@ -111,7 +111,7 @@ def live_server(apply_migrations):
     os.chdir(str(APP_DIR))
 
     # app インポートはここで初めて行う（DATABASE_URL 設定後）
-    from app_factory import app  # noqa: PLC0415
+    from app_factory import app
 
     port = _get_free_port()
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")

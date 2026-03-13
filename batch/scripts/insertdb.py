@@ -3,18 +3,16 @@ import hashlib
 import json
 import os
 import re
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any
 
 import mysql.connector
-from mysql.connector import errorcode
-from mysql.connector.cursor import MySQLCursor
+from comment_body_html import BODY_HTML_RENDER_VERSION, render_comment_body_html
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
-
-from comment_body_html import BODY_HTML_RENDER_VERSION, render_comment_body_html
-
+from mysql.connector import errorcode
+from mysql.connector.cursor import MySQLCursor
 
 # -----------------------
 # 設定（環境変数で上書き可）😺🦐
@@ -40,19 +38,19 @@ DEFAULT_PLATFORM = os.getenv("PLATFORM", "twitch")
 VOD_JSON_RE = re.compile(r"^(\d+)\.json$")
 
 
-def parse_dt_utc(dt_str: Optional[str]) -> Optional[datetime]:
+def parse_dt_utc(dt_str: str | None) -> datetime | None:
     """ISO文字列をUTCのdatetime(naive)にする（MySQL DATETIME想定）😺🦐"""
     if not dt_str:
         return None
     dt = dtparser.isoparse(dt_str)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    dt_utc = dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    dt_utc = dt.astimezone(UTC)
     return dt_utc.replace(tzinfo=None)
 
 
-def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: Optional[str],
-                profile_image_url: Optional[str], platform: str) -> None:
+def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: str | None,
+                profile_image_url: str | None, platform: str) -> None:
     sql = """
     INSERT INTO users (user_id, login, display_name, profile_image_url, platform, created_at, updated_at)
     VALUES (%s, %s, %s, %s, %s, NOW(6), NOW(6))
@@ -66,7 +64,7 @@ def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: Option
     cur.execute(sql, (user_id, login, display_name, profile_image_url, platform))
 
 
-def upsert_vod(cur: MySQLCursor, vod: Dict[str, Any], streamer: Dict[str, Any], platform: str) -> int:
+def upsert_vod(cur: MySQLCursor, vod: dict[str, Any], streamer: dict[str, Any], platform: str) -> int:
     vod_id = int(vod["id"])
     owner_user_id = int(streamer["id"])
 
@@ -112,7 +110,7 @@ def upsert_vod(cur: MySQLCursor, vod: Dict[str, Any], streamer: Dict[str, Any], 
     return vod_id
 
 
-def insert_comment(cur: MySQLCursor, vod_id: int, c: Dict[str, Any], platform: str) -> None:
+def insert_comment(cur: MySQLCursor, vod_id: int, c: dict[str, Any], platform: str) -> None:
     comment_id = c["_id"]
     offset_seconds = int(c.get("content_offset_seconds", 0))
     created_at_utc = parse_dt_utc(c.get("created_at"))
@@ -171,9 +169,7 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: Dict[str, Any], platform: s
 
 
 def vod_already_ingested(cur: MySQLCursor, vod_id: int) -> bool:
-    """
-    既存データ判定（主に完了マーカー未導入時のログ補助用）。
-    """
+    """既存データ判定（主に完了マーカー未導入時のログ補助用）。"""
     cur.execute("SELECT 1 FROM vods WHERE vod_id=%s LIMIT 1", (vod_id,))
     return cur.fetchone() is not None
 
@@ -189,7 +185,7 @@ def compute_sha256(path: str) -> str:
     return hasher.hexdigest()
 
 
-def get_vod_ingest_marker(cur: MySQLCursor, vod_id: int) -> Optional[Tuple[str, int]]:
+def get_vod_ingest_marker(cur: MySQLCursor, vod_id: int) -> tuple[str, int] | None:
     try:
         cur.execute(
             """
@@ -240,8 +236,8 @@ def upsert_vod_ingest_marker(
     )
 
 
-def list_comment_json_files(dir_path: str) -> List[Tuple[str, str, int]]:
-    items: List[Tuple[str, str, int]] = []
+def list_comment_json_files(dir_path: str) -> list[tuple[str, str, int]]:
+    items: list[tuple[str, str, int]] = []
     for name in sorted(os.listdir(dir_path)):
         m = VOD_JSON_RE.match(name)
         if not m:
@@ -277,8 +273,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -> Tuple[int, int]:
-    with open(json_path, "r", encoding="utf-8") as f:
+def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -> tuple[int, int]:
+    with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
     vod = data.get("video") or {}

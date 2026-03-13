@@ -2,11 +2,9 @@ import csv
 import io
 import json
 import re
-from datetime import date as date_type
-from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from cache import (
@@ -27,9 +25,9 @@ from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo, vote_repo
 from services.comment_service import export_user_comments, fetch_user_comment_page
+from services.index_service import build_index_context, build_landing_data
 from services.rate_limit import InMemoryRateLimiter
 from services.vote_input import MAX_VOTE_BULK_IDS, normalize_comment_ids
-from services.index_service import build_index_context, build_landing_data
 
 router = APIRouter()
 
@@ -43,7 +41,7 @@ class CommentVotesRequest(BaseModel):
 VOTE_RATE_LIMITER = InMemoryRateLimiter(limit=30, window_seconds=60)
 
 
-def _parse_int(value: Optional[str]) -> Optional[int]:
+def _parse_int(value: str | None) -> int | None:
     if value and value.strip():
         try:
             return int(value)
@@ -80,7 +78,7 @@ def _render_user_comments_html(context: dict) -> str:
     return templates.env.get_template("user_comments.html").render(context)
 
 
-def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
+def _load_user_meta(login: str, uid: int, db) -> dict | None:
     if login not in QUICK_LINK_LOGINS:
         return None
     cached = get_user_meta_cache(login)
@@ -96,16 +94,16 @@ def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
 
 def _is_initial_comments_page_request(
     *,
-    vod_id: Optional[int],
-    owner_user_id: Optional[int],
-    q: Optional[str],
-    exclude_q: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    vod_id: int | None,
+    owner_user_id: int | None,
+    q: str | None,
+    exclude_q: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     page_size: int,
     sort: str,
-    cursor: Optional[str],
+    cursor: str | None,
 ) -> bool:
     return (
         vod_id is None
@@ -150,7 +148,7 @@ def _build_user_comments_context(
     total: int,
     page_title: str,
     filters: dict,
-    error: Optional[str],
+    error: str | None,
     data_version: str,
 ) -> dict:
     return {
@@ -226,16 +224,16 @@ def user_comments_page(
     request: Request,
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
-    vod_id: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    vod_id: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
-    cursor: Optional[str] = Query(None),
+    cursor: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
@@ -340,16 +338,16 @@ def user_comments_page(
 def user_comments_api(
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
-    vod_id: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    vod_id: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
-    cursor: Optional[str] = Query(None),
+    cursor: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
@@ -445,13 +443,13 @@ def user_comments_export(
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
     format: str = Query("csv"),
-    date: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    vod_id: Optional[str] = Query(None),
+    date: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    vod_id: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)

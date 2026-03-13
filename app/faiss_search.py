@@ -1,12 +1,10 @@
-"""
-FAISS 検索クライアント
+"""FAISS 検索クライアント
 
 faiss-api サービスへのHTTP通信を担うクライアントモジュール。
 FAISS_API_URL が未設定の場合はすべての関数が空/Falseを返す。
 """
 
 import os
-from typing import Dict, List, Optional, Tuple
 
 import requests
 from requests import RequestException
@@ -42,7 +40,7 @@ def is_index_available(login: str) -> bool:
         return False
 
 
-def get_emotion_axes() -> List[Dict[str, str]]:
+def get_emotion_axes() -> list[dict[str, str]]:
     """利用可能な感情軸の一覧を返す（UI表示用）"""
     if not _is_enabled():
         return []
@@ -54,9 +52,8 @@ def get_emotion_axes() -> List[Dict[str, str]]:
         return []
 
 
-def similar_search(login: str, query_text: str, top_k: int = 20) -> Optional[List[Tuple[str, float]]]:
-    """
-    意味的類似検索。
+def similar_search(login: str, query_text: str, top_k: int = 20) -> list[tuple[str, float]] | None:
+    """意味的類似検索。
     Returns: [(comment_id, score), ...] または None (インデックス未作成)
     """
     if not _is_enabled():
@@ -75,9 +72,8 @@ def similar_search(login: str, query_text: str, top_k: int = 20) -> Optional[Lis
         raise RuntimeError(f"faiss similar_search failed: {e}") from e
 
 
-def centroid_search(login: str, position: float, top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
-    """
-    重心距離検索。position: 0.0=典型的, 1.0=珍しい
+def centroid_search(login: str, position: float, top_k: int = 50) -> list[tuple[str, float]] | None:
+    """重心距離検索。position: 0.0=典型的, 1.0=珍しい
     Returns: [(comment_id, centroid_similarity), ...] または None
     """
     if not _is_enabled():
@@ -96,9 +92,8 @@ def centroid_search(login: str, position: float, top_k: int = 50) -> Optional[Li
         raise RuntimeError(f"faiss centroid_search failed: {e}") from e
 
 
-def get_clusters(login: str, n_clusters: int = 8) -> Optional[List[Dict]]:
-    """
-    K-means クラスタリングで発言パターンを分類する。
+def get_clusters(login: str, n_clusters: int = 8) -> list[dict] | None:
+    """K-means クラスタリングで発言パターンを分類する。
     Returns: [{"cluster_id": int, "size": int, "representative_ids": [str, ...]}, ...] または None
     """
     if not _is_enabled():
@@ -117,9 +112,8 @@ def get_clusters(login: str, n_clusters: int = 8) -> Optional[List[Dict]]:
         raise RuntimeError(f"faiss get_clusters failed: {e}") from e
 
 
-def get_cluster_members(login: str, centroid: List[float], n_members: int) -> Optional[List[str]]:
-    """
-    クラスタの重心に近い上位 n_members 件のコメントIDを返す。
+def get_cluster_members(login: str, centroid: list[float], n_members: int) -> list[str] | None:
+    """クラスタの重心に近い上位 n_members 件のコメントIDを返す。
     Returns: [comment_id, ...] または None
     """
     if not _is_enabled():
@@ -138,9 +132,8 @@ def get_cluster_members(login: str, centroid: List[float], n_members: int) -> Op
         raise RuntimeError(f"faiss get_cluster_members failed: {e}") from e
 
 
-def get_subclusters(login: str, centroid: List[float], n_members: int, n_clusters: int = 4) -> Optional[List[Dict]]:
-    """
-    親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+def get_subclusters(login: str, centroid: list[float], n_members: int, n_clusters: int = 4) -> list[dict] | None:
+    """親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
     Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "centroid": [...]}, ...] または None
     """
     if not _is_enabled():
@@ -159,9 +152,8 @@ def get_subclusters(login: str, centroid: List[float], n_members: int, n_cluster
         raise RuntimeError(f"faiss get_subclusters failed: {e}") from e
 
 
-def emotion_search(login: str, weights: Dict[str, float], top_k: int = 50) -> Optional[List[Tuple[str, float]]]:
-    """
-    感情アンカー検索。各感情の重みを合成したベクトルで検索。
+def emotion_search(login: str, weights: dict[str, float], top_k: int = 50) -> list[tuple[str, float]] | None:
+    """感情アンカー検索。各感情の重みを合成したベクトルで検索。
     weights: {"joy": 0.8, "surprise": 0.5, ...}
     Returns: [(comment_id, score), ...] または None
     """

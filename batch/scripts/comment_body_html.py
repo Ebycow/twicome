@@ -1,7 +1,6 @@
 import html
 import json
 import re
-from typing import Optional
 from urllib.parse import quote
 
 BODY_HTML_RENDER_VERSION = 1
@@ -10,7 +9,7 @@ EMOTE_URL_TEMPLATE = "https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/defau
 EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
-def normalize_emote_id(raw_emote_id) -> Optional[str]:
+def normalize_emote_id(raw_emote_id) -> str | None:
     if raw_emote_id is None:
         return None
     raw_value = str(raw_emote_id)

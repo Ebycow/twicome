@@ -3,9 +3,8 @@ import os
 from pathlib import Path
 
 import mysql.connector
-from dotenv import load_dotenv
-
 from comment_body_html import BODY_HTML_RENDER_VERSION, render_comment_body_html
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 ENV_PATH = Path(os.getenv("ENV_FILE", str(PROJECT_ROOT / ".env")))

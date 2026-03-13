@@ -1,5 +1,4 @@
-"""
-Redis キャッシュ無効化スクリプト
+"""Redis キャッシュ無効化スクリプト
 
 バッチ処理（insertdb.py）完了後に呼ばれ、
 QUICK_LINK_LOGINS に含まれるユーザのメタキャッシュを削除する。
@@ -10,7 +9,7 @@ REDIS_URL が未設定の場合はスキップ（エラーにしない）。
 
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -43,7 +42,7 @@ for login in logins:
     keys.append(f"twicome:meta:{login}")
 keys.extend(r.scan_iter("twicome:index:html:*"))
 deleted = r.delete(*keys)
-new_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+new_version = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 r.set("twicome:data_version", new_version)
 print(f"キャッシュ無効化完了: {deleted} キー削除 ({', '.join(keys)})")
 print(f"データバージョン更新: twicome:data_version={new_version}")

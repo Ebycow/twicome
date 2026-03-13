@@ -1,8 +1,6 @@
-"""
-stats ページ用のデータアクセス層。
+"""stats ページ用のデータアクセス層。
 stats.py ルーターから SQL を抽出したもの。
 """
-from typing import Optional
 
 from sqlalchemy import text
 
@@ -148,7 +146,7 @@ def fetch_impact_buckets(db, uid: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def fetch_cn_scores(db, uid: int) -> Optional[dict]:
+def fetch_cn_scores(db, uid: int) -> dict | None:
     """コミュニティノートの平均スコア。ノートがなければ None。"""
     row = db.execute(
         text("""

@@ -1,7 +1,6 @@
 """user_repo の統合テスト。"""
-import pytest
-from tests.integration.helpers import seed_comment, seed_user, seed_vod
 from repositories import user_repo
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 
 class TestFindUser:
@@ -35,9 +34,9 @@ class TestFindUser:
 
 class TestFetchIndexUsers:
     def test_returns_users_with_comment_count(self, db):
-        owner = seed_user(db, user_id=10, login="streamer", platform="twitch")
-        commenter = seed_user(db, user_id=11, login="viewer", platform="twitch")
-        vod = seed_vod(db, vod_id=200, owner_user_id=10)
+        seed_user(db, user_id=10, login="streamer", platform="twitch")
+        seed_user(db, user_id=11, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=200, owner_user_id=10)
         seed_comment(db, comment_id="c1", vod_id=200, commenter_user_id=11,
                      commenter_login_snapshot="viewer")
         seed_comment(db, comment_id="c2", vod_id=200, commenter_user_id=11,

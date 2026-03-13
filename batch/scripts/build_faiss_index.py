@@ -1,5 +1,4 @@
-"""
-FAISS インデックス構築スクリプト (faiss-api クライアント版)
+"""FAISS インデックス構築スクリプト (faiss-api クライアント版)
 
 faiss_config.json に記載されたユーザのコメントを MySQL から取得し、
 faiss-api へ送信することでインデックスを更新する。
@@ -95,14 +94,14 @@ def update_index_for_user(conn, login: str):
     cur.close()
 
     if not rows:
-        print(f"  コメントなし、スキップ")
+        print("  コメントなし、スキップ")
         return
 
     new_rows = [r for r in rows if r["comment_id"] not in indexed_ids]
     print(f"  DB: {len(rows)} 件 / 既インデックス済み: {len(indexed_ids)} 件 / 新規: {len(new_rows)} 件")
 
     if not new_rows:
-        print(f"  新規なし、スキップ")
+        print("  新規なし、スキップ")
         return
 
     print(f"  新規 {len(new_rows)} 件 → faiss-api へ送信中...")

@@ -11,11 +11,9 @@ HTML レンダリング統合テスト。
 - コミュニティノートの条件付きレンダリング
 - FAISS UI の非表示（FAISS_API_URL 未設定時）
 """
-import pytest
 from bs4 import BeautifulSoup
-from tests.integration.helpers import seed_comment, seed_user, seed_vod
-from datetime import datetime, timezone
 
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 # ── ヘルパー ──────────────────────────────────────────────────────────────────
 

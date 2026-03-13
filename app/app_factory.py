@@ -1,14 +1,14 @@
-from fastapi import FastAPI
 import json
 from pathlib import Path
 
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from routers import ALL_ROUTERS
 
 from core.config import FAISS_API_URL, ROOT_PATH, SERVICE_WORKER_CACHE_NAME
 from core.middleware import CSRFProtectionMiddleware, HostCheckMiddleware, SecurityHeadersMiddleware
 from faiss_search import ping_faiss_api
-from routers import ALL_ROUTERS
 
 app = FastAPI(root_path=ROOT_PATH)
 app.add_middleware(CSRFProtectionMiddleware)

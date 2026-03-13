@@ -1,4 +1,4 @@
-"""
+r"""
 ユーザーコメントページ (/u/{login}) の Playwright UI テスト
 
 【このファイルで学べること】
@@ -19,12 +19,11 @@
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from playwright.sync_api import Page, expect
 
 from tests.integration.helpers import seed_comment, seed_user, seed_vod
-
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +113,7 @@ class TestCommentDisplay:
                 commenter_login_snapshot="multicomment_user",
                 body=f"コメント{i}",
                 offset_seconds=i * 10,
-                created_at=datetime(2024, 6, 1, 10, i, 0, tzinfo=timezone.utc),
+                created_at=datetime(2024, 6, 1, 10, i, 0, tzinfo=UTC),
             )
 
         page.goto("/u/multicomment_user")
@@ -191,11 +190,11 @@ class TestFilterForm:
         seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
                      commenter_login_snapshot="fan6", body="hello world",
                      offset_seconds=10,
-                     created_at=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc))
+                     created_at=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
         seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2,
                      commenter_login_snapshot="fan6", body="goodbye",
                      offset_seconds=20,
-                     created_at=datetime(2024, 6, 1, 10, 1, 0, tzinfo=timezone.utc))
+                     created_at=datetime(2024, 6, 1, 10, 1, 0, tzinfo=UTC))
 
         # q=hello でフィルターして直接アクセス（フォーム送信の代わりに URL で指定）
         page.goto("/u/fan6?q=hello")

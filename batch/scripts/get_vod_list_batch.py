@@ -1,7 +1,8 @@
-import requests
-import pandas as pd
 import os
 from pathlib import Path
+
+import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
@@ -14,9 +15,7 @@ DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "default"
 
 
 def get_live_user_ids(user_ids, access_token, client_id):
-    """
-    まとめて「今配信中のuser_id集合」を返す😺🦐
-    """
+    """まとめて「今配信中のuser_id集合」を返す😺🦐"""
     headers = {
         "Client-ID": client_id,
         "Authorization": f"Bearer {access_token}"

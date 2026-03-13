@@ -1,9 +1,10 @@
 import re
 from urllib.parse import urlparse
 
-from core.config import HOST_CHECK_ENABLED
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from core.config import HOST_CHECK_ENABLED
 
 
 def is_ip_address(host: str) -> bool:
@@ -44,8 +45,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class CSRFProtectionMiddleware(BaseHTTPMiddleware):
-    """
-    CSRF保護ミドルウェア
+    """CSRF保護ミドルウェア
     - フォーム送信（Content-Type: application/x-www-form-urlencoded）の場合はRefererチェック
     - AJAX（Content-Type: application/json または X-Requested-With ヘッダー）は許可
     """

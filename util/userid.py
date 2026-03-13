@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -25,7 +24,7 @@ def load_env(path: Path) -> dict[str, str]:
     return env
 
 
-def get_user_id(username: str, client_id: str, access_token: str) -> Optional[str]:
+def get_user_id(username: str, client_id: str, access_token: str) -> str | None:
     url = "https://api.twitch.tv/helix/users"
     headers = {
         "Client-ID": client_id,

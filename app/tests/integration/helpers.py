@@ -2,7 +2,7 @@
 統合テスト用シードデータヘルパー。
 各テストが必要なデータを DB に投入するための関数群。
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def seed_user(db, *, user_id=1, login="testuser", display_name="テストユーザー",
@@ -41,11 +41,11 @@ def seed_vod(db, *, vod_id=100, owner_user_id=1, title="テスト配信",
 def seed_comment(db, *, comment_id="c001", vod_id=100, commenter_user_id=1,
                  commenter_login_snapshot="testuser", body="テストコメント",
                  offset_seconds=60,
-                 created_at: datetime = None,
+                 created_at: datetime | None = None,
                  likes=0, dislikes=0) -> dict:
     from sqlalchemy import text
     if created_at is None:
-        created_at = datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
+        created_at = datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC)
     naive_utc = created_at.replace(tzinfo=None) if created_at.tzinfo else created_at
     db.execute(
         text("""

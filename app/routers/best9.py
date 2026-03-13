@@ -1,7 +1,6 @@
 import base64
 import zlib
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
@@ -26,9 +25,9 @@ def _decompress_ids(z: str) -> list[str]:
 @router.get("/best9", response_class=HTMLResponse)
 def best9_page(
     request: Request,
-    z: Optional[str] = Query(None),    # 圧縮版（新形式）
-    ids: Optional[str] = Query(None),  # レガシー互換
-    login: Optional[str] = Query(None),
+    z: str | None = Query(None),    # 圧縮版（新形式）
+    ids: str | None = Query(None),  # レガシー互換
+    login: str | None = Query(None),
 ):
     if z:
         try:

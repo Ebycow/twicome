@@ -1,5 +1,4 @@
-"""
-FAISS API サービス
+"""FAISS API サービス
 
 埋め込みモデルとFAISSインデックス管理を一元化するサービス。
 app と batch からHTTP経由で利用する。
@@ -9,7 +8,6 @@ import json
 import os
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import faiss
 import numpy as np
@@ -25,7 +23,7 @@ CONFIG_PATH = Path(os.getenv("FAISS_CONFIG_PATH", "/app/faiss_config.json"))
 
 # faiss_config.json から感情アンカーを読み込む
 # 形式: {"joy": {"positive": [...], "negative": [...]}, ...}
-_emotion_anchors_config: Dict[str, Dict[str, List[str]]] = {}
+_emotion_anchors_config: dict[str, dict[str, list[str]]] = {}
 if CONFIG_PATH.is_file():
     with open(CONFIG_PATH) as _f:
         _cfg = json.load(_f)
@@ -34,7 +32,7 @@ if CONFIG_PATH.is_file():
 app = FastAPI(title="FAISS API", version="1.0.0")
 
 # --- シングルトン: 埋め込みモデル ---
-_model: Optional[SentenceTransformer] = None
+_model: SentenceTransformer | None = None
 _model_lock = threading.Lock()
 
 
@@ -48,13 +46,12 @@ def get_model() -> SentenceTransformer:
 
 
 # --- 感情アンカーの埋め込みキャッシュ ---
-_emotion_embeddings: Optional[Dict[str, np.ndarray]] = None
+_emotion_embeddings: dict[str, np.ndarray] | None = None
 _emotion_lock = threading.Lock()
 
 
-def get_emotion_embeddings() -> Dict[str, np.ndarray]:
-    """
-    各感情の双極軸ベクトルを返す。
+def get_emotion_embeddings() -> dict[str, np.ndarray]:
+    """各感情の双極軸ベクトルを返す。
     positive - negative の方向を正規化したベクトル。
     """
     global _emotion_embeddings
@@ -90,9 +87,9 @@ class UserIndex:
 
     def __init__(self, login: str):
         self.login = login
-        self.index: Optional[faiss.Index] = None
-        self.comment_ids: List[str] = []
-        self.knn_densities: Optional[List[float]] = None  # k近傍平均類似度（典型度スライダー用）
+        self.index: faiss.Index | None = None
+        self.comment_ids: list[str] = []
+        self.knn_densities: list[float] | None = None  # k近傍平均類似度（典型度スライダー用）
         self.lock = threading.Lock()
 
     @property
@@ -122,7 +119,7 @@ class UserIndex:
             if self.index is None and self.is_available():
                 self.load()
 
-    def update(self, new_ids: List[str], new_embeddings: np.ndarray) -> int:
+    def update(self, new_ids: list[str], new_embeddings: np.ndarray) -> int:
         """新規埋め込みをインデックスに追加し、重心を再計算してアトミック保存する。追加件数を返す"""
         with self.lock:
             dim = new_embeddings.shape[1]
@@ -177,19 +174,19 @@ class UserIndex:
 
             return len(new_ids)
 
-    def search(self, query_embedding: np.ndarray, top_k: int) -> List[Tuple[str, float]]:
+    def search(self, query_embedding: np.ndarray, top_k: int) -> list[tuple[str, float]]:
         """類似検索。[(comment_id, score), ...] を返す"""
         k = min(top_k, self.index.ntotal)
         if query_embedding.ndim == 1:
             query_embedding = query_embedding.reshape(1, -1)
         scores, indices = self.index.search(query_embedding, k)
         results = []
-        for score, idx in zip(scores[0], indices[0]):
+        for score, idx in zip(scores[0], indices[0], strict=False):
             if 0 <= idx < len(self.comment_ids):
                 results.append((self.comment_ids[idx], float(score)))
         return results
 
-    def search_centroid(self, position: float, top_k: int) -> List[Tuple[str, float]]:
+    def search_centroid(self, position: float, top_k: int) -> list[tuple[str, float]]:
         """典型度検索。position=0.0→典型的(密度高), 1.0→珍しい(密度低)"""
         if self.knn_densities is None:
             return []
@@ -204,7 +201,7 @@ class UserIndex:
 
 
 # ユーザ別インデックスのレジストリ
-_user_indexes: Dict[str, UserIndex] = {}
+_user_indexes: dict[str, UserIndex] = {}
 _registry_lock = threading.Lock()
 
 
@@ -221,13 +218,13 @@ def get_user_index(login: str) -> UserIndex:
 
 # --- リクエスト/レスポンスモデル ---
 class EmbedRequest(BaseModel):
-    texts: List[str]
+    texts: list[str]
     normalize: bool = True
 
 
 class IndexUpdateRequest(BaseModel):
-    comment_ids: List[str]
-    texts: List[str]
+    comment_ids: list[str]
+    texts: list[str]
 
 
 class SimilarSearchRequest(BaseModel):
@@ -241,18 +238,18 @@ class CentroidSearchRequest(BaseModel):
 
 
 class EmotionSearchRequest(BaseModel):
-    weights: Dict[str, float]
+    weights: dict[str, float]
     top_k: int = 50
 
 
 class SubclusterRequest(BaseModel):
-    centroid: List[float]        # 親クラスタの正規化済み重心ベクトル
+    centroid: list[float]        # 親クラスタの正規化済み重心ベクトル
     n_members: int               # 親クラスタのサイズ（検索上限として使用）
     n_clusters: int = 4          # サブクラスタ数
 
 
 class ClusterMembersRequest(BaseModel):
-    centroid: List[float]        # クラスタの正規化済み重心ベクトル
+    centroid: list[float]        # クラスタの正規化済み重心ベクトル
     n_members: int               # 取得する件数
 
 
@@ -328,8 +325,7 @@ def update_index(login: str, req: IndexUpdateRequest):
 
 @app.get("/index/clusters/{login}")
 def get_clusters(login: str, n_clusters: int = 8):
-    """
-    K-means クラスタリングで発言パターンを分類する。
+    """K-means クラスタリングで発言パターンを分類する。
     各クラスタの件数と代表コメントID (重心に近い上位3件) を返す。
     """
     ui = get_user_index(login)
@@ -382,8 +378,7 @@ def get_clusters(login: str, n_clusters: int = 8):
 
 @app.post("/index/subcluster/{login}")
 def subcluster(login: str, req: SubclusterRequest):
-    """
-    親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
+    """親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
     重心に近い上位 n_members 件を取得し、その中でさらに K-means を実行する。
     """
     ui = get_user_index(login)

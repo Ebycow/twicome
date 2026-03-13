@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -8,7 +10,6 @@ from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo
 from services.comment_utils import decorate_comment
-from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -100,7 +101,7 @@ def cluster_comments_page(
         try:
             ids = faiss_search.get_cluster_members(login, centroid_list, n_members)
             if ids:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 raw = comment_repo.fetch_comments_by_ids(db, ids)
                 comments = [decorate_comment(c, now) for c in raw]
         except Exception as e:

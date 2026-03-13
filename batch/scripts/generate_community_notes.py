@@ -1,5 +1,4 @@
-"""
-コミュニティノート生成バッチ
+"""コミュニティノート生成バッチ
 
 twicome_dislikes_count が閾値以上かつ community_notes が未生成のコメントに対して、
 OpenRouter API を使用してコミュニティノートを生成し、community_notes テーブルに保存する。
@@ -9,11 +8,11 @@ import argparse
 import json
 import os
 import time
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
-import requests
 import mysql.connector
+import requests
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
@@ -111,7 +110,7 @@ def fetch_target_comments(cur, force: bool = False):
 def backup_old_notes(notes: list[tuple[str, str]]):
     """旧コミュニティノートをJSONファイルにバックアップ"""
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     path = os.path.join(BACKUP_DIR, f"backup_{timestamp}.json")
     data = [
         {"comment_id": cid, "old_note_json": body}
@@ -285,7 +284,7 @@ def main():
                     print(f"       eligible={note_data.get('eligible')}, status={note_data.get('status')}, danger={danger:.0f}, subjectivity={subj}")
                     success += 1
                 else:
-                    print(f"    -> 空のレスポンスまたはパース失敗、スキップ")
+                    print("    -> 空のレスポンスまたはパース失敗、スキップ")
                     fail += 1
             except Exception as e:
                 print(f"    -> エラー: {e}")

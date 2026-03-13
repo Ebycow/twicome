@@ -2,7 +2,6 @@ import html
 import json
 import re
 from datetime import datetime, timedelta
-from typing import Optional
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import pytz
@@ -41,7 +40,7 @@ def utc_to_jst(dt: datetime) -> datetime:
     return dt.astimezone(jst_tz)
 
 
-def build_vod_link(url: Optional[str], offset_seconds: int) -> Optional[str]:
+def build_vod_link(url: str | None, offset_seconds: int) -> str | None:
     if not url:
         return None
     # 既に ? がある場合も想定（必要なら厳密化）
@@ -49,7 +48,7 @@ def build_vod_link(url: Optional[str], offset_seconds: int) -> Optional[str]:
     return f"{url}{sep}t={seconds_to_twitch_t(offset_seconds)}"
 
 
-def build_youtube_link(url: Optional[str], offset_seconds: int) -> Optional[str]:
+def build_youtube_link(url: str | None, offset_seconds: int) -> str | None:
     if not url:
         return None
     try:
@@ -62,7 +61,7 @@ def build_youtube_link(url: Optional[str], offset_seconds: int) -> Optional[str]
         return f"{url}{sep}t={max(0, int(offset_seconds))}s"
 
 
-def split_filter_terms(raw: Optional[str]):
+def split_filter_terms(raw: str | None):
     if not raw:
         return []
     return [term for term in re.split(r"[\s,、]+", raw.strip()) if term]
@@ -72,7 +71,7 @@ EMOTE_URL_TEMPLATE = "https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/defau
 EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
-def normalize_emote_id(raw_emote_id) -> Optional[str]:
+def normalize_emote_id(raw_emote_id) -> str | None:
     if raw_emote_id is None:
         return None
     raw_value = str(raw_emote_id)
@@ -102,7 +101,7 @@ def _sanitize_emote_text(text) -> str:
     return html.escape(re.sub(r"<[^>]*>", "", text or ""))
 
 
-def _normalize_utc_datetime(value) -> Optional[datetime]:
+def _normalize_utc_datetime(value) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -152,7 +151,7 @@ def render_comment_body_html(raw_json, fallback_body):
     return "".join(parts)
 
 
-def _normalize_body_html_version(value) -> Optional[int]:
+def _normalize_body_html_version(value) -> int | None:
     if value is None:
         return None
     try:

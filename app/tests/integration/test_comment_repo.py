@@ -1,9 +1,9 @@
 """comment_repo の統合テスト。"""
-from datetime import datetime, timezone
 
 import pytest
-from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
 from repositories import comment_repo
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 
 @pytest.fixture(autouse=True)

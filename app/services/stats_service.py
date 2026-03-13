@@ -1,9 +1,7 @@
-"""
-stats ページの業務ロジック。
+"""stats ページの業務ロジック。
 stats.py ルーターから統計計算を抽出したもの。
 """
 from collections import defaultdict
-from typing import Optional
 
 from scipy.stats import mannwhitneyu
 
@@ -73,7 +71,7 @@ def build_owners_stats(db, uid: int, total_comments: int) -> list[dict]:
     return owners_stats
 
 
-def build_cn_scores(db, uid: int) -> Optional[dict]:
+def build_cn_scores(db, uid: int) -> dict | None:
     """コミュニティノート平均スコアと危険度分布。ノートがなければ None。"""
     cn_avg = stats_repo.fetch_cn_scores(db, uid)
     if cn_avg is None:
@@ -104,9 +102,8 @@ def build_cn_scores(db, uid: int) -> Optional[dict]:
     }
 
 
-def build_impact_stats(db, uid: int) -> tuple[list[dict], Optional[dict]]:
-    """
-    コメント影響度分析。VOD 数が多すぎる場合は空を返す。
+def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
+    """コメント影響度分析。VOD 数が多すぎる場合は空を返す。
     Returns (impact_stats, impact_total)
     """
     vod_count = stats_repo.count_user_vods(db, uid)

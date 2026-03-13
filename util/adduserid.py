@@ -1,7 +1,8 @@
-import requests
-import pandas as pd
 import sys
 from pathlib import Path
+
+import pandas as pd
+import requests
 
 
 def load_env(path: Path) -> dict[str, str]:

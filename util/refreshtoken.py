@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-import os
-import time
-import tempfile
 import fcntl
-from typing import Dict, List, Tuple
+import os
+import tempfile
+import time
 
 import requests
 
 
-def parse_env_lines(lines: List[str]) -> Tuple[Dict[str, str], List[Tuple[str, str]]]:
+def parse_env_lines(lines: list[str]) -> tuple[dict[str, str], list[tuple[str, str]]]:
+    """Returns:
+    - kv: parsed key/value map (only for KEY=VALUE lines)
+    - parsed: list of tuples (kind, content) where kind in {"raw", "kv"} for reconstruction
     """
-    Returns:
-      - kv: parsed key/value map (only for KEY=VALUE lines)
-      - parsed: list of tuples (kind, content) where kind in {"raw", "kv"} for reconstruction
-    """
-    kv: Dict[str, str] = {}
-    parsed: List[Tuple[str, str]] = []
+    kv: dict[str, str] = {}
+    parsed: list[tuple[str, str]] = []
 
     for line in lines:
         s = line.rstrip("\n")
@@ -48,15 +45,13 @@ def parse_env_lines(lines: List[str]) -> Tuple[Dict[str, str], List[Tuple[str, s
     return kv, parsed
 
 
-def render_env(lines_parsed: List[Tuple[str, str]], existing_kv: Dict[str, str], updates: Dict[str, str]) -> List[str]:
-    """
-    Reconstruct env file lines, updating keys in-place, preserving comments and unknown raw lines.
-    """
+def render_env(lines_parsed: list[tuple[str, str]], existing_kv: dict[str, str], updates: dict[str, str]) -> list[str]:
+    """Reconstruct env file lines, updating keys in-place, preserving comments and unknown raw lines."""
     merged = dict(existing_kv)
     merged.update(updates)
 
     seen_keys = set()
-    out: List[str] = []
+    out: list[str] = []
 
     for kind, content in lines_parsed:
         if kind == "raw":
@@ -83,7 +78,7 @@ def render_env(lines_parsed: List[Tuple[str, str]], existing_kv: Dict[str, str],
     return [l + "\n" for l in out]
 
 
-def atomic_write(path: str, content_lines: List[str], mode: int = 0o600) -> None:
+def atomic_write(path: str, content_lines: list[str], mode: int = 0o600) -> None:
     directory = os.path.dirname(os.path.abspath(path)) or "."
     fd, tmppath = tempfile.mkstemp(prefix=".tokenenv.", dir=directory)
     try:
@@ -102,7 +97,7 @@ def atomic_write(path: str, content_lines: List[str], mode: int = 0o600) -> None
             pass
 
 
-def refresh_token(client_id: str, client_secret: str, scope: str) -> Dict[str, str]:
+def refresh_token(client_id: str, client_secret: str, scope: str) -> dict[str, str]:
     url = "https://id.twitch.tv/oauth2/token"
     data = {
         "client_id": client_id,
@@ -154,7 +149,7 @@ def main() -> int:
     env_client_id = None
     env_client_secret = None
     if os.path.exists(args.env_path):
-        with open(args.env_path, "r", encoding="utf-8") as f:
+        with open(args.env_path, encoding="utf-8") as f:
             env_kv, _ = parse_env_lines(f.readlines())
             env_client_id = env_kv.get("CLIENT_ID", "").strip() or None
             env_client_secret = env_kv.get("CLIENT_SECRET", "").strip() or None
@@ -191,7 +186,7 @@ def main() -> int:
 
         # Read current .env if exists
         if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 lines = f.readlines()
         else:
             lines = ["# Auto-managed by refresh_twitch_token.py\n"]
