@@ -185,6 +185,39 @@ services:
     networks:
       - backend
 
+  # ── UI テスト実行用サービス（Playwright / Chromium）─────────────────────────
+  # 使い方:
+  #   UI テスト全体:   docker compose -f docker-compose.dev.yml run --rm test-ui
+  #   特定ファイル:    docker compose -f docker-compose.dev.yml run --rm test-ui pytest tests/ui/test_index_page.py -v
+  #
+  # Playwright は --with-deps で Chromium のシステム依存もインストール済み。
+  # 初回ビルドはダウンロードがあるため数分かかる。
+  test-ui:
+    profiles: [test-ui]
+    build:
+      context: ./app
+      dockerfile: Dockerfile.test-ui
+    environment:
+      TEST_DATABASE_URL: "mysql+pymysql://${COMPOSE_MYSQL_USER:-appuser}:${COMPOSE_MYSQL_PASSWORD:-apppass}@db:3306/${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}?charset=utf8mb4"
+      MYSQL_HOST: "db"
+      MYSQL_PORT: "3306"
+      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
+      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+      REDIS_URL: ""
+      FAISS_API_URL: ""
+      HOST_CHECK_ENABLED: "false"
+      ROOT_PATH: ""
+    volumes:
+      - ./app:/app
+      - ./migrate:/migrate:ro
+    working_dir: /app
+    command: ["pytest", "tests/ui", "-v"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   hf-cache:
   mysql8_dev_data:
