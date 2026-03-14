@@ -53,7 +53,7 @@ jobs:
           print(f"syntax compile ok: {count} files")
           PY
 
-  # ── Ruff lint / format チェック ────────────────────────────────────────────
+  # ── Lint / format チェック ────────────────────────────────────────────────
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -78,6 +78,9 @@ jobs:
 
       - name: Run Ruff format check
         run: ruff format . --check
+
+      - name: Run HTML/Jinja lint warnings
+        run: djlint app/templates --lint
 
   # ── ユニットテスト（DB不要、高速） ──────────────────────────────────────────
   unit-test:

@@ -188,6 +188,8 @@ services:
   # ── Lint 実行用サービス（repo ルート全体を対象）─────────────────────────────
   # 使い方:
   #   lint:           docker compose -f docker-compose.dev.yml run --rm lint
+  #   html lint:      docker compose -f docker-compose.dev.yml run --rm lint-html
+  #   html strict:    docker compose -f docker-compose.dev.yml run --rm lint-html djlint app/templates --lint
   #   format 確認:    docker compose -f docker-compose.dev.yml run --rm lint ruff format . --check
   #   自動修正:       docker compose -f docker-compose.dev.yml run --rm lint ruff check . --fix
   lint:
@@ -197,6 +199,14 @@ services:
       - .:/workspace
     working_dir: /workspace
     command: ["ruff", "check", "."]
+
+  lint-html:
+    profiles: [lint]
+    build: ./app
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: ["djlint", "app/templates", "--lint", "--warn"]
 
   # ── UI テスト実行用サービス（Playwright / Chromium）─────────────────────────
   # 使い方:

@@ -73,3 +73,17 @@ split-on-trailing-comma = true
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.djlint]
+profile = "jinja"
+indent = 2
+max_line_length = 120
+line_break_after_multiline_tag = true
+blank_line_after_tag = "extends,include"
+use_gitignore = true
+linter_output_format = "{filename}:{line}: {code} {message} {match}"
+# H021/H023: 現状はインライン style と HTML entity を多用しているため段階導入では除外
+# H030/H031: SEO メタ要件はページ差が大きく、まずは構文・構造チェックを優先
+# J004/J018: FastAPI + Jinja2 では root_path/request.url_for を使うため既定ルールと相性が悪い
+# T003: endblock 名は有用だが既存テンプレートに広く未適用なので後追いで揃える
+ignore = "H021,H023,H030,H031,J004,J018,T003"

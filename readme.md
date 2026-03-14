@@ -263,6 +263,12 @@ app/tests/
 # 通常テスト（unit + integration）
 docker compose -f docker-compose.dev.yml run --rm test
 
+# HTML / Jinja lint（まずは warning モード）
+docker compose -f docker-compose.dev.yml run --rm lint-html
+
+# HTML / Jinja lint（strict）
+docker compose -f docker-compose.dev.yml run --rm lint-html djlint app/templates --lint
+
 # unit テストのみ（DB 不要、高速）
 docker compose -f docker-compose.dev.yml run --rm test pytest tests/unit
 
