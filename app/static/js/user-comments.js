@@ -102,6 +102,48 @@
     return html;
   }
 
+  function createCommentElement(comment, options) {
+    options = options || {};
+    var badge = typeof options.badge === 'function' ? options.badge(comment) : (options.badge || '');
+    var link = document.createElement('a');
+    link.href = '?cursor=' + comment.comment_id;
+    link.style.textDecoration = 'none';
+    link.style.color = 'inherit';
+    link.style.display = 'block';
+    link.addEventListener('click', function (e) {
+      if (e.target.closest('button')) { e.preventDefault(); return; }
+    });
+    var commentDiv = document.createElement('div');
+    if (options.cursorMode) {
+      if (comment.comment_id === filters.cursor) commentDiv.className = 'comment highlighted';
+      else if (comment.commenter_login_snapshot === userLogin) commentDiv.className = 'comment grayed';
+      else commentDiv.className = 'comment';
+    } else {
+      commentDiv.className = 'comment';
+    }
+    commentDiv.id = comment.comment_id;
+    commentDiv.innerHTML =
+      '<div class="comment-head">' +
+      '<div>' +
+      badge +
+      '<a href="' + escapeHtml(comment.vod_jump_link) + '" target="_blank" class="pill">VOD ' + escapeHtml(String(comment.vod_id)) + '</a>' +
+      (comment.youtube_jump_link ? '<a href="' + escapeHtml(comment.youtube_jump_link) + '" target="_blank" class="pill">YouTube</a>' : '') +
+      '<strong>' + escapeHtml(comment.vod_title) + '</strong>' +
+      (options.showOwner ? '<span class="meta">· 配信者: ' + escapeHtml(comment.owner_login) + (comment.owner_display_name ? '（' + escapeHtml(comment.owner_display_name) + '）' : '') + '</span>' : '') +
+      '<span class="meta">· ' + escapeHtml(comment.commenter_login_snapshot) + (comment.commenter_display_name_snapshot ? '（' + escapeHtml(comment.commenter_display_name_snapshot) + '）' : '') + 'の書き込み</span>' +
+      '<span class="meta">· ' + escapeHtml(comment.offset_hms) + '</span>' +
+      (comment.comment_created_at_jst ? '<span class="meta">· ' + escapeHtml(comment.comment_created_at_jst) + ' JST</span>' : '') +
+      (options.showRelativeTime && comment.relative_time ? '<span class="meta ' + (comment.is_recent ? 'recent' : '') + '">· ' + escapeHtml(comment.relative_time) + '</span>' : '') +
+      (options.showBits && comment.bits_spent ? '<span class="pill">bits ' + escapeHtml(comment.bits_spent) + '</span>' : '') +
+      '</div>' +
+      '<div class="meta">' + renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count) + '</div>' +
+      '</div>' +
+      '<div class="body">' + renderBody(comment) + '</div>' +
+      renderCommunityNote(comment);
+    link.appendChild(commentDiv);
+    return { link: link, commentDiv: commentDiv };
+  }
+
   function updateURL(page, cursor) {
     var url = new URL(window.location);
     if (cursor) {
@@ -216,47 +258,18 @@
 
       var itemsToRender = direction === 'prepend' ? data.items.slice().reverse() : data.items;
       itemsToRender.forEach(function (comment) {
-        var link = document.createElement('a');
-        link.href = '?cursor=' + comment.comment_id;
-        link.style.textDecoration = 'none';
-        link.style.color = 'inherit';
-        link.style.display = 'block';
-        link.addEventListener('click', function (e) {
-          if (e.target.closest('button')) { e.preventDefault(); return; }
+        var el = createCommentElement(comment, {
+          cursorMode: isCursorMode,
+          showOwner: true,
+          showRelativeTime: true,
+          showBits: true,
         });
-        var commentDiv = document.createElement('div');
-        if (isCursorMode) {
-          if (comment.comment_id === filters.cursor) commentDiv.className = 'comment highlighted';
-          else if (comment.commenter_login_snapshot === userLogin) commentDiv.className = 'comment grayed';
-          else commentDiv.className = 'comment';
-        } else {
-          commentDiv.className = 'comment';
-        }
-        commentDiv.id = comment.comment_id;
-        commentDiv.innerHTML =
-          '<div class="comment-head">' +
-          '<div>' +
-          '<a href="' + escapeHtml(comment.vod_jump_link) + '" target="_blank" class="pill">VOD ' + escapeHtml(comment.vod_id) + '</a>' +
-          (comment.youtube_jump_link ? '<a href="' + escapeHtml(comment.youtube_jump_link) + '" target="_blank" class="pill">YouTube</a>' : '') +
-          '<strong>' + escapeHtml(comment.vod_title) + '</strong>' +
-          '<span class="meta">· 配信者: ' + escapeHtml(comment.owner_login) + (comment.owner_display_name ? '（' + escapeHtml(comment.owner_display_name) + '）' : '') + '</span>' +
-          '<span class="meta">· ' + escapeHtml(comment.commenter_login_snapshot) + (comment.commenter_display_name_snapshot ? '（' + escapeHtml(comment.commenter_display_name_snapshot) + '）' : '') + 'の書き込み</span>' +
-          '<span class="meta">· ' + escapeHtml(comment.offset_hms) + '</span>' +
-          (comment.comment_created_at_jst ? '<span class="meta">· ' + escapeHtml(comment.comment_created_at_jst) + ' JST</span>' : '') +
-          (comment.relative_time ? '<span class="meta ' + (comment.is_recent ? 'recent' : '') + '">· ' + escapeHtml(comment.relative_time) + '</span>' : '') +
-          (comment.bits_spent ? '<span class="pill">bits ' + escapeHtml(comment.bits_spent) + '</span>' : '') +
-          '</div>' +
-          '<div class="meta">' + renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count) + '</div>' +
-          '</div>' +
-          '<div class="body">' + renderBody(comment) + '</div>' +
-          renderCommunityNote(comment);
-        link.appendChild(commentDiv);
         if (direction === 'prepend') {
-          listElement.insertBefore(link, listElement.firstChild);
+          listElement.insertBefore(el.link, listElement.firstChild);
         } else {
-          listElement.appendChild(link);
+          listElement.appendChild(el.link);
         }
-        if (isBest9Mode) addBest9Button(commentDiv);
+        if (isBest9Mode) addBest9Button(el.commentDiv);
       });
 
       if (direction === 'prepend') currentMinPage = Math.min(currentMinPage, page);
@@ -372,14 +385,17 @@
   var best9ToggleBtn = document.getElementById('best9-toggle-btn');
   var best9Bar = document.getElementById('best9-bar');
 
+  function captureBest9Text(commentId, commentDiv) {
+    if (best9Data.has(commentId)) return;
+    var bodyEl = commentDiv ? commentDiv.querySelector('.body') : null;
+    if (bodyEl) best9Data.set(commentId, (bodyEl.innerText || bodyEl.textContent || '').trim());
+  }
+
   function addBest9Button(commentDiv) {
     if (commentDiv.querySelector('.best9-add-btn')) return;
     var commentId = commentDiv.id;
     if (!commentId) return;
-    if (best9Selected.has(commentId) && !best9Data.has(commentId)) {
-      var bodyEl = commentDiv.querySelector('.body');
-      if (bodyEl) best9Data.set(commentId, (bodyEl.innerText || bodyEl.textContent || '').trim());
-    }
+    if (best9Selected.has(commentId)) captureBest9Text(commentId, commentDiv);
     var btn = document.createElement('button');
     var isSelected = best9Selected.has(commentId);
     btn.className = 'best9-add-btn' + (isSelected ? ' selected' : '');
@@ -420,10 +436,7 @@
       best9Selected.add(commentId);
       if (btn) { btn.className = 'best9-add-btn selected'; btn.textContent = '選択済み ✓'; }
       if (commentDiv) commentDiv.classList.add('best9-selected');
-      if (commentDiv && !best9Data.has(commentId)) {
-        var bodyEl = commentDiv.querySelector('.body');
-        if (bodyEl) best9Data.set(commentId, (bodyEl.innerText || bodyEl.textContent || '').trim());
-      }
+      captureBest9Text(commentId, commentDiv);
     }
     saveBest9();
     updateBest9Bar();
@@ -451,8 +464,7 @@
       var buf = new Uint8Array(totalLen);
       var offset = 0;
       for (var i = 0; i < chunks.length; i++) { buf.set(chunks[i], offset); offset += chunks[i].length; }
-      var binary = '';
-      buf.forEach(function (b) { binary += String.fromCharCode(b); });
+      var binary = String.fromCharCode.apply(null, buf);
       return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     } catch (e) { return null; }
   }
@@ -630,34 +642,9 @@
       return;
     }
     items.forEach(function (comment) {
-      var link = document.createElement('a');
-      link.href = '?cursor=' + comment.comment_id;
-      link.style.textDecoration = 'none';
-      link.style.color = 'inherit';
-      link.style.display = 'block';
-      link.addEventListener('click', function (e) { if (e.target.closest('button')) { e.preventDefault(); return; } });
-      var commentDiv = document.createElement('div');
-      commentDiv.className = 'comment';
-      commentDiv.id = comment.comment_id;
-      var badge = typeof badgeHtml === 'function' ? badgeHtml(comment) : (badgeHtml || '');
-      commentDiv.innerHTML =
-        '<div class="comment-head">' +
-        '<div>' +
-        badge +
-        '<a href="' + escapeHtml(comment.vod_jump_link) + '" target="_blank" class="pill">VOD ' + escapeHtml(String(comment.vod_id)) + '</a>' +
-        (comment.youtube_jump_link ? '<a href="' + escapeHtml(comment.youtube_jump_link) + '" target="_blank" class="pill">YouTube</a>' : '') +
-        '<strong>' + escapeHtml(comment.vod_title) + '</strong>' +
-        '<span class="meta">· ' + escapeHtml(comment.commenter_login_snapshot) + (comment.commenter_display_name_snapshot ? '（' + escapeHtml(comment.commenter_display_name_snapshot) + '）の書き込み' : '') + '</span>' +
-        '<span class="meta">· ' + escapeHtml(comment.offset_hms) + '</span>' +
-        (comment.comment_created_at_jst ? '<span class="meta">· ' + escapeHtml(comment.comment_created_at_jst) + ' JST</span>' : '') +
-        '</div>' +
-        '<div class="meta">' + renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count) + '</div>' +
-        '</div>' +
-        '<div class="body">' + renderBody(comment) + '</div>' +
-        renderCommunityNote(comment);
-      link.appendChild(commentDiv);
-      listElement.appendChild(link);
-      if (isBest9Mode) addBest9Button(commentDiv);
+      var el = createCommentElement(comment, { badge: badgeHtml });
+      listElement.appendChild(el.link);
+      if (isBest9Mode) addBest9Button(el.commentDiv);
     });
   }
 
@@ -666,12 +653,6 @@
     isSimilarMode = false;
     if (similarClear) similarClear.style.display = 'none';
     if (similarStatus) similarStatus.textContent = '';
-    var centroidClear = document.getElementById('centroid-clear');
-    var centroidStatus = document.getElementById('centroid-status');
-    var emotionClear = document.getElementById('emotion-clear');
-    var emotionStatus = document.getElementById('emotion-status');
-    var centroidDetails = document.getElementById('centroid-details');
-    var emotionDetails = document.getElementById('emotion-details');
     if (centroidClear) centroidClear.style.display = 'none';
     if (centroidStatus) centroidStatus.textContent = '';
     if (emotionClear) emotionClear.style.display = 'none';
@@ -733,7 +714,7 @@
   var centroidSlider = document.getElementById('centroid-slider');
   var centroidVal = document.getElementById('centroid-val');
   var centroidSearchBtn = document.getElementById('centroid-search-btn');
-  var centroidClearEl = document.getElementById('centroid-clear');
+  var centroidClear = document.getElementById('centroid-clear');
   var centroidClearBtn = document.getElementById('centroid-clear-btn');
   var centroidStatus = document.getElementById('centroid-status');
   var centroidTopK = document.getElementById('centroid-top-k');
@@ -754,7 +735,7 @@
         if (!resp.ok) throw new Error('Failed');
         var data = await resp.json();
         isSpecialMode = true;
-        centroidClearEl.style.display = 'block';
+        centroidClear.style.display = 'block';
         centroidDetails.open = true;
         var posLabel = position < 0.3 ? '典型的な発言' : position > 0.7 ? '珍しい発言' : '中間の発言';
         centroidStatus.textContent = posLabel + ' - ' + data.items.length + ' 件';
@@ -776,7 +757,7 @@
   var emotionSliders = document.querySelectorAll('#emotion-sliders input[type="range"]');
   var emotionSearchBtn = document.getElementById('emotion-search-btn');
   var emotionResetBtn = document.getElementById('emotion-reset-btn');
-  var emotionClearEl = document.getElementById('emotion-clear');
+  var emotionClear = document.getElementById('emotion-clear');
   var emotionClearBtn = document.getElementById('emotion-clear-btn');
   var emotionStatus = document.getElementById('emotion-status');
   var emotionTopK = document.getElementById('emotion-top-k');
@@ -813,7 +794,7 @@
         if (!resp.ok) throw new Error('Failed');
         var data = await resp.json();
         isSpecialMode = true;
-        emotionClearEl.style.display = 'block';
+        emotionClear.style.display = 'block';
         emotionDetails.open = true;
         var labels = { joy:'笑い', surprise:'驚き', admiration:'称賛', anger:'怒り', sadness:'悲しみ', cheer:'応援' };
         var activeList = Object.entries(weights).filter(function (kv) { return kv[1] > 0; })
@@ -997,8 +978,9 @@
         .catch(function () {});
     }
 
-    function todayJST() {
+    function getJSTDate(offsetDays) {
       var now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      if (offsetDays) now.setUTCDate(now.getUTCDate() + offsetDays);
       return now.toISOString().slice(0, 10);
     }
 
@@ -1009,16 +991,11 @@
     }
 
     exportDetails.querySelectorAll('.export-today-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { doExport({ format: btn.dataset.format, date: todayJST() }); });
+      btn.addEventListener('click', function () { doExport({ format: btn.dataset.format, date: getJSTDate(0) }); });
     });
 
-    function yesterdayJST() {
-      var now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-      now.setUTCDate(now.getUTCDate() - 1);
-      return now.toISOString().slice(0, 10);
-    }
     exportDetails.querySelectorAll('.export-yesterday-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { doExport({ format: btn.dataset.format, date: yesterdayJST() }); });
+      btn.addEventListener('click', function () { doExport({ format: btn.dataset.format, date: getJSTDate(-1) }); });
     });
 
     exportDetails.querySelectorAll('.export-range-btn').forEach(function (btn) {
