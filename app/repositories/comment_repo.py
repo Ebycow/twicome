@@ -5,7 +5,7 @@ WHERE 句・ORDER BY 句の構築を含む SQL を封じ込める。
 
 from datetime import datetime
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from services.comment_utils import BODY_HTML_RENDER_VERSION, build_comment_body_select_sql
 
@@ -440,20 +440,67 @@ _QUIZ_COL_LIST = (
 )
 
 
+_RAND_RATIO_MIN_LIMIT = 100
+"""この件数未満の limit では COUNT を取らず直接 ORDER BY RAND() を使う。
+小さい limit なら ORDER BY RAND() でも十分速く、COUNT クエリを増やすと逆に遅くなる。"""
+
+
+def _fetch_comment_ids_random(db, count_sql: str, id_sql: str, params: dict, limit: int) -> list:
+    """COUNT で件数を調べ、大テーブルは RAND()<ratio フィルタ（ソートなし）、小テーブルは ORDER BY RAND() で ID を取得する。
+
+    limit < _RAND_RATIO_MIN_LIMIT の場合は COUNT をスキップして直接 ORDER BY RAND() を使う。
+    RAND()<ratio は全行をスキャンしつつ LIMIT で早期終了できるため、ORDER BY RAND() の O(n log n) ソートを回避できる。
+    oversample = 2.5: ratio = limit * 2.5 / total で期待件数は limit の 2.5 倍 → 不足確率は極めて低い。
+    """
+    if limit < _RAND_RATIO_MIN_LIMIT:
+        # 小 limit: COUNT 不要、ORDER BY RAND() で十分速い
+        rows = db.execute(
+            text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
+            {**params, "_lim": limit},
+        ).mappings().all()
+        return [r["comment_id"] for r in rows]
+
+    total = db.execute(text(count_sql), params).scalar() or 0
+    if total == 0:
+        return []
+
+    if total <= limit * 3:
+        # 小テーブル: ORDER BY RAND() で確実に limit 件取得
+        rows = db.execute(
+            text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
+            {**params, "_lim": limit},
+        ).mappings().all()
+    else:
+        # 大テーブル: RAND() < ratio でソートなしサンプリング (O(n)、早期終了あり)
+        ratio = min(0.95, limit * 2.5 / total)
+        rows = db.execute(
+            text(f"{id_sql} AND RAND() < :_ratio LIMIT :_lim"),
+            {**params, "_ratio": ratio, "_lim": limit},
+        ).mappings().all()
+
+    return [r["comment_id"] for r in rows]
+
+
 def fetch_quiz_target_comments(db, uid: int, limit: int) -> list[dict]:
     """クイズ用：指定ユーザーのコメントをランダムに取得。"""
+    ids = _fetch_comment_ids_random(
+        db,
+        count_sql="SELECT COUNT(*) FROM comments WHERE commenter_user_id = :uid AND CHAR_LENGTH(body) >= 3",
+        id_sql="SELECT comment_id FROM comments WHERE commenter_user_id = :uid AND CHAR_LENGTH(body) >= 3",
+        params={"uid": uid},
+        limit=limit,
+    )
+    if not ids:
+        return []
     rows = (
         db.execute(
             text(f"""
             SELECT {_QUIZ_COL_LIST}
             FROM comments c
             JOIN vods v ON v.vod_id = c.vod_id
-            WHERE c.commenter_user_id = :uid
-              AND CHAR_LENGTH(c.body) >= 3
-            ORDER BY RAND()
-            LIMIT :lim
-        """),
-            {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+            WHERE c.comment_id IN :ids
+        """).bindparams(bindparam("ids", expanding=True)),
+            {"ids": ids, "body_html_version": BODY_HTML_RENDER_VERSION},
         )
         .mappings()
         .all()
@@ -462,20 +509,52 @@ def fetch_quiz_target_comments(db, uid: int, limit: int) -> list[dict]:
 
 
 def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
-    """クイズ用：指定ユーザーが参加した VOD の他ユーザーコメントをランダムに取得。"""
+    """クイズ用：指定ユーザーが参加した VOD の他ユーザーコメントをランダムに取得。
+
+    サブクエリ JOIN で VOD 絞り込みを行い、expanding bindparam を使わずに済む形にしている。
+    """
+    other_where = """
+        commenter_user_id != :uid
+        AND CHAR_LENGTH(body) >= 3
+        AND vod_id IN (SELECT DISTINCT vod_id FROM comments WHERE commenter_user_id = :uid)
+    """
+    if limit < _RAND_RATIO_MIN_LIMIT:
+        # 小 limit: COUNT 不要、ORDER BY RAND() で十分速い
+        id_rows = db.execute(
+            text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
+            {"uid": uid, "lim": limit},
+        ).mappings().all()
+    else:
+        total = db.execute(
+            text(f"SELECT COUNT(*) FROM comments WHERE {other_where}"),
+            {"uid": uid},
+        ).scalar() or 0
+        if total == 0:
+            return []
+        if total <= limit * 3:
+            id_rows = db.execute(
+                text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
+                {"uid": uid, "lim": limit},
+            ).mappings().all()
+        else:
+            ratio = min(0.95, limit * 2.5 / total)
+            id_rows = db.execute(
+                text(f"SELECT comment_id FROM comments WHERE {other_where} AND RAND() < :ratio LIMIT :lim"),
+                {"uid": uid, "ratio": ratio, "lim": limit},
+            ).mappings().all()
+
+    ids = [r["comment_id"] for r in id_rows]
+    if not ids:
+        return []
     rows = (
         db.execute(
             text(f"""
             SELECT {_QUIZ_COL_LIST}
             FROM comments c
             JOIN vods v ON v.vod_id = c.vod_id
-            WHERE c.commenter_user_id != :uid
-              AND c.vod_id IN (SELECT DISTINCT vod_id FROM comments WHERE commenter_user_id = :uid)
-              AND CHAR_LENGTH(c.body) >= 3
-            ORDER BY RAND()
-            LIMIT :lim
-        """),
-            {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+            WHERE c.comment_id IN :ids
+        """).bindparams(bindparam("ids", expanding=True)),
+            {"ids": ids, "body_html_version": BODY_HTML_RENDER_VERSION},
         )
         .mappings()
         .all()

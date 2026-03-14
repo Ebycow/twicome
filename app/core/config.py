@@ -1,6 +1,7 @@
 """アプリケーション設定・環境変数"""
 
 import os
+import secrets
 import subprocess
 import time
 
@@ -87,3 +88,7 @@ def _get_static_version() -> str:
 
 
 STATIC_VERSION: str = _get_static_version()
+
+# クイズタスク API のトークン署名キー
+# 環境変数未設定時はプロセス起動ごとにランダム生成（同一プロセス内でのみ有効）
+QUIZ_SECRET_KEY: str = os.getenv("QUIZ_SECRET_KEY") or secrets.token_hex(32)

@@ -1,0 +1,6 @@
+# 全ベースライン共通 (必須)
+requests
+scikit-learn
+
+# baseline_sentence_bert.py のみ必要 (任意)
+# sentence-transformers
