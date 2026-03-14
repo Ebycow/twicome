@@ -9,7 +9,6 @@ Twicome の HTTP API を MCP ツールとして公開する。
 """
 
 import os
-from typing import Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -39,12 +38,12 @@ def _request(path: str, params: dict) -> dict:
         if e.response.status_code == 404:
             try:
                 body = e.response.json()
-                raise ValueError(body.get("error", "not_found"))
-            except Exception:
-                raise ValueError("not_found")
-        raise RuntimeError(f"API error: {e.response.status_code} {e.response.text}")
+                raise ValueError(body.get("error", "not_found")) from e
+            except Exception as parse_err:
+                raise ValueError("not_found") from parse_err
+        raise RuntimeError(f"API error: {e.response.status_code} {e.response.text}") from e
     except httpx.RequestError as e:
-        raise RuntimeError(f"接続エラー: {e}。TWICOME_BASE_URL={BASE_URL} を確認してください。")
+        raise RuntimeError(f"接続エラー: {e}。TWICOME_BASE_URL={BASE_URL} を確認してください。") from e
 
 
 def _format_comment(item: dict) -> str:
@@ -79,10 +78,10 @@ def _format_comment(item: dict) -> str:
 @mcp.tool()
 def get_user_comments(
     login: str,
-    q: Optional[str] = None,
-    exclude_q: Optional[str] = None,
-    vod_id: Optional[str] = None,
-    owner_user_id: Optional[str] = None,
+    q: str | None = None,
+    exclude_q: str | None = None,
+    vod_id: str | None = None,
+    owner_user_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
     sort: str = "created_at",

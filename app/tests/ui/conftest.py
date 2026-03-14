@@ -53,6 +53,7 @@ _TRUNCATE_TABLES = ["community_notes", "comments", "vods", "users"]
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
 
+
 def _get_free_port() -> int:
     """OS が空きポートを割り当て、その番号を返す。"""
     with socket.socket() as s:
@@ -76,6 +77,7 @@ class _UvicornServer(threading.Thread):
 
 
 # ── セッションスコープのフィクスチャ ─────────────────────────────────────────
+
 
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations():
@@ -111,7 +113,7 @@ def live_server(apply_migrations):
     os.chdir(str(APP_DIR))
 
     # app インポートはここで初めて行う（DATABASE_URL 設定後）
-    from app_factory import app  # noqa: PLC0415
+    from app_factory import app
 
     port = _get_free_port()
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
@@ -146,6 +148,7 @@ def base_url(live_server: str) -> str:
 
 
 # ── テストごとのフィクスチャ ─────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def db(db_engine):

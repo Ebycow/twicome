@@ -1,10 +1,14 @@
-import requests
-import pandas as pd
+"""ユーザーID追加ユーティリティ"""
+
 import sys
 from pathlib import Path
 
+import pandas as pd
+import requests
+
 
 def load_env(path: Path) -> dict[str, str]:
+    """.env ファイルを読み込んで key-value dict を返す。"""
     env: dict[str, str] = {}
     if not path.exists():
         return env
@@ -26,12 +30,11 @@ ENV = load_env(Path(__file__).resolve().parents[1] / ".env")
 CLIENT_ID = ENV.get("CLIENT_ID", "").strip()
 ACCESS_TOKEN = ENV.get("ACCESS_TOKEN", "").strip()
 
+
 def get_user_id(username):
+    """Twitch API でユーザー名からユーザー ID を取得する。"""
     url = f"https://api.twitch.tv/helix/users?login={username}"
-    headers = {
-        "Client-ID": CLIENT_ID,
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
+    headers = {"Client-ID": CLIENT_ID, "Authorization": f"Bearer {ACCESS_TOKEN}"}
 
     response = requests.get(url, headers=headers)
     data = response.json()
@@ -41,6 +44,7 @@ def get_user_id(username):
         return user_id
     else:
         return None
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

@@ -1,5 +1,4 @@
-"""
-FAISS インデックス構築スクリプト (faiss-api クライアント版)
+"""FAISS インデックス構築スクリプト (faiss-api クライアント版)
 
 faiss_config.json に記載されたユーザのコメントを MySQL から取得し、
 faiss-api へ送信することでインデックスを更新する。
@@ -56,9 +55,7 @@ CHUNK_SIZE = 1000
 _batch_data_dir = os.getenv("BATCH_DATA_DIR", "")
 _app_env = os.getenv("APP_ENV", "development")
 FAISS_DATA_DIR = (
-    Path(_batch_data_dir) / "faiss_data"
-    if _batch_data_dir
-    else PROJECT_ROOT / "data" / _app_env / "faiss_data"
+    Path(_batch_data_dir) / "faiss_data" if _batch_data_dir else PROJECT_ROOT / "data" / _app_env / "faiss_data"
 )
 
 
@@ -95,21 +92,21 @@ def update_index_for_user(conn, login: str):
     cur.close()
 
     if not rows:
-        print(f"  コメントなし、スキップ")
+        print("  コメントなし、スキップ")
         return
 
     new_rows = [r for r in rows if r["comment_id"] not in indexed_ids]
     print(f"  DB: {len(rows)} 件 / 既インデックス済み: {len(indexed_ids)} 件 / 新規: {len(new_rows)} 件")
 
     if not new_rows:
-        print(f"  新規なし、スキップ")
+        print("  新規なし、スキップ")
         return
 
     print(f"  新規 {len(new_rows)} 件 → faiss-api へ送信中...")
 
     total_added = 0
     for i in range(0, len(new_rows), CHUNK_SIZE):
-        chunk = new_rows[i:i + CHUNK_SIZE]
+        chunk = new_rows[i : i + CHUNK_SIZE]
         chunk_ids = [r["comment_id"] for r in chunk]
         chunk_texts = [r["body"] for r in chunk]
 
@@ -132,6 +129,7 @@ def update_index_for_user(conn, login: str):
 
 
 def main():
+    """FAISS インデックス構築のエントリーポイント。"""
     # 対象ユーザの決定
     if len(sys.argv) > 1:
         target_users = sys.argv[1:]

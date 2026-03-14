@@ -2,15 +2,15 @@ import random
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import text
 
 from core.config import DEFAULT_PLATFORM
 from core.db import SessionLocal
 from core.templates import templates
-from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body_select_sql, _get_comment_body_html
+from repositories import comment_repo, user_repo
+from services.comment_utils import get_comment_body_html
 
 router = APIRouter()
-_COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
+
 
 @router.get("/u/{login}/quiz", response_class=HTMLResponse)
 def quiz_page(
@@ -19,34 +19,27 @@ def quiz_page(
     platform: str = Query(DEFAULT_PLATFORM),
 ):
     with SessionLocal() as db:
-        user_row = db.execute(
-            text("""
-                SELECT user_id, login, display_name, profile_image_url
-                FROM users
-                WHERE platform = :platform AND login = :login
-                LIMIT 1
-            """),
-            {"platform": platform, "login": login},
-        ).mappings().first()
-
+        user_row = user_repo.find_user(db, login, platform)
         if not user_row:
             return templates.TemplateResponse(
                 "quiz.html",
-                {"request": request, "error": "ユーザが見つかりませんでした", "user": None, "comment_count": 0, "platform": platform},
+                {
+                    "request": request,
+                    "error": "ユーザが見つかりませんでした",
+                    "user": None,
+                    "comment_count": 0,
+                    "platform": platform,
+                },
                 status_code=404,
             )
-
-        comment_count = db.execute(
-            text("SELECT COUNT(*) AS cnt FROM comments WHERE commenter_user_id = :uid"),
-            {"uid": user_row["user_id"]},
-        ).mappings().first()["cnt"]
+        comment_count = comment_repo.count_comments(db, user_row["user_id"])
 
     return templates.TemplateResponse(
         "quiz.html",
         {
             "request": request,
             "error": None,
-            "user": dict(user_row),
+            "user": user_row,
             "comment_count": comment_count,
             "platform": platform,
         },
@@ -60,15 +53,7 @@ def quiz_start_api(
     count: int = Query(30, ge=10, le=100),
 ):
     with SessionLocal() as db:
-        user_row = db.execute(
-            text("""
-                SELECT user_id, login, display_name
-                FROM users
-                WHERE platform = :platform AND login = :login
-                LIMIT 1
-            """),
-            {"platform": platform, "login": login},
-        ).mappings().first()
+        user_row = user_repo.find_user(db, login, platform)
         if not user_row:
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
@@ -76,61 +61,39 @@ def quiz_start_api(
         target_count = count // 2
         other_count = count - target_count
 
-        target_comments = db.execute(
-            text(f"""
-                SELECT {_COMMENT_BODY_SELECT_SQL}, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
-                       c.user_color, v.title AS vod_title
-                FROM comments c
-                JOIN vods v ON v.vod_id = c.vod_id
-                WHERE c.commenter_user_id = :uid
-                  AND CHAR_LENGTH(c.body) >= 3
-                ORDER BY RAND()
-                LIMIT :lim
-            """),
-            {"uid": uid, "lim": target_count, "body_html_version": BODY_HTML_RENDER_VERSION},
-        ).mappings().all()
-
-        other_comments = db.execute(
-            text(f"""
-                SELECT {_COMMENT_BODY_SELECT_SQL}, c.commenter_login_snapshot, c.commenter_display_name_snapshot,
-                       c.user_color, v.title AS vod_title
-                FROM comments c
-                JOIN vods v ON v.vod_id = c.vod_id
-                WHERE c.commenter_user_id != :uid
-                  AND c.vod_id IN (SELECT DISTINCT vod_id FROM comments WHERE commenter_user_id = :uid)
-                  AND CHAR_LENGTH(c.body) >= 3
-                ORDER BY RAND()
-                LIMIT :lim
-            """),
-            {"uid": uid, "lim": other_count, "body_html_version": BODY_HTML_RENDER_VERSION},
-        ).mappings().all()
+        target_comments = comment_repo.fetch_quiz_target_comments(db, uid, target_count)
+        other_comments = comment_repo.fetch_quiz_other_comments(db, uid, other_count)
 
         questions = []
         for r in target_comments:
-            questions.append({
-                "body": r["body"],
-                "body_html": _get_comment_body_html(r),
-                "is_target": True,
-                "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
-                "vod_title": r["vod_title"],
-                "user_color": r["user_color"],
-            })
+            questions.append(
+                {
+                    "body": r["body"],
+                    "body_html": get_comment_body_html(r),
+                    "is_target": True,
+                    "actual_commenter_display_name": r["commenter_display_name_snapshot"]
+                    or r["commenter_login_snapshot"],
+                    "vod_title": r["vod_title"],
+                    "user_color": r["user_color"],
+                }
+            )
         for r in other_comments:
-            questions.append({
-                "body": r["body"],
-                "body_html": _get_comment_body_html(r),
-                "is_target": False,
-                "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
-                "vod_title": r["vod_title"],
-                "user_color": r["user_color"],
-            })
+            questions.append(
+                {
+                    "body": r["body"],
+                    "body_html": get_comment_body_html(r),
+                    "is_target": False,
+                    "actual_commenter_display_name": r["commenter_display_name_snapshot"]
+                    or r["commenter_login_snapshot"],
+                    "vod_title": r["vod_title"],
+                    "user_color": r["user_color"],
+                }
+            )
 
         random.shuffle(questions)
 
     return {
-        "user": dict(user_row),
+        "user": user_row,
         "total": len(questions),
         "questions": questions,
     }
-
-

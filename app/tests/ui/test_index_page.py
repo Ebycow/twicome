@@ -21,7 +21,6 @@
 
 import re
 
-import pytest
 from playwright.sync_api import Page, expect
 
 
@@ -69,6 +68,7 @@ class TestPageLoad:
         これはサーバーサイドの条件付きレンダリングの動作確認の例。
         """
         from tests.integration.helpers import seed_user, seed_vod
+
         seed_user(db, user_id=1, login="somestreamer", platform="twitch")
         # streamers は users JOIN vods クエリなので VOD も必要
         seed_vod(db, vod_id=100, owner_user_id=1)
@@ -134,7 +134,7 @@ class TestSearchInput:
         expect(page.locator("#login-search-clear")).to_be_visible()  # 表示を確認
 
         page.locator("#login-search-clear").click()
-        expect(page.locator("#login-search-clear")).to_be_hidden()   # 非表示を確認
+        expect(page.locator("#login-search-clear")).to_be_hidden()  # 非表示を確認
 
 
 class TestFormSubmission:
@@ -156,6 +156,7 @@ class TestFormSubmission:
         という手順が必要になる。
         """
         from tests.integration.helpers import seed_user
+
         # DB にユーザーを投入してからページを開く
         seed_user(db, user_id=10, login="gostreamer", platform="twitch")
 

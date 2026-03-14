@@ -1,14 +1,16 @@
-from fastapi import FastAPI
+"""FastAPI アプリケーションファクトリ"""
+
 import json
 from pathlib import Path
 
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from routers import ALL_ROUTERS
 
 from core.config import FAISS_API_URL, ROOT_PATH, SERVICE_WORKER_CACHE_NAME
 from core.middleware import CSRFProtectionMiddleware, HostCheckMiddleware, SecurityHeadersMiddleware
 from faiss_search import ping_faiss_api
-from routers import ALL_ROUTERS
 
 app = FastAPI(root_path=ROOT_PATH)
 app.add_middleware(CSRFProtectionMiddleware)
@@ -31,6 +33,7 @@ def _render_service_worker_script() -> str:
 
 @app.get("/sw.js", include_in_schema=False)
 def service_worker():
+    """Service Worker JS を返す。"""
     response = Response(_render_service_worker_script(), media_type="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache"
@@ -39,11 +42,13 @@ def service_worker():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
+    """Favicon を返す。"""
     return FileResponse("static/icons/favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/manifest.json", include_in_schema=False)
 def pwa_manifest():
+    """PWA マニフェスト JSON を返す。"""
     base = ROOT_PATH  # e.g. "" (dev) or "/twicome" (prod)
     icons_base = f"{base}/static/icons"
     sizes = [36, 48, 72, 96, 128, 144, 152, 192, 256, 384, 512]
@@ -73,6 +78,7 @@ def pwa_manifest():
 
 @app.get("/health")
 def health():
+    """ヘルスチェックエンドポイント。"""
     return JSONResponse({"status": "ok"})
 
 

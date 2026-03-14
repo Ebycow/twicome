@@ -1,5 +1,4 @@
-"""
-トップページ HTML キャッシュの事前生成スクリプト。
+"""トップページ HTML キャッシュの事前生成スクリプト。
 
 invalidate_cache.py による data_version 更新直後に app へ内部 GET を送り、
 / の SSR と Redis HTML キャッシュを先に構築する。
@@ -11,7 +10,6 @@ import time
 from urllib.parse import urljoin
 
 import requests
-
 
 APP_INTERNAL_BASE_URL = os.getenv("APP_INTERNAL_BASE_URL", "http://app:8000").strip()
 INDEX_PREWARM_URL = os.getenv("INDEX_PREWARM_URL", "").strip()
@@ -39,6 +37,7 @@ def _fetch_expected_version(session: requests.Session, url: str) -> str | None:
 
 
 def main() -> int:
+    """トップページ HTML キャッシュを事前生成するエントリーポイント。"""
     if not os.getenv("REDIS_URL", "").strip():
         print("REDIS_URL が設定されていません。トップHTML prewarm をスキップします。")
         return 0

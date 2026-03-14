@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}ツイコメ{% endblock %}</title>
+    {% include "partials/_head_meta_icons.html" %}
+    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="{{ root_path }}/static/css/base.css?v={{ static_version }}" />
+    {% block page_css %}{% endblock %}
+    {% block styles %}{% endblock %}
+  </head>
+  <body>
+    {% block body %}{% endblock %}
+    {% block scripts %}{% endblock %}
+    <script type="application/json" id="app-root-path">{{ root_path | tojson }}</script>
+    {% block sw_script %}
+    <script src="{{ root_path }}/static/js/base.js?v={{ static_version }}"></script>
+    {% endblock %}
+  </body>
+</html>

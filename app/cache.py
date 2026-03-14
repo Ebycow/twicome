@@ -1,14 +1,13 @@
-"""
-Redis キャッシュ ユーティリティ
+"""Redis キャッシュ ユーティリティ
 
 REDIS_URL が設定されていない場合はすべての操作が no-op になり、
 呼び出し元は DB フォールバックを使う。
 """
+
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
 
@@ -21,7 +20,7 @@ INDEX_USERS_CACHE_KEY = "twicome:index:users"
 INDEX_HTML_CACHE_KEY_PREFIX = "twicome:index:html"
 COMMENTS_HTML_CACHE_KEY_PREFIX = "twicome:comments:html"
 
-_startup_data_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+_startup_data_version = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 
 
 def _compute_render_version() -> str:
@@ -39,11 +38,7 @@ def _compute_render_version() -> str:
     mtimes: list[int] = []
     for candidate in candidates:
         if candidate.is_dir():
-            mtimes.extend(
-                int(path.stat().st_mtime_ns)
-                for path in candidate.rglob("*")
-                if path.is_file()
-            )
+            mtimes.extend(int(path.stat().st_mtime_ns) for path in candidate.rglob("*") if path.is_file())
         elif candidate.exists():
             mtimes.append(int(candidate.stat().st_mtime_ns))
 
@@ -75,7 +70,7 @@ def _get_redis():
         return None
 
 
-def get_user_meta_cache(login: str) -> Optional[dict]:
+def get_user_meta_cache(login: str) -> dict | None:
     """vod_options / owner_options のキャッシュを取得する。未ヒット時は None。"""
     r = _get_redis()
     if not r:
@@ -134,7 +129,7 @@ def set_data_version(version: str) -> str:
     return value
 
 
-def get_index_html_cache(version: str) -> Optional[str]:
+def get_index_html_cache(version: str) -> str | None:
     """データバージョンに紐づくトップ HTML キャッシュを取得する。"""
     r = _get_redis()
     if not r:
@@ -167,7 +162,7 @@ def _comments_html_cache_key(version: str, platform: str, login: str) -> str:
     return f"{COMMENTS_HTML_CACHE_KEY_PREFIX}:{version}:{normalized_platform}:{normalized_login}"
 
 
-def get_comments_html_cache(version: str, platform: str, login: str) -> Optional[str]:
+def get_comments_html_cache(version: str, platform: str, login: str) -> str | None:
     """データバージョンに紐づく初期コメントページ HTML キャッシュを取得する。"""
     r = _get_redis()
     if not r:
@@ -194,7 +189,7 @@ def set_comments_html_cache(version: str, platform: str, login: str, html: str) 
         print(f"[cache] set_comments_html_cache error: {e}")
 
 
-def get_index_landing_cache() -> Optional[dict]:
+def get_index_landing_cache() -> dict | None:
     """トップページ表示に必要な軽量データのキャッシュを取得する。"""
     r = _get_redis()
     if not r:
@@ -223,7 +218,7 @@ def set_index_landing_cache(data: dict) -> None:
         print(f"[cache] set_index_landing_cache error: {e}")
 
 
-def get_index_users_cache() -> Optional[list]:
+def get_index_users_cache() -> list | None:
     """トップページ検索用ユーザー一覧キャッシュを取得する。"""
     r = _get_redis()
     if not r:

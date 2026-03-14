@@ -18,8 +18,7 @@ else:
 
 if not TWITCH_DOWNLOADER.exists():
     raise FileNotFoundError(
-        f"TwitchDownloaderCLI not found at {TWITCH_DOWNLOADER}. "
-        "Set TWITCH_DOWNLOADER_CLI to override."
+        f"TwitchDownloaderCLI not found at {TWITCH_DOWNLOADER}. Set TWITCH_DOWNLOADER_CLI to override."
     )
 
 if not os.access(TWITCH_DOWNLOADER, os.X_OK):
@@ -29,8 +28,7 @@ COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 if not CSV_FILE.exists():
     raise FileNotFoundError(
-        f"VOD CSV not found: {CSV_FILE}. "
-        "Run get_vod_list_batch.py first or set VODS_CSV to override."
+        f"VOD CSV not found: {CSV_FILE}. Run get_vod_list_batch.py first or set VODS_CSV to override."
     )
 
 with CSV_FILE.open("r", encoding="utf-8") as f:

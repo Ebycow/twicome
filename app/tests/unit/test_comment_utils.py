@@ -2,9 +2,8 @@
 services/comment_utils.py の純粋関数ユニットテスト
 DB・外部API 不要。
 """
-from datetime import datetime, timezone
 
-import pytest
+from datetime import UTC, datetime
 
 from services.comment_utils import (
     build_vod_link,
@@ -19,8 +18,8 @@ from services.comment_utils import (
     utc_to_jst,
 )
 
-
 # ── seconds_to_hms ──────────────────────────────────────────────────────────
+
 
 class TestSecondsToHms:
     def test_under_one_hour(self):
@@ -41,6 +40,7 @@ class TestSecondsToHms:
 
 # ── seconds_to_twitch_t ──────────────────────────────────────────────────────
 
+
 class TestSecondsToTwitchT:
     def test_hours_minutes_seconds(self):
         assert seconds_to_twitch_t(3661) == "1h1m1s"
@@ -59,6 +59,7 @@ class TestSecondsToTwitchT:
 
 
 # ── split_filter_terms ───────────────────────────────────────────────────────
+
 
 class TestSplitFilterTerms:
     def test_space_separated(self):
@@ -88,6 +89,7 @@ class TestSplitFilterTerms:
 
 # ── normalize_emote_id ───────────────────────────────────────────────────────
 
+
 class TestNormalizeEmoteId:
     def test_valid_id(self):
         assert normalize_emote_id("emotesv2_abc123") == "emotesv2_abc123"
@@ -110,6 +112,7 @@ class TestNormalizeEmoteId:
 
 # ── build_vod_link ───────────────────────────────────────────────────────────
 
+
 class TestBuildVodLink:
     def test_basic(self):
         link = build_vod_link("https://www.twitch.tv/videos/123", 90)
@@ -128,6 +131,7 @@ class TestBuildVodLink:
 
 
 # ── build_youtube_link ───────────────────────────────────────────────────────
+
 
 class TestBuildYoutubeLink:
     def test_basic(self):
@@ -149,6 +153,7 @@ class TestBuildYoutubeLink:
 
 # ── render_comment_body_html ─────────────────────────────────────────────────
 
+
 class TestRenderCommentBodyHtml:
     def test_plain_text(self):
         result = render_comment_body_html(None, "hello world")
@@ -160,13 +165,7 @@ class TestRenderCommentBodyHtml:
         assert "&lt;script&gt;" in result
 
     def test_with_emote_fragment(self):
-        raw = {
-            "message": {
-                "fragments": [
-                    {"text": "Kappa", "emoticon": {"emoticon_id": "25"}}
-                ]
-            }
-        }
+        raw = {"message": {"fragments": [{"text": "Kappa", "emoticon": {"emoticon_id": "25"}}]}}
         result = render_comment_body_html(raw, "Kappa")
         assert '<img class="emote"' in result
         assert 'alt="Kappa"' in result
@@ -195,18 +194,13 @@ class TestRenderCommentBodyHtml:
         assert result == "fallback"
 
     def test_xss_in_emote_text(self):
-        raw = {
-            "message": {
-                "fragments": [
-                    {"text": '<img src=x onerror=alert(1)>', "emoticon": {"emoticon_id": "25"}}
-                ]
-            }
-        }
+        raw = {"message": {"fragments": [{"text": "<img src=x onerror=alert(1)>", "emoticon": {"emoticon_id": "25"}}]}}
         result = render_comment_body_html(raw, "fallback")
         assert "onerror" not in result
 
 
 # ── get_comment_body_html ────────────────────────────────────────────────────
+
 
 class TestGetCommentBodyHtml:
     def test_uses_stored_html_when_version_matches(self):
@@ -241,9 +235,10 @@ class TestGetCommentBodyHtml:
 
 # ── utc_to_jst ───────────────────────────────────────────────────────────────
 
+
 class TestUtcToJst:
     def test_converts_correctly(self):
-        dt_utc = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        dt_utc = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
         dt_jst = utc_to_jst(dt_utc)
         assert dt_jst.hour == 9
         assert dt_jst.day == 1
@@ -257,13 +252,14 @@ class TestUtcToJst:
 
 # ── decorate_comment ─────────────────────────────────────────────────────────
 
+
 class TestDecorateComment:
     def _base_row(self, **kwargs):
         row = {
             "comment_id": "c1",
             "vod_id": 123,
             "offset_seconds": 90,
-            "comment_created_at_utc": datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+            "comment_created_at_utc": datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC),
             "body": "hello",
             "body_html": "hello",
             "body_html_version": 1,
@@ -280,58 +276,50 @@ class TestDecorateComment:
 
     def test_offset_hms_computed(self):
         row = self._base_row(offset_seconds=90)
-        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert result["offset_hms"] == "01:30"
 
     def test_vod_link_built(self):
         row = self._base_row(offset_seconds=90)
-        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert "t=1m30s" in result["vod_link"]
 
     def test_raw_json_removed(self):
         row = self._base_row()
-        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert "raw_json" not in result
         assert "body_html_version" not in result
 
     def test_relative_time_hours(self):
-        row = self._base_row(
-            comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
-        )
-        now = datetime(2024, 6, 1, 12, 30, 0, tzinfo=timezone.utc)
+        row = self._base_row(comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
+        now = datetime(2024, 6, 1, 12, 30, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert "2時間" in result["relative_time"]
 
     def test_relative_time_days(self):
-        row = self._base_row(
-            comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
-        )
-        now = datetime(2024, 6, 3, 10, 0, 0, tzinfo=timezone.utc)
+        row = self._base_row(comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
+        now = datetime(2024, 6, 3, 10, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert "日前" in result["relative_time"]
 
     def test_is_recent_within_24h(self):
-        row = self._base_row(
-            comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
-        )
-        now = datetime(2024, 6, 1, 20, 0, 0, tzinfo=timezone.utc)
+        row = self._base_row(comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
+        now = datetime(2024, 6, 1, 20, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert result["is_recent"] is True
 
     def test_is_recent_false_over_24h(self):
-        row = self._base_row(
-            comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
-        )
-        now = datetime(2024, 6, 2, 11, 0, 0, tzinfo=timezone.utc)
+        row = self._base_row(comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
+        now = datetime(2024, 6, 2, 11, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert result["is_recent"] is False
 
     def test_string_created_at_parsed(self):
         """Redis キャッシュから復元した文字列の datetime を正しく扱う。"""
         row = self._base_row(comment_created_at_utc="2024-06-01T10:00:00")
-        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert result["relative_time"] is not None

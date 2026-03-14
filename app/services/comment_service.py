@@ -1,13 +1,11 @@
-"""
-コメント閲覧・ページネーションの業務ロジック。
+"""コメント閲覧・ページネーションの業務ロジック。
 
-user_comments_page（HTML）と user_comments_api（JSON）の両ハンドラが
-fetch_user_comment_page() を共有する。
+user_comments_page（HTML）と user_comments_api（JSON）の両ハンドラが fetch_user_comment_page() を共有する。
 """
+
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta, timezone
 
 from repositories import comment_repo, user_repo
 from services.comment_utils import decorate_comment, split_filter_terms
@@ -17,26 +15,26 @@ _EXPORT_LIMIT = 5000
 
 
 def _parse_jst_date_to_utc_range(
-    date_from: Optional[str],
-    date_to: Optional[str],
-) -> tuple[Optional[datetime], Optional[datetime]]:
-    """
-    YYYY-MM-DD (JST) の日付文字列を UTC datetime の範囲に変換する。
+    date_from: str | None,
+    date_to: str | None,
+) -> tuple[datetime | None, datetime | None]:
+    """YYYY-MM-DD (JST) の日付文字列を UTC datetime の範囲に変換する。
+
     date_from → その日の 00:00:00 JST (= UTC -9h)
     date_to   → 翌日の 00:00:00 JST (exclusive, = UTC -9h)
     """
-    date_from_utc: Optional[datetime] = None
-    date_to_utc: Optional[datetime] = None
+    date_from_utc: datetime | None = None
+    date_to_utc: datetime | None = None
     if date_from:
         try:
             d = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=JST)
-            date_from_utc = d.astimezone(timezone.utc).replace(tzinfo=None)
+            date_from_utc = d.astimezone(UTC).replace(tzinfo=None)
         except ValueError:
             pass
     if date_to:
         try:
             d = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=JST)
-            date_to_utc = (d + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+            date_to_utc = (d + timedelta(days=1)).astimezone(UTC).replace(tzinfo=None)
         except ValueError:
             pass
     return date_from_utc, date_to_utc
@@ -44,6 +42,8 @@ def _parse_jst_date_to_utc_range(
 
 @dataclass
 class CommentPage:
+    """コメント一覧ページのデータを保持するデータクラス。"""
+
     user: dict
     comments: list[dict]
     total: int
@@ -60,23 +60,22 @@ def fetch_user_comment_page(
     login: str,
     platform: str,
     *,
-    user: Optional[dict] = None,
-    vod_id: Optional[int] = None,
-    owner_user_id: Optional[int] = None,
-    q: Optional[str] = None,
-    exclude_q: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    user: dict | None = None,
+    vod_id: int | None = None,
+    owner_user_id: int | None = None,
+    q: str | None = None,
+    exclude_q: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     page: int = 1,
     page_size: int = 50,
     sort: str = "created_at",
-    cursor: Optional[str] = None,
+    cursor: str | None = None,
     load_meta: bool = False,
 ) -> CommentPage:
-    """
-    ユーザーのコメント一覧ページデータを返す。
-    user が存在しない場合は ValueError を raise する。
+    """ユーザーのコメント一覧ページデータを返す。
 
+    user が存在しない場合は ValueError を raise する。
     user を渡すと find_user クエリをスキップできる（ルーター側で取得済みの場合）。
     load_meta=True のとき vod_options / owner_options を取得する（HTML ページ用）。
     """
@@ -109,43 +108,65 @@ def fetch_user_comment_page(
             half = page_size // 2
             offset = max(0, cursor_pos - half)
             page = (offset // page_size) + 1
-            rows = comment_repo.fetch_comments_in_vod(
-                db, cursor_vod_id, sort=sort, limit=page_size, offset=offset
-            )
+            rows = comment_repo.fetch_comments_in_vod(db, cursor_vod_id, limit=page_size, offset=offset)
             pages = 0  # カーソルモードではページ数を返さない
         else:
             # カーソルが見つからない場合はフォールバック
             total = comment_repo.count_comments(
-                db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
-                q=q, exclude_terms=exclude_terms,
-                date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+                db,
+                uid,
+                vod_id=vod_id,
+                owner_user_id=owner_user_id,
+                q=q,
+                exclude_terms=exclude_terms,
+                date_from_utc=date_from_utc,
+                date_to_utc=date_to_utc,
             )
             offset = 0
             pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
             rows = comment_repo.fetch_comments(
-                db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
-                q=q, exclude_terms=exclude_terms, sort=sort,
-                limit=page_size, offset=offset,
-                date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+                db,
+                uid,
+                vod_id=vod_id,
+                owner_user_id=owner_user_id,
+                q=q,
+                exclude_terms=exclude_terms,
+                sort=sort,
+                limit=page_size,
+                offset=offset,
+                date_from_utc=date_from_utc,
+                date_to_utc=date_to_utc,
             )
     else:
         # ── 通常ページネーション ─────────────────────────────────────────────
         total = comment_repo.count_comments(
-            db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
-            q=q, exclude_terms=exclude_terms,
-            date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+            db,
+            uid,
+            vod_id=vod_id,
+            owner_user_id=owner_user_id,
+            q=q,
+            exclude_terms=exclude_terms,
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
         )
         pages = max(1, math.ceil(total / page_size)) if total > 0 else 0
         page = min(page, pages) if pages else 1
         offset = (page - 1) * page_size
         rows = comment_repo.fetch_comments(
-            db, uid, vod_id=vod_id, owner_user_id=owner_user_id,
-            q=q, exclude_terms=exclude_terms, sort=sort,
-            limit=page_size, offset=offset,
-            date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+            db,
+            uid,
+            vod_id=vod_id,
+            owner_user_id=owner_user_id,
+            q=q,
+            exclude_terms=exclude_terms,
+            sort=sort,
+            limit=page_size,
+            offset=offset,
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     comments = [decorate_comment(row, now) for row in rows]
 
     return CommentPage(
@@ -177,16 +198,16 @@ def export_user_comments(
     login: str,
     platform: str,
     *,
-    date: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    q: Optional[str] = None,
-    exclude_q: Optional[str] = None,
-    owner_user_id: Optional[int] = None,
-    vod_id: Optional[int] = None,
+    date: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    q: str | None = None,
+    exclude_q: str | None = None,
+    owner_user_id: int | None = None,
+    vod_id: int | None = None,
 ) -> list[dict]:
-    """
-    エクスポート用にコメントを最大 _EXPORT_LIMIT 件取得する。
+    """エクスポート用にコメントを最大 _EXPORT_LIMIT 件取得する。
+
     date を指定すると date_from/date_to より優先して単日フィルタになる。
     """
     user = user_repo.find_user(db, login, platform)
@@ -202,7 +223,8 @@ def export_user_comments(
     date_from_utc, date_to_utc = _parse_jst_date_to_utc_range(effective_from, effective_to)
 
     rows = comment_repo.fetch_comments(
-        db, uid,
+        db,
+        uid,
         vod_id=vod_id,
         owner_user_id=owner_user_id,
         q=q,
@@ -213,5 +235,5 @@ def export_user_comments(
         date_from_utc=date_from_utc,
         date_to_utc=date_to_utc,
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [decorate_comment(row, now) for row in rows]

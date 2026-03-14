@@ -1,10 +1,12 @@
+"""Twitch API クライアント"""
+
 import os
-from typing import Optional
 
 import requests
 
 
-def get_user_id(username: str) -> Optional[str]:
+def get_user_id(username: str) -> str | None:
+    """Twitch API でユーザー名からユーザー ID を取得する。"""
     access_token = os.getenv("ACCESS_TOKEN")
     client_id = os.getenv("CLIENT_ID")
 

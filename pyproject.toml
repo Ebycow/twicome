@@ -1,0 +1,89 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (未使用インポート・変数等)
+    "I",   # isort (import 順序)
+    "B",   # flake8-bugbear (実バグになりやすいパターン)
+    "D",   # pydocstyle (docstring 規約)
+    "UP",  # pyupgrade (Python 3.11 向け現代的構文)
+    "RUF", # ruff 固有ルール
+]
+ignore = [
+    # FastAPI パターンの除外
+    # Depends(), Query(), Form() 等をデフォルト引数に使うのは FastAPI の正規パターン
+    "B008",
+
+    # 日本語 docstring 非対応ルール
+    "D400",  # 文末ピリオド不要
+    "D401",  # imperative mood 不要
+    "D415",  # 文末記号不要
+    "D406",  # セクション名末尾コロン (Google style と競合)
+    "D407",  # セクション区切り (Google style と競合)
+
+    # 競合するルールペア: 片方を採用
+    "D203",  # D211 (クラス前に空行なし) を採用するため除外
+    "D213",  # D212 (docstring 1行目にサマリ) を採用するため除外
+
+    # 任意とするもの
+    "D104",  # public package の docstring は任意
+    "D105",  # magic method の docstring は任意
+    "D107",  # __init__ の docstring は任意
+    "D102",  # public method の docstring は任意 (クラスが少ないため)
+
+    # 日本語全角文字 (（）「」等) は正当な日本語表記
+    "RUF001",  # 全角文字の ambiguous 警告 (docstring)
+    "RUF002",  # 全角文字の ambiguous 警告 (docstring)
+    "RUF003",  # 全角文字の ambiguous 警告 (comment)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# テスト: docstring 不要
+"app/tests/**/*.py" = ["D", "F811"]
+# ルーター: パスと HTTP メソッドで自明なため関数 docstring 不要
+"app/routers/**/*.py" = ["D100", "D103"]
+# faiss-api エンドポイント: 同上
+"faiss-api/main.py" = ["D103"]
+# マイグレーション: 自動生成コード
+"migrate/**/*.py" = ["D", "E501"]
+# エントリーポイント: docstring 不要
+"app/main.py" = ["D"]
+# バッチスクリプト: モジュール docstring は任意
+"batch/scripts/**/*.py" = ["D100"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+# app/ 配下は作業ディレクトリから直接 import するため first-party 扱い
+known-first-party = [
+    "services",
+    "repositories",
+    "core",
+    "cache",
+    "faiss_search",
+    "app_factory",
+]
+split-on-trailing-comma = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.djlint]
+profile = "jinja"
+indent = 2
+max_line_length = 120
+line_break_after_multiline_tag = true
+blank_line_after_tag = "extends,include"
+use_gitignore = true
+linter_output_format = "{filename}:{line}: {code} {message} {match}"
+# H021/H023: 現状はインライン style と HTML entity を多用しているため段階導入では除外
+# H030/H031: SEO メタ要件はページ差が大きく、まずは構文・構造チェックを優先
+# J004/J018: FastAPI + Jinja2 では root_path/request.url_for を使うため既定ルールと相性が悪い
+# T003: endblock 名は有用だが既存テンプレートに広く未適用なので後追いで揃える
+ignore = "H021,H023,H030,H031,J004,J018,T003"

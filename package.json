@@ -1,0 +1,10 @@
+{
+  "name": "twicome-lint",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-plugin-jsdoc": "^50.0.0",
+    "globals": "^15.0.0"
+  }
+}

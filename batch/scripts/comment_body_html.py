@@ -1,7 +1,8 @@
+"""コメント本文 HTML レンダリングユーティリティ（バッチ用）。"""
+
 import html
 import json
 import re
-from typing import Optional
 from urllib.parse import quote
 
 BODY_HTML_RENDER_VERSION = 1
@@ -10,7 +11,8 @@ EMOTE_URL_TEMPLATE = "https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/defau
 EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
-def normalize_emote_id(raw_emote_id) -> Optional[str]:
+def normalize_emote_id(raw_emote_id) -> str | None:
+    """エモート ID を正規化して返す。無効な場合は None。"""
     if raw_emote_id is None:
         return None
     raw_value = str(raw_emote_id)
@@ -25,6 +27,7 @@ def normalize_emote_id(raw_emote_id) -> Optional[str]:
 
 
 def parse_raw_comment(raw_json):
+    """raw_json フィールドを dict にパースして返す。"""
     if not raw_json:
         return None
     if isinstance(raw_json, dict):
@@ -40,6 +43,7 @@ def _sanitize_emote_text(text) -> str:
 
 
 def render_comment_body_html(raw_json, fallback_body):
+    """コメントの raw_json からエモート付き HTML を生成する。"""
     data = parse_raw_comment(raw_json)
     fragments = None
     if isinstance(data, dict):
@@ -63,7 +67,8 @@ def render_comment_body_html(raw_json, fallback_body):
             url2 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="2.0"), quote=True)
             url3 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="3.0"), quote=True)
             parts.append(
-                f'<img class="emote" src="{url1}" srcset="{url2} 2x, {url3} 3x" alt="{escaped}" title="{escaped}" loading="lazy" decoding="async">'
+                f'<img class="emote" src="{url1}" srcset="{url2} 2x, {url3} 3x"'
+                f' alt="{escaped}" title="{escaped}" loading="lazy" decoding="async">'
             )
         else:
             parts.append(html.escape(text))

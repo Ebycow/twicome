@@ -1,203 +1,12 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>発言パターン探索 - {{ user.login if user else 'Unknown' }}</title>
-    {% include "partials/_head_meta_icons.html" %}
-    <style>
-      :root {
-        --bg-color: #ffffff;
-        --text-color: #111111;
-        --card-border: #ddd;
-        --card-bg: #ffffff;
-        --meta-color: #666;
-        --error-bg: #fff3f3;
-        --error-border: #f2b3b3;
-        --link-color: #007bff;
-        --sub-bg: #f7f7f7;
-        --btn-bg: #f0f0f0;
-        --btn-hover: #e0e0e0;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg-color: #1a1a1a;
-          --text-color: #e0e0e0;
-          --card-border: #444;
-          --card-bg: #2a2a2a;
-          --meta-color: #999;
-          --error-bg: #3a2020;
-          --error-border: #6b3a3a;
-          --link-color: #6db3f2;
-          --sub-bg: #222;
-          --btn-bg: #333;
-          --btn-hover: #444;
-        }
-      }
-      body {
-        font-family: system-ui, -apple-system, sans-serif;
-        margin: 0;
-        padding: 24px;
-        background: var(--bg-color);
-        color: var(--text-color);
-      }
-      a { color: var(--link-color); }
-      h1, h2, p { margin: 0; }
+{% extends "base.html" %}
 
-      .main {
-        max-width: 1200px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-      }
-      .top {
-        display: flex;
-        gap: 16px;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-      }
-      .top-title { display: flex; flex-direction: column; gap: 4px; }
-      .top-links { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-      .meta { color: var(--meta-color); font-size: 0.9rem; }
+{% block title %}発言パターン探索 - {{ user.login if user else 'Unknown' }}{% endblock %}
 
-      .controls {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .controls label { font-size: 0.9rem; }
-      .n-btn {
-        padding: 4px 12px;
-        border: 1px solid var(--card-border);
-        border-radius: 6px;
-        background: var(--btn-bg);
-        color: var(--text-color);
-        cursor: pointer;
-        font-size: 0.85rem;
-        text-decoration: none;
-      }
-      .n-btn:hover { background: var(--btn-hover); }
-      .n-btn.active { border-color: var(--link-color); color: var(--link-color); font-weight: bold; }
+{% block page_css %}
+<link rel="stylesheet" href="{{ root_path }}/static/css/user_clusters.css?v={{ static_version }}" />
+{% endblock %}
 
-      .clusters-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 14px;
-      }
-
-      .cluster-card {
-        border: 1px solid var(--card-border);
-        border-radius: 10px;
-        background: var(--card-bg);
-        overflow: hidden;
-      }
-      .cluster-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 14px;
-        border-bottom: 1px solid var(--card-border);
-      }
-      .cluster-rank { font-weight: bold; font-size: 0.9rem; color: var(--meta-color); }
-      .cluster-size { font-size: 0.85rem; color: var(--meta-color); }
-      .cluster-body { padding: 10px 14px; }
-      .cluster-examples {
-        margin: 0;
-        padding: 0 0 0 1.2em;
-        font-size: 0.87rem;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-      .cluster-examples li { word-break: break-all; }
-
-      .drill-btn {
-        margin-top: 10px;
-        padding: 5px 12px;
-        border: 1px solid var(--card-border);
-        border-radius: 6px;
-        background: var(--btn-bg);
-        color: var(--text-color);
-        cursor: pointer;
-        font-size: 0.82rem;
-        width: 100%;
-      }
-      .drill-btn:hover { background: var(--btn-hover); }
-      .drill-btn:disabled { opacity: 0.5; cursor: default; }
-      .view-btn {
-        margin-top: 6px;
-        padding: 5px 12px;
-        border: 1px solid var(--link-color);
-        border-radius: 6px;
-        background: transparent;
-        color: var(--link-color);
-        cursor: pointer;
-        font-size: 0.82rem;
-        width: 100%;
-      }
-      .view-btn:hover { opacity: 0.75; }
-
-      .subclusters-wrap {
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px dashed var(--card-border);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .subcluster-card {
-        background: var(--sub-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 8px;
-        padding: 8px 12px;
-      }
-      .subcluster-head {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.82rem;
-        color: var(--meta-color);
-        margin-bottom: 6px;
-      }
-      .subcluster-examples {
-        margin: 0;
-        padding: 0 0 0 1.1em;
-        font-size: 0.83rem;
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-      }
-      .subcluster-examples li { word-break: break-all; }
-      .sub-drill-btn {
-        margin-top: 6px;
-        padding: 3px 10px;
-        border: 1px solid var(--card-border);
-        border-radius: 5px;
-        background: var(--btn-bg);
-        color: var(--text-color);
-        cursor: pointer;
-        font-size: 0.78rem;
-        width: 100%;
-      }
-      .sub-drill-btn:hover { background: var(--btn-hover); }
-      .sub-drill-btn:disabled { opacity: 0.5; cursor: default; }
-
-      .error-card {
-        padding: 14px;
-        border: 1px solid var(--error-border);
-        border-radius: 10px;
-        background: var(--error-bg);
-      }
-
-      @media (max-width: 700px) {
-        body { padding: 14px; }
-        .clusters-grid { grid-template-columns: 1fr; }
-      }
-    </style>
-  </head>
-  <body>
+{% block body %}
     <main class="main">
       <div class="top">
         <div class="top-title">
@@ -207,7 +16,7 @@
           {% endif %}
         </div>
         <div class="top-links">
-          <a href="{{ request.url_for('user_stats_page', login=login) }}{% if platform != 'twitch' %}?platform={{ platform }}{% endif %}">← 統計に戻る</a>
+          <a href="{{ request.url_for('user_stats_page', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 統計に戻る</a>
         </div>
       </div>
 
@@ -219,7 +28,7 @@
       <div class="controls">
         <label>グループ数:</label>
         {% for n in [6, 8, 12, 16, 24] %}
-        <a href="?n_clusters={{ n }}{% if platform != 'twitch' %}&platform={{ platform }}{% endif %}"
+        <a href="?n_clusters={{ n }}{{ '&platform=' ~ platform if platform != 'twitch' else '' }}"
            class="n-btn {% if n_clusters == n %}active{% endif %}">{{ n }}</a>
         {% endfor %}
       </div>
@@ -244,7 +53,7 @@
                     data-size="{{ cl.size }}"
                     onclick="drillDown(this, 4)">さらに分解 →</button>
             {% if cl.size <= 200 %}
-            <form method="POST" action="{{ request.url_for('cluster_comments_page', login=login) }}" target="_blank" style="margin-top:6px;">
+            <form method="post" action="{{ request.url_for('cluster_comments_page', login=login) }}" target="_blank" style="margin-top:6px;">
               <input type="hidden" name="centroid" value="{{ cl.centroid | tojson }}">
               <input type="hidden" name="n_members" value="{{ cl.size }}">
               <input type="hidden" name="platform" value="{{ platform }}">
@@ -261,82 +70,9 @@
       {% endif %}
     </main>
 
-    <script>
-      const LOGIN = {{ login | tojson }};
-      const SUBCLUSTER_URL = location.pathname + '/subcluster';
+    <script type="application/json" id="clusters-login-data">{{ login | tojson }}</script>
+    <script type="application/json" id="clusters-platform-data">{{ platform | tojson }}</script>
+    <script src="{{ root_path }}/static/js/user-clusters.js?v={{ static_version }}"></script>
+{% endblock %}
 
-      async function drillDown(btn, nClusters) {
-        const centroid = JSON.parse(btn.dataset.centroid);
-        const nMembers = parseInt(btn.dataset.size, 10);
-        btn.disabled = true;
-        btn.textContent = '分析中...';
-
-        try {
-          const resp = await fetch(SUBCLUSTER_URL, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({centroid, n_members: nMembers, n_clusters: nClusters}),
-          });
-          const data = await resp.json();
-          if (data.error) throw new Error(data.error);
-
-          const wrap = document.createElement('div');
-          wrap.className = 'subclusters-wrap';
-
-          for (const [i, sc] of data.subclusters.entries()) {
-            const card = document.createElement('div');
-            card.className = 'subcluster-card';
-
-            const head = document.createElement('div');
-            head.className = 'subcluster-head';
-            head.innerHTML = `<span>#${i + 1}</span><span>${sc.size} 件</span>`;
-
-            const ul = document.createElement('ul');
-            ul.className = 'subcluster-examples';
-            for (const text of sc.representatives) {
-              const li = document.createElement('li');
-              li.textContent = text;
-              ul.appendChild(li);
-            }
-
-            card.appendChild(head);
-            card.appendChild(ul);
-
-            if (sc.size >= 8) {
-              const subBtn = document.createElement('button');
-              subBtn.className = 'sub-drill-btn';
-              subBtn.textContent = 'さらに分解 →';
-              subBtn.dataset.centroid = JSON.stringify(sc.centroid);
-              subBtn.dataset.size = String(sc.size);
-              subBtn.onclick = function() { drillDown(this, 4); };
-              card.appendChild(subBtn);
-            }
-
-            if (sc.size <= 200) {
-              const viewForm = document.createElement('form');
-              viewForm.method = 'POST';
-              viewForm.action = location.pathname.replace('/clusters', '/cluster-comments');
-              viewForm.target = '_blank';
-              viewForm.style.marginTop = '4px';
-              viewForm.innerHTML = `
-                <input type="hidden" name="centroid" value="${JSON.stringify(sc.centroid).replace(/"/g, '&quot;')}">
-                <input type="hidden" name="n_members" value="${sc.size}">
-                <input type="hidden" name="platform" value="{{ platform }}">
-                <button type="submit" class="view-btn">コメント一覧を見る (${sc.size} 件)</button>
-              `;
-              card.appendChild(viewForm);
-            }
-
-            wrap.appendChild(card);
-          }
-
-          // ボタンを削除してサブクラスタを挿入
-          btn.replaceWith(wrap);
-        } catch (e) {
-          btn.disabled = false;
-          btn.textContent = 'エラー: ' + e.message;
-        }
-      }
-    </script>
-  </body>
-</html>
+{% block sw_script %}{% endblock %}

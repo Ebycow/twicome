@@ -1,9 +1,9 @@
-"""
-コメント関連のデータアクセス層。
+"""コメント関連のデータアクセス層。
+
 WHERE 句・ORDER BY 句の構築を含む SQL を封じ込める。
 """
+
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import text
 
@@ -32,12 +32,12 @@ _COL_LIST = f"""
 
 def _build_where(
     uid: int,
-    vod_id: Optional[int],
-    owner_user_id: Optional[int],
-    q: Optional[str],
+    vod_id: int | None,
+    owner_user_id: int | None,
+    q: str | None,
     exclude_terms: list[str],
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> tuple[str, dict]:
     """WHERE 句の SQL 文字列とパラメータを返す。"""
     where = ["c.commenter_user_id = :uid"]
@@ -71,8 +71,11 @@ def _build_where(
     return " AND ".join(where), params
 
 
-def _build_order(sort: str) -> str:
-    """ORDER BY 句の SQL 文字列を返す。"""
+def _build_user_comment_order(sort: str) -> str:
+    """ORDER BY 句の SQL 文字列を返す（ユーザーコメント一覧用）。
+
+    コミュニティノート・危険度・ランダムを含む全ソート種別に対応する。
+    """
     if sort == "created_at":
         return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
     if sort == "likes":
@@ -82,47 +85,69 @@ def _build_order(sort: str) -> str:
     if sort == "community_note":
         return "ORDER BY cn.created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
     if sort == "danger":
-        return "ORDER BY COALESCE((cn.harm_risk + cn.exaggeration + cn.evidence_gap + cn.subjectivity), 0) DESC, c.vod_id DESC, c.offset_seconds DESC"
+        return (
+            "ORDER BY COALESCE((cn.harm_risk + cn.exaggeration + cn.evidence_gap + cn.subjectivity), 0) DESC,"
+            " c.vod_id DESC, c.offset_seconds DESC"
+        )
     if sort == "random":
         return "ORDER BY RAND()"
     return "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
+
+
+def _build_vod_order() -> str:
+    """ORDER BY 句の SQL 文字列を返す（VOD 内コメント一覧用）。
+
+    VOD 内コメントは再生順（投稿日時降順）のみで整列する。
+    """
+    return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
 
 
 def count_comments(
     db,
     uid: int,
     *,
-    vod_id: Optional[int] = None,
-    owner_user_id: Optional[int] = None,
-    q: Optional[str] = None,
-    exclude_terms: Optional[list[str]] = None,
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    vod_id: int | None = None,
+    owner_user_id: int | None = None,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> int:
     """フィルタ条件に合うコメント数を返す。"""
     where_sql, params = _build_where(
-        uid, vod_id, owner_user_id, q, exclude_terms or [],
-        date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+        uid,
+        vod_id,
+        owner_user_id,
+        q,
+        exclude_terms or [],
+        date_from_utc=date_from_utc,
+        date_to_utc=date_to_utc,
     )
     # owner_user_id フィルター時のみ vods JOIN が必要
     count_from = (
-        "FROM comments c JOIN vods v ON v.vod_id = c.vod_id"
-        if owner_user_id is not None
-        else "FROM comments c"
+        "FROM comments c JOIN vods v ON v.vod_id = c.vod_id" if owner_user_id is not None else "FROM comments c"
     )
-    row = db.execute(
-        text(f"SELECT COUNT(*) AS cnt {count_from} WHERE {where_sql}"),
-        params,
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(f"SELECT COUNT(*) AS cnt {count_from} WHERE {where_sql}"),
+            params,
+        )
+        .mappings()
+        .first()
+    )
     return int(row["cnt"])
 
 
 def count_comments_in_vod(db, vod_id: int) -> int:
     """VOD 内のコメント総数。"""
-    row = db.execute(
-        text("SELECT COUNT(*) AS cnt FROM comments c WHERE c.vod_id = :vod_id"),
-        {"vod_id": vod_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text("SELECT COUNT(*) AS cnt FROM comments c WHERE c.vod_id = :vod_id"),
+            {"vod_id": vod_id},
+        )
+        .mappings()
+        .first()
+    )
     return int(row["cnt"])
 
 
@@ -130,25 +155,30 @@ def fetch_comments(
     db,
     uid: int,
     *,
-    vod_id: Optional[int] = None,
-    owner_user_id: Optional[int] = None,
-    q: Optional[str] = None,
-    exclude_terms: Optional[list[str]] = None,
+    vod_id: int | None = None,
+    owner_user_id: int | None = None,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
     sort: str = "created_at",
     limit: int = 50,
     offset: int = 0,
-    date_from_utc: Optional[datetime] = None,
-    date_to_utc: Optional[datetime] = None,
+    date_from_utc: datetime | None = None,
+    date_to_utc: datetime | None = None,
 ) -> list[dict]:
-    """
-    フィルタ・ソート・ページネーションを適用してコメントを取得する。
+    """フィルタ・ソート・ページネーションを適用してコメントを取得する。
+
     sort=created_at かつフィルタなしの場合、サブクエリ最適化を使用する。
     """
     where_sql, params = _build_where(
-        uid, vod_id, owner_user_id, q, exclude_terms or [],
-        date_from_utc=date_from_utc, date_to_utc=date_to_utc,
+        uid,
+        vod_id,
+        owner_user_id,
+        q,
+        exclude_terms or [],
+        date_from_utc=date_from_utc,
+        date_to_utc=date_to_utc,
     )
-    order_sql = _build_order(sort)
+    order_sql = _build_user_comment_order(sort)
     params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
 
     use_subquery = (
@@ -162,8 +192,9 @@ def fetch_comments(
     )
 
     if use_subquery:
-        rows = db.execute(
-            text(f"""
+        rows = (
+            db.execute(
+                text(f"""
                 SELECT {_COL_LIST}
                 FROM (
                     SELECT comment_id, vod_id, offset_seconds, comment_created_at_utc,
@@ -180,11 +211,15 @@ def fetch_comments(
                 JOIN users u ON u.user_id = v.owner_user_id
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
     else:
-        rows = db.execute(
-            text(f"""
+        rows = (
+            db.execute(
+                text(f"""
                 SELECT {_COL_LIST}
                 FROM comments c
                 JOIN vods v ON v.vod_id = c.vod_id
@@ -194,8 +229,11 @@ def fetch_comments(
                 {order_sql}
                 LIMIT :limit OFFSET :offset
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
     return [dict(row) for row in rows]
 
@@ -204,14 +242,14 @@ def fetch_comments_in_vod(
     db,
     vod_id: int,
     *,
-    sort: str = "created_at",
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
     """カーソルページネーション用：VOD 内の全コメントをソート順で取得。"""
-    order_sql = _build_order(sort)
-    rows = db.execute(
-        text(f"""
+    order_sql = _build_vod_order()
+    rows = (
+        db.execute(
+            text(f"""
             SELECT {_COL_LIST}
             FROM comments c
             JOIN vods v ON v.vod_id = c.vod_id
@@ -221,23 +259,29 @@ def fetch_comments_in_vod(
             {order_sql}
             LIMIT :limit OFFSET :offset
         """),
-        {"vod_id": vod_id, "limit": limit, "offset": offset,
-         "body_html_version": BODY_HTML_RENDER_VERSION},
-    ).mappings().all()
+            {"vod_id": vod_id, "limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]
 
 
-def find_comment_by_id(db, comment_id: str) -> Optional[dict]:
+def find_comment_by_id(db, comment_id: str) -> dict | None:
     """コメント ID でコメントを1件取得。カーソル解決用。"""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT vod_id, body, comment_created_at_utc,
                    offset_seconds, twicome_likes_count, twicome_dislikes_count
             FROM comments
             WHERE comment_id = :comment_id
         """),
-        {"comment_id": comment_id},
-    ).mappings().first()
+            {"comment_id": comment_id},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
@@ -257,14 +301,18 @@ def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
 
     placeholders = ", ".join(f":comment_id_{idx}" for idx in range(len(normalized_ids)))
     params = {f"comment_id_{idx}": comment_id for idx, comment_id in enumerate(normalized_ids)}
-    rows = db.execute(
-        text(f"""
+    rows = (
+        db.execute(
+            text(f"""
             SELECT comment_id, twicome_likes_count, twicome_dislikes_count
             FROM comments
             WHERE comment_id IN ({placeholders})
         """),
-        params,
-    ).mappings().all()
+            params,
+        )
+        .mappings()
+        .all()
+    )
 
     return {
         row["comment_id"]: {
@@ -276,8 +324,8 @@ def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
 
 
 def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
-    """
-    指定ソート順でカーソルコメントより前にある行数を返す。
+    """指定ソート順でカーソルコメントより前にある行数を返す。
+
     offset = max(0, cursor_pos - page_size // 2) の計算に使う。
     """
     c_created_at = cursor_row.get("comment_created_at_utc")
@@ -286,40 +334,56 @@ def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
     c_dislikes = cursor_row.get("twicome_dislikes_count") or 0
 
     if sort == "created_at":
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT COUNT(*) AS pos FROM comments c
                 WHERE c.vod_id = :vod_id AND (
                     c.comment_created_at_utc > :c_created_at
                     OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds > :c_offset)
                 )
             """),
-            {"vod_id": vod_id, "c_created_at": c_created_at, "c_offset": c_offset},
-        ).mappings().first()
+                {"vod_id": vod_id, "c_created_at": c_created_at, "c_offset": c_offset},
+            )
+            .mappings()
+            .first()
+        )
     elif sort == "likes":
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT COUNT(*) AS pos FROM comments c
                 WHERE c.vod_id = :vod_id AND c.twicome_likes_count > :c_likes
             """),
-            {"vod_id": vod_id, "c_likes": c_likes},
-        ).mappings().first()
+                {"vod_id": vod_id, "c_likes": c_likes},
+            )
+            .mappings()
+            .first()
+        )
     elif sort == "dislikes":
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT COUNT(*) AS pos FROM comments c
                 WHERE c.vod_id = :vod_id AND c.twicome_dislikes_count > :c_dislikes
             """),
-            {"vod_id": vod_id, "c_dislikes": c_dislikes},
-        ).mappings().first()
+                {"vod_id": vod_id, "c_dislikes": c_dislikes},
+            )
+            .mappings()
+            .first()
+        )
     else:
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT COUNT(*) AS pos FROM comments c
                 WHERE c.vod_id = :vod_id AND c.offset_seconds > :c_offset
             """),
-            {"vod_id": vod_id, "c_offset": c_offset},
-        ).mappings().first()
+                {"vod_id": vod_id, "c_offset": c_offset},
+            )
+            .mappings()
+            .first()
+        )
 
     return int(row["pos"]) if row else 0
 
@@ -332,8 +396,9 @@ def fetch_comments_by_ids(db, comment_ids: list[str]) -> list[dict]:
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
     params["body_html_version"] = BODY_HTML_RENDER_VERSION
     _body = build_comment_body_select_sql("c")
-    rows = db.execute(
-        text(f"""
+    rows = (
+        db.execute(
+            text(f"""
             SELECT c.comment_id, {_body},
                    c.comment_created_at_utc, c.offset_seconds,
                    c.vod_id,
@@ -345,8 +410,11 @@ def fetch_comments_by_ids(db, comment_ids: list[str]) -> list[dict]:
             WHERE c.comment_id IN ({placeholders})
             ORDER BY c.comment_created_at_utc DESC
         """),
-        params,
-    ).mappings().all()
+            params,
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]
 
 
@@ -356,19 +424,73 @@ def fetch_comment_bodies_by_ids(db, comment_ids: list[str]) -> dict[str, str]:
         return {}
     placeholders = ", ".join(f":id_{i}" for i in range(len(comment_ids)))
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
-    rows = db.execute(
-        text(f"SELECT comment_id, body FROM comments WHERE comment_id IN ({placeholders})"),
-        params,
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(f"SELECT comment_id, body FROM comments WHERE comment_id IN ({placeholders})"),
+            params,
+        )
+        .mappings()
+        .all()
+    )
     return {row["comment_id"]: row["body"] for row in rows}
+
+
+_QUIZ_COL_LIST = (
+    f"{_BODY_SELECT}, c.commenter_login_snapshot, c.commenter_display_name_snapshot, c.user_color, v.title AS vod_title"
+)
+
+
+def fetch_quiz_target_comments(db, uid: int, limit: int) -> list[dict]:
+    """クイズ用：指定ユーザーのコメントをランダムに取得。"""
+    rows = (
+        db.execute(
+            text(f"""
+            SELECT {_QUIZ_COL_LIST}
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            WHERE c.commenter_user_id = :uid
+              AND CHAR_LENGTH(c.body) >= 3
+            ORDER BY RAND()
+            LIMIT :lim
+        """),
+            {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
+    """クイズ用：指定ユーザーが参加した VOD の他ユーザーコメントをランダムに取得。"""
+    rows = (
+        db.execute(
+            text(f"""
+            SELECT {_QUIZ_COL_LIST}
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            WHERE c.commenter_user_id != :uid
+              AND c.vod_id IN (SELECT DISTINCT vod_id FROM comments WHERE commenter_user_id = :uid)
+              AND CHAR_LENGTH(c.body) >= 3
+            ORDER BY RAND()
+            LIMIT :lim
+        """),
+            {"uid": uid, "lim": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
 
 
 def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
     """いいね・dislike の合計が多い順でコメントを取得（トップページ用）。"""
     from services.comment_utils import build_comment_body_select_sql
+
     body_select = build_comment_body_select_sql("c")
-    rows = db.execute(
-        text(f"""
+    rows = (
+        db.execute(
+            text(f"""
             SELECT
                 c.comment_id,
                 {body_select},
@@ -387,6 +509,9 @@ def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
             ORDER BY (c.twicome_likes_count + c.twicome_dislikes_count) DESC
             LIMIT :limit
         """),
-        {"limit": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
-    ).mappings().all()
+            {"limit": limit, "body_html_version": BODY_HTML_RENDER_VERSION},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]

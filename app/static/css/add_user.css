@@ -1,0 +1,44 @@
+      :root {
+        --bg-color: #ffffff;
+        --text-color: #111111;
+        --card-border: #ddd;
+        --card-bg: #ffffff;
+        --input-border: #ccc;
+        --input-bg: #ffffff;
+        --button-bg: #f0f0f0;
+        --button-text: #111111;
+        --table-header-bg: #f2f2f2;
+        --table-border: #ddd;
+        --message-color: #22aa22;
+        --error-color: #dd3333;
+        --link-color: #007bff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-color: #1a1a1a;
+          --text-color: #e0e0e0;
+          --card-border: #444;
+          --card-bg: #2a2a2a;
+          --input-border: #555;
+          --input-bg: #2a2a2a;
+          --button-bg: #3a3a3a;
+          --button-text: #e0e0e0;
+          --table-header-bg: #333;
+          --table-border: #444;
+          --message-color: #66dd66;
+          --error-color: #ff6666;
+          --link-color: #6db3f2;
+        }
+      }
+      body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; background: var(--bg-color); color: var(--text-color); }
+      .card { max-width: 720px; padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card-bg); }
+      label { display:block; margin-top: 12px; }
+      input { width: 100%; padding: 10px; margin-top: 6px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); }
+      button { margin-top: 16px; padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; background: var(--button-bg); color: var(--button-text); }
+      button:hover { opacity: 0.8; }
+      .message { color: var(--message-color); margin-top: 12px; }
+      .error { color: var(--error-color); margin-top: 12px; }
+      a { color: var(--link-color); }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th { background-color: var(--table-header-bg); border: 1px solid var(--table-border); padding: 8px; text-align: left; }
+      td { border: 1px solid var(--table-border); padding: 8px; }

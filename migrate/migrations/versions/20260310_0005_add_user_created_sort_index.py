@@ -4,17 +4,18 @@ Revision ID: 20260310_0005
 Revises: 20260310_0004
 Create Date: 2026-03-10 00:00:00
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20260310_0005"
-down_revision: Union[str, None] = "20260310_0004"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "20260310_0004"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -22,6 +23,7 @@ def upgrade() -> None:
     # filesort なしで処理するカバリングインデックス
     # ユーザーコメントページのメインSELECT（created_at ソート）を 2秒→0.002秒に改善
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     existing = [idx["name"] for idx in inspect(conn).get_indexes("comments")]
     if "idx_comments_user_created_sort" not in existing:
@@ -33,6 +35,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     existing = [idx["name"] for idx in inspect(conn).get_indexes("comments")]
     if "idx_comments_user_created_sort" in existing:

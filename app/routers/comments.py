@@ -2,11 +2,9 @@ import csv
 import io
 import json
 import re
-from datetime import date as date_type
-from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from cache import (
@@ -27,23 +25,26 @@ from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo, vote_repo
 from services.comment_service import export_user_comments, fetch_user_comment_page
+from services.index_service import build_index_context, build_landing_data
 from services.rate_limit import InMemoryRateLimiter
 from services.vote_input import MAX_VOTE_BULK_IDS, normalize_comment_ids
-from services.index_service import build_index_context, build_landing_data
 
 router = APIRouter()
 
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
 
+
 class CommentVotesRequest(BaseModel):
+    """コメント投票数一括取得リクエスト。"""
+
     comment_ids: list[str] = Field(default_factory=list)
 
 
 VOTE_RATE_LIMITER = InMemoryRateLimiter(limit=30, window_seconds=60)
 
 
-def _parse_int(value: Optional[str]) -> Optional[int]:
+def _parse_int(value: str | None) -> int | None:
     if value and value.strip():
         try:
             return int(value)
@@ -80,7 +81,7 @@ def _render_user_comments_html(context: dict) -> str:
     return templates.env.get_template("user_comments.html").render(context)
 
 
-def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
+def _load_user_meta(login: str, uid: int, db) -> dict | None:
     if login not in QUICK_LINK_LOGINS:
         return None
     cached = get_user_meta_cache(login)
@@ -96,16 +97,16 @@ def _load_user_meta(login: str, uid: int, db) -> Optional[dict]:
 
 def _is_initial_comments_page_request(
     *,
-    vod_id: Optional[int],
-    owner_user_id: Optional[int],
-    q: Optional[str],
-    exclude_q: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    vod_id: int | None,
+    owner_user_id: int | None,
+    q: str | None,
+    exclude_q: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     page_size: int,
     sort: str,
-    cursor: Optional[str],
+    cursor: str | None,
 ) -> bool:
     return (
         vod_id is None
@@ -119,8 +120,6 @@ def _is_initial_comments_page_request(
         and sort == "created_at"
         and not cursor
     )
-
-
 
 
 def _client_key(request: Request) -> str:
@@ -138,6 +137,7 @@ def _check_vote_rate_limit(request: Request):
         status_code=429,
     )
 
+
 def _build_user_comments_context(
     request: Request,
     *,
@@ -150,7 +150,7 @@ def _build_user_comments_context(
     total: int,
     page_title: str,
     filters: dict,
-    error: Optional[str],
+    error: str | None,
     data_version: str,
 ) -> dict:
     return {
@@ -172,6 +172,7 @@ def _build_user_comments_context(
 
 
 # ── インデックスページ ────────────────────────────────────────────────────────
+
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -221,21 +222,22 @@ def go(request: Request, login: str = Form(...), platform: str = Form(DEFAULT_PL
 
 # ── ユーザーコメント一覧 ──────────────────────────────────────────────────────
 
+
 @router.get("/u/{login}", response_class=HTMLResponse)
 def user_comments_page(
     request: Request,
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
-    vod_id: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    vod_id: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
-    cursor: Optional[str] = Query(None),
+    cursor: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
@@ -268,13 +270,20 @@ def user_comments_page(
 
         try:
             page_data = fetch_user_comment_page(
-                db, login, platform,
+                db,
+                login,
+                platform,
                 user=user_row_raw,
-                vod_id=vod_id_int, owner_user_id=owner_user_id_int,
-                q=q, exclude_q=exclude_q,
-                date_from=date_from, date_to=date_to,
-                page=page, page_size=page_size,
-                sort=sort, cursor=cursor,
+                vod_id=vod_id_int,
+                owner_user_id=owner_user_id_int,
+                q=q,
+                exclude_q=exclude_q,
+                date_from=date_from,
+                date_to=date_to,
+                page=page,
+                page_size=page_size,
+                sort=sort,
+                cursor=cursor,
                 load_meta=should_load_meta,
             )
         except ValueError as e:
@@ -308,10 +317,7 @@ def user_comments_page(
                 headers=headers,
             )
 
-    vod_options = (
-        cached_meta["vod_options"] if cached_meta and owner_user_id_int is None
-        else page_data.vod_options
-    )
+    vod_options = cached_meta["vod_options"] if cached_meta and owner_user_id_int is None else page_data.vod_options
     owner_options = cached_meta["owner_options"] if cached_meta else page_data.owner_options
     context = _build_user_comments_context(
         request,
@@ -340,16 +346,16 @@ def user_comments_page(
 def user_comments_api(
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
-    vod_id: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    vod_id: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
-    cursor: Optional[str] = Query(None),
+    cursor: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
@@ -357,12 +363,19 @@ def user_comments_api(
     with SessionLocal() as db:
         try:
             page_data = fetch_user_comment_page(
-                db, login, platform,
-                vod_id=vod_id_int, owner_user_id=owner_user_id_int,
-                q=q, exclude_q=exclude_q,
-                date_from=date_from, date_to=date_to,
-                page=page, page_size=page_size,
-                sort=sort, cursor=cursor,
+                db,
+                login,
+                platform,
+                vod_id=vod_id_int,
+                owner_user_id=owner_user_id_int,
+                q=q,
+                exclude_q=exclude_q,
+                date_from=date_from,
+                date_to=date_to,
+                page=page,
+                page_size=page_size,
+                sort=sort,
+                cursor=cursor,
             )
         except ValueError:
             return JSONResponse({"error": "user_not_found"}, status_code=404)
@@ -418,14 +431,16 @@ def _comments_to_csv(comments: list[dict]) -> str:
     writer = csv.writer(buf)
     writer.writerow(_EXPORT_CSV_HEADERS)
     for c in comments:
-        writer.writerow([
-            c.get("comment_created_at_jst", ""),
-            c.get("owner_login", ""),
-            c.get("vod_title", ""),
-            c.get("offset_hms", ""),
-            _strip_html(c.get("body_html", "")),
-            c.get("bits_spent") or "",
-        ])
+        writer.writerow(
+            [
+                c.get("comment_created_at_jst", ""),
+                c.get("owner_login", ""),
+                c.get("vod_title", ""),
+                c.get("offset_hms", ""),
+                _strip_html(c.get("body_html", "")),
+                c.get("bits_spent") or "",
+            ]
+        )
     return buf.getvalue()
 
 
@@ -445,13 +460,13 @@ def user_comments_export(
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
     format: str = Query("csv"),
-    date: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-    exclude_q: Optional[str] = Query(None),
-    owner_user_id: Optional[str] = Query(None),
-    vod_id: Optional[str] = Query(None),
+    date: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    q: str | None = Query(None),
+    exclude_q: str | None = Query(None),
+    owner_user_id: str | None = Query(None),
+    vod_id: str | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
@@ -462,7 +477,9 @@ def user_comments_export(
     with SessionLocal() as db:
         try:
             comments = export_user_comments(
-                db, login, platform,
+                db,
+                login,
+                platform,
                 date=date,
                 date_from=date_from,
                 date_to=date_to,
@@ -501,8 +518,9 @@ def user_comments_export(
             for c in comments
         ]
         return Response(
-            content=json.dumps({"user": login, "total": len(safe_comments), "items": safe_comments},
-                               ensure_ascii=False, indent=2).encode("utf-8"),
+            content=json.dumps(
+                {"user": login, "total": len(safe_comments), "items": safe_comments}, ensure_ascii=False, indent=2
+            ).encode("utf-8"),
             media_type="application/json; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
@@ -516,6 +534,7 @@ def user_comments_export(
 
 
 # ── 投票 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/like/{comment_id}")
 def like_comment(request: Request, comment_id: str, count: int = Query(1, ge=1, le=100)):

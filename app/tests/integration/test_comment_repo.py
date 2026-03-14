@@ -1,9 +1,9 @@
 """comment_repo の統合テスト。"""
-from datetime import datetime, timezone
 
 import pytest
-from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
 from repositories import comment_repo
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 
 @pytest.fixture(autouse=True)
@@ -11,8 +11,7 @@ def base_data(db):
     """各テストで使う共通ベースデータ。"""
     seed_user(db, user_id=1, login="streamer", platform="twitch")
     seed_user(db, user_id=2, login="viewer", platform="twitch")
-    seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信",
-             url="https://www.twitch.tv/videos/100")
+    seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信", url="https://www.twitch.tv/videos/100")
 
 
 class TestCountComments:
@@ -50,8 +49,9 @@ class TestFetchComments:
 
     def test_pagination(self, db):
         for i in range(5):
-            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2,
-                         body=f"コメント{i}", offset_seconds=i * 10)
+            seed_comment(
+                db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, body=f"コメント{i}", offset_seconds=i * 10
+            )
         rows = comment_repo.fetch_comments(db, uid=2, limit=2, offset=0)
         assert len(rows) == 2
 
@@ -99,6 +99,96 @@ class TestCountCommentsInVod:
 
     def test_zero_for_empty_vod(self, db):
         assert comment_repo.count_comments_in_vod(db, vod_id=100) == 0
+
+
+class TestFetchQuizTargetComments:
+    def test_returns_target_user_comments(self, db):
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="ターゲットコメント")
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
+        assert len(rows) == 1
+        assert rows[0]["body"] == "ターゲットコメント"
+
+    def test_excludes_other_users_comments(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="mine")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="theirs")
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
+        assert all(r["body"] == "mine" for r in rows)
+
+    def test_filters_short_bodies(self, db):
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="ok")  # 2文字
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, body="長いコメント")
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
+        assert len(rows) == 1
+        assert rows[0]["body"] == "長いコメント"
+
+    def test_respects_limit(self, db):
+        for i in range(5):
+            seed_comment(
+                db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, body=f"コメント{i}", offset_seconds=i * 10
+            )
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=3)
+        assert len(rows) == 3
+
+    def test_includes_vod_title(self, db):
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="コメント")
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
+        assert rows[0]["vod_title"] == "テスト配信"
+
+    def test_returns_empty_for_no_comments(self, db):
+        rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
+        assert rows == []
+
+
+class TestFetchQuizOtherComments:
+    def test_returns_other_users_comments_in_same_vod(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="target")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="other comment")
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
+        assert len(rows) == 1
+        assert rows[0]["body"] == "other comment"
+
+    def test_excludes_target_user_own_comments(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="mine")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="theirs")
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
+        assert all(r["body"] != "mine" for r in rows)
+
+    def test_excludes_vods_target_never_visited(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_vod(db, vod_id=101, owner_user_id=1, title="別の配信")
+        # uid=2 は vod_id=101 にコメントしていない
+        seed_comment(db, comment_id="c1", vod_id=101, commenter_user_id=3, body="別VODコメント")
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
+        assert rows == []
+
+    def test_filters_short_bodies(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="trigger")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="ok")  # 2文字
+        seed_comment(db, comment_id="c3", vod_id=100, commenter_user_id=3, body="長いコメント")
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
+        assert len(rows) == 1
+        assert rows[0]["body"] == "長いコメント"
+
+    def test_respects_limit(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c0", vod_id=100, commenter_user_id=2, body="trigger")
+        for i in range(5):
+            seed_comment(
+                db, comment_id=f"c{i + 1}", vod_id=100, commenter_user_id=3, body=f"コメント{i}", offset_seconds=i * 10
+            )
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=3)
+        assert len(rows) == 3
+
+    def test_returns_empty_when_target_has_no_comments(self, db):
+        seed_user(db, user_id=3, login="other", platform="twitch")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=3, body="other comment")
+        # uid=2 はどのVODにもコメントしていない
+        rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
+        assert rows == []
 
 
 class TestGetCursorPosition:

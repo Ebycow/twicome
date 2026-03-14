@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - CICD
+      - radical-refactoring
 
 jobs:
   # ── 軽量 broken code detection（構文エラー検知） ────────────────────────────
@@ -52,6 +52,48 @@ jobs:
 
           print(f"syntax compile ok: {count} files")
           PY
+
+  # ── Lint / format チェック ────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: app/requirements.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: pip install -r app/requirements.txt
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Run Ruff lint
+        run: ruff check .
+
+      - name: Run Ruff format check
+        run: ruff format . --check
+
+      - name: Run JS lint
+        run: npx eslint app/static/js/
+
+      - name: Run HTML/Jinja lint
+        run: djlint app/templates --lint
 
   # ── ユニットテスト（DB不要、高速） ──────────────────────────────────────────
   unit-test:
@@ -363,6 +405,7 @@ jobs:
           coverage xml -o test-reports/combined/coverage.xml
           cp .ci-artifacts/unit/test-reports/unit/junit.xml test-reports/combined/junit-unit.xml
           cp .ci-artifacts/integration/test-reports/integration/junit.xml test-reports/combined/junit-integration.xml
+          cp .ci-artifacts/ui/test-reports/ui/junit.xml test-reports/combined/junit-ui.xml
           {
             echo "## Coverage Summary"
             echo
@@ -381,5 +424,6 @@ jobs:
             app/test-reports/combined/coverage.txt
             app/test-reports/combined/junit-unit.xml
             app/test-reports/combined/junit-integration.xml
+            app/test-reports/combined/junit-ui.xml
           if-no-files-found: warn
           retention-days: 14

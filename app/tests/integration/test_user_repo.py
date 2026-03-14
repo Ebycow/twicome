@@ -1,7 +1,7 @@
 """user_repo の統合テスト。"""
-import pytest
-from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
 from repositories import user_repo
+from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 
 class TestFindUser:
@@ -21,16 +21,24 @@ class TestFindUser:
         result = user_repo.find_user(db, "alice", "youtube")
         assert result is None
 
+    def test_returns_profile_image_url(self, db):
+        seed_user(db, user_id=1, login="alice", platform="twitch", profile_image_url="https://example.com/alice.png")
+        result = user_repo.find_user(db, "alice", "twitch")
+        assert result["profile_image_url"] == "https://example.com/alice.png"
+
+    def test_profile_image_url_none_when_not_set(self, db):
+        seed_user(db, user_id=1, login="alice", platform="twitch", profile_image_url=None)
+        result = user_repo.find_user(db, "alice", "twitch")
+        assert result["profile_image_url"] is None
+
 
 class TestFetchIndexUsers:
     def test_returns_users_with_comment_count(self, db):
-        owner = seed_user(db, user_id=10, login="streamer", platform="twitch")
-        commenter = seed_user(db, user_id=11, login="viewer", platform="twitch")
-        vod = seed_vod(db, vod_id=200, owner_user_id=10)
-        seed_comment(db, comment_id="c1", vod_id=200, commenter_user_id=11,
-                     commenter_login_snapshot="viewer")
-        seed_comment(db, comment_id="c2", vod_id=200, commenter_user_id=11,
-                     commenter_login_snapshot="viewer")
+        seed_user(db, user_id=10, login="streamer", platform="twitch")
+        seed_user(db, user_id=11, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=200, owner_user_id=10)
+        seed_comment(db, comment_id="c1", vod_id=200, commenter_user_id=11, commenter_login_snapshot="viewer")
+        seed_comment(db, comment_id="c2", vod_id=200, commenter_user_id=11, commenter_login_snapshot="viewer")
 
         users = user_repo.fetch_index_users(db)
         viewer = next((u for u in users if u["login"] == "viewer"), None)
@@ -81,10 +89,8 @@ class TestFetchCommentersForStreamer:
         seed_user(db, user_id=2, login="viewer_a", platform="twitch")
         seed_user(db, user_id=3, login="viewer_b", platform="twitch")
         seed_vod(db, vod_id=100, owner_user_id=1)
-        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
-                     commenter_login_snapshot="viewer_a")
-        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3,
-                     commenter_login_snapshot="viewer_b")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer_a")
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, commenter_login_snapshot="viewer_b")
 
         logins = user_repo.fetch_commenters_for_streamer(db, "streamer")
         assert "viewer_a" in logins
