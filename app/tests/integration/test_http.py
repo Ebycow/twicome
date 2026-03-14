@@ -45,7 +45,7 @@ class TestIndex:
     def test_index_embeds_service_worker_cache_name(self, client):
         resp = client.get("/")
         assert resp.status_code == 200
-        assert 'const serviceWorkerCacheName = "twicome-v11";' in resp.text
+        assert '<script type="application/json" id="sw-cache-name-data">"twicome-v11"</script>' in resp.text
 
     def test_service_worker_script_embeds_cache_name(self, client):
         resp = client.get("/sw.js")

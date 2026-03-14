@@ -66,6 +66,7 @@ REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
 
 def _get_static_version() -> str:
     """静的ファイルのキャッシュバスティング用バージョン文字列を返す。
+
     STATIC_VERSION 環境変数 > git short hash > 起動時タイムスタンプ の順で決定する。
     """
     env_ver = os.getenv("STATIC_VERSION", "").strip()
