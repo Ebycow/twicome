@@ -1,6 +1,8 @@
 """アプリケーション設定・環境変数"""
 
 import os
+import subprocess
+import time
 
 # 例: mysql+pymysql://user:password@dbhost:3306/appdb?charset=utf8mb4
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -60,3 +62,27 @@ FAISS_ENABLED: bool = bool(FAISS_API_URL)
 # .env 例: REDIS_URL=redis://redis:6379/0
 # 未設定の場合はキャッシュ無効（DB に直接アクセス）
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
+
+
+def _get_static_version() -> str:
+    """静的ファイルのキャッシュバスティング用バージョン文字列を返す。
+    STATIC_VERSION 環境変数 > git short hash > 起動時タイムスタンプ の順で決定する。
+    """
+    env_ver = os.getenv("STATIC_VERSION", "").strip()
+    if env_ver:
+        return env_ver
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return str(int(time.time()))
+
+
+STATIC_VERSION: str = _get_static_version()
