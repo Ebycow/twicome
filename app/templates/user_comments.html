@@ -402,7 +402,7 @@
     <script type="application/json" id="pages-data">{{ pages | tojson }}</script>
     <script type="application/json" id="user-data">{{ user.login | tojson }}</script>
     <script type="application/json" id="data-version-data">{{ data_version | tojson }}</script>
-    <script src="{{ root_path }}/static/offline-access.js"></script>
+    <script src="{{ root_path }}/static/offline-access.js?v={{ static_version }}"></script>
     <script>
       if (window.TwicomeOfflineAccess) {
         window.TwicomeOfflineAccess.markVisited({{ root_path | tojson }}, 'comments', {{ user.login | tojson }});
