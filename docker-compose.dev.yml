@@ -192,6 +192,8 @@ services:
   #   html strict:    docker compose -f docker-compose.dev.yml run --rm lint-html djlint app/templates --lint
   #   format 確認:    docker compose -f docker-compose.dev.yml run --rm lint ruff format . --check
   #   自動修正:       docker compose -f docker-compose.dev.yml run --rm lint ruff check . --fix
+  #   JS lint:        docker compose -f docker-compose.dev.yml run --rm lint-js
+  #   JS 自動修正:    docker compose -f docker-compose.dev.yml run --rm lint-js npx eslint app/static/js/ --fix
   lint:
     profiles: [lint]
     build: ./app
@@ -207,6 +209,15 @@ services:
       - .:/workspace
     working_dir: /workspace
     command: ["djlint", "app/templates", "--lint", "--warn"]
+
+  lint-js:
+    profiles: [lint]
+    image: node:lts-alpine
+    volumes:
+      - .:/workspace
+      - eslint-node-modules:/workspace/node_modules
+    working_dir: /workspace
+    command: sh -c "npm install --silent && npx eslint app/static/js/"
 
   # ── UI テスト実行用サービス（Playwright / Chromium）─────────────────────────
   # 使い方:
@@ -245,6 +256,7 @@ volumes:
   hf-cache:
   mysql8_dev_data:
   redis_dev_data:
+  eslint-node-modules:
 
 networks:
   backend:
