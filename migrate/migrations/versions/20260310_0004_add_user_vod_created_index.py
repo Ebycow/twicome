@@ -4,6 +4,7 @@ Revision ID: 20260310_0004
 Revises: 20260227_0003
 Create Date: 2026-03-10 00:00:00
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -22,6 +23,7 @@ def upgrade() -> None:
     # vod_options クエリ（ユーザーコメントページのVODドロップダウン）の2秒→0.04秒改善
     # 既に手動で追加済みの場合はスキップ
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     existing = [idx["name"] for idx in inspect(conn).get_indexes("comments")]
     if "idx_comments_user_vod_created" not in existing:
@@ -33,6 +35,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     existing = [idx["name"] for idx in inspect(conn).get_indexes("comments")]
     if "idx_comments_user_vod_created" in existing:

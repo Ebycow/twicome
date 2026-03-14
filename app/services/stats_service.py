@@ -2,6 +2,7 @@
 
 stats.py ルーターから統計計算を抽出したもの。
 """
+
 from collections import defaultdict
 
 from scipy.stats import mannwhitneyu
@@ -60,15 +61,17 @@ def build_owners_stats(db, uid: int, total_comments: int) -> list[dict]:
             if total_buckets > 0:
                 active_rate = round((active_buckets / total_buckets) * 100, 1)
                 inactive_rate = round(100.0 - active_rate, 1)
-        owners_stats.append({
-            "rank": idx,
-            "login": row["login"],
-            "display_name": row["display_name"],
-            "count": count,
-            "ratio": ratio,
-            "active_rate": active_rate,
-            "inactive_rate": inactive_rate,
-        })
+        owners_stats.append(
+            {
+                "rank": idx,
+                "login": row["login"],
+                "display_name": row["display_name"],
+                "count": count,
+                "ratio": ratio,
+                "active_rate": active_rate,
+                "inactive_rate": inactive_rate,
+            }
+        )
     return owners_stats
 
 
@@ -114,11 +117,16 @@ def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
 
     bucket_rows = stats_repo.fetch_impact_buckets(db, uid)
 
-    owner_buckets: dict = defaultdict(lambda: {
-        "login": "", "display_name": "",
-        "active_comments": [], "inactive_comments": [],
-        "active_unique": [], "inactive_unique": [],
-    })
+    owner_buckets: dict = defaultdict(
+        lambda: {
+            "login": "",
+            "display_name": "",
+            "active_comments": [],
+            "inactive_comments": [],
+            "active_unique": [],
+            "inactive_unique": [],
+        }
+    )
     all_active_comments: list[float] = []
     all_inactive_comments: list[float] = []
     all_active_unique: list[float] = []
@@ -148,20 +156,22 @@ def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
             continue
         avg_a, avg_i, c_change, c_p = _calc_impact(d["active_comments"], d["inactive_comments"])
         avg_ua, avg_ui, u_change, u_p = _calc_impact(d["active_unique"], d["inactive_unique"])
-        impact_stats.append({
-            "owner_login": d["login"],
-            "owner_display_name": d["display_name"],
-            "active_buckets": len(d["active_comments"]),
-            "inactive_buckets": len(d["inactive_comments"]),
-            "avg_others_active": avg_a,
-            "avg_others_inactive": avg_i,
-            "comment_change": c_change,
-            "p_value": c_p,
-            "avg_unique_active": avg_ua,
-            "avg_unique_inactive": avg_ui,
-            "unique_change": u_change,
-            "p_value_unique": u_p,
-        })
+        impact_stats.append(
+            {
+                "owner_login": d["login"],
+                "owner_display_name": d["display_name"],
+                "active_buckets": len(d["active_comments"]),
+                "inactive_buckets": len(d["inactive_comments"]),
+                "avg_others_active": avg_a,
+                "avg_others_inactive": avg_i,
+                "comment_change": c_change,
+                "p_value": c_p,
+                "avg_unique_active": avg_ua,
+                "avg_unique_inactive": avg_ui,
+                "unique_change": u_change,
+                "p_value_unique": u_p,
+            }
+        )
 
     impact_total = None
     if len(all_active_comments) >= 3 and len(all_inactive_comments) >= 3:

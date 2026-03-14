@@ -39,21 +39,28 @@ def similar_search_api(
         return _faiss_unavailable_response()
 
     with SessionLocal() as db:
-        user_row = db.execute(
-            text("""
+        user_row = (
+            db.execute(
+                text("""
                 SELECT user_id, login, display_name
                 FROM users
                 WHERE platform = :platform AND login = :login
                 LIMIT 1
             """),
-            {"platform": platform, "login": login},
-        ).mappings().first()
+                {"platform": platform, "login": login},
+            )
+            .mappings()
+            .first()
+        )
         if not user_row:
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
     if not is_index_available(login):
         return JSONResponse(
-            {"error": "similar_search_not_available", "message": "このユーザの類似検索インデックスはまだ作成されていません"},
+            {
+                "error": "similar_search_not_available",
+                "message": "このユーザの類似検索インデックスはまだ作成されていません",
+            },
             status_code=404,
         )
 
@@ -64,7 +71,10 @@ def similar_search_api(
 
     if results is None:
         return JSONResponse(
-            {"error": "similar_search_not_available", "message": "このユーザの類似検索インデックスはまだ作成されていません"},
+            {
+                "error": "similar_search_not_available",
+                "message": "このユーザの類似検索インデックスはまだ作成されていません",
+            },
             status_code=404,
         )
 
@@ -78,8 +88,9 @@ def similar_search_api(
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
 
     with SessionLocal() as db:
-        rows = db.execute(
-            text(f"""
+        rows = (
+            db.execute(
+                text(f"""
                 SELECT
                     c.comment_id,
                     c.vod_id,
@@ -114,8 +125,11 @@ def similar_search_api(
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
-        ).mappings().all()
+                {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
+            )
+            .mappings()
+            .all()
+        )
 
     rows_map = {r["comment_id"]: r for r in rows}
     comments = []
@@ -141,8 +155,9 @@ def _fetch_comment_details(results: list) -> list:
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
 
     with SessionLocal() as db:
-        rows = db.execute(
-            text(f"""
+        rows = (
+            db.execute(
+                text(f"""
                 SELECT
                     c.comment_id, c.vod_id, c.offset_seconds, c.comment_created_at_utc,
                     c.commenter_login_snapshot, c.commenter_display_name_snapshot,
@@ -158,7 +173,8 @@ def _fetch_comment_details(results: list) -> list:
                     cn.subjectivity AS cn_subjectivity,
                     cn.issues AS cn_issues,
                     cn.ask AS cn_ask,
-                    v.title AS vod_title, v.url AS vod_url, v.youtube_url AS youtube_url, v.created_at_utc AS vod_created_at_utc,
+                    v.title AS vod_title, v.url AS vod_url,
+                    v.youtube_url AS youtube_url, v.created_at_utc AS vod_created_at_utc,
                     u.login AS owner_login, u.display_name AS owner_display_name
                 FROM comments c
                 JOIN vods v ON v.vod_id = c.vod_id
@@ -166,8 +182,11 @@ def _fetch_comment_details(results: list) -> list:
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
-        ).mappings().all()
+                {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
+            )
+            .mappings()
+            .all()
+        )
 
     rows_map = {r["comment_id"]: r for r in rows}
     comments = []
@@ -194,10 +213,17 @@ def centroid_search_api(
         return _faiss_unavailable_response()
 
     with SessionLocal() as db:
-        user_row = db.execute(
-            text("SELECT user_id, login, display_name FROM users WHERE platform = :platform AND login = :login LIMIT 1"),
-            {"platform": platform, "login": login},
-        ).mappings().first()
+        user_row = (
+            db.execute(
+                text(
+                    "SELECT user_id, login, display_name FROM users"
+                    " WHERE platform = :platform AND login = :login LIMIT 1"
+                ),
+                {"platform": platform, "login": login},
+            )
+            .mappings()
+            .first()
+        )
         if not user_row:
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
@@ -232,17 +258,31 @@ def emotion_search_api(
         return _faiss_unavailable_response()
 
     with SessionLocal() as db:
-        user_row = db.execute(
-            text("SELECT user_id, login, display_name FROM users WHERE platform = :platform AND login = :login LIMIT 1"),
-            {"platform": platform, "login": login},
-        ).mappings().first()
+        user_row = (
+            db.execute(
+                text(
+                    "SELECT user_id, login, display_name FROM users"
+                    " WHERE platform = :platform AND login = :login LIMIT 1"
+                ),
+                {"platform": platform, "login": login},
+            )
+            .mappings()
+            .first()
+        )
         if not user_row:
             return JSONResponse({"error": "user_not_found"}, status_code=404)
 
     if not is_index_available(login):
         return JSONResponse({"error": "index_not_available"}, status_code=404)
 
-    weights = {"joy": joy, "surprise": surprise, "admiration": admiration, "anger": anger, "sadness": sadness, "cheer": cheer}
+    weights = {
+        "joy": joy,
+        "surprise": surprise,
+        "admiration": admiration,
+        "anger": anger,
+        "sadness": sadness,
+        "cheer": cheer,
+    }
     if all(v == 0 for v in weights.values()):
         return {"user": dict(user_row), "weights": weights, "total": 0, "items": []}
 

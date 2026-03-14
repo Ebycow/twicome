@@ -10,7 +10,7 @@ import requests
 
 
 def parse_env_lines(lines: list[str]) -> tuple[dict[str, str], list[tuple[str, str]]]:
-    """env ファイルの行リストをパースして kv マップと再構築用リストを返す。
+    """Env ファイルの行リストをパースして kv マップと再構築用リストを返す。
 
     - kv: parsed key/value map (only for KEY=VALUE lines)
     - parsed: list of tuples (kind, content) where kind in {"raw", "kv"} for reconstruction
@@ -48,7 +48,7 @@ def parse_env_lines(lines: list[str]) -> tuple[dict[str, str], list[tuple[str, s
 
 
 def render_env(lines_parsed: list[tuple[str, str]], existing_kv: dict[str, str], updates: dict[str, str]) -> list[str]:
-    """env ファイルの行を再構築する。キーはインプレースで更新し、コメントや未知の行は保持する。"""
+    """Env ファイルの行を再構築する。キーはインプレースで更新し、コメントや未知の行は保持する。"""
     merged = dict(existing_kv)
     merged.update(updates)
 
@@ -66,14 +66,14 @@ def render_env(lines_parsed: list[tuple[str, str]], existing_kv: dict[str, str],
         val = merged.get(key, "")
 
         # Quote safely (simple approach)
-        val_escaped = val.replace('"', r'\"')
+        val_escaped = val.replace('"', r"\"")
         out.append(f'{key}="{val_escaped}"')
 
     # Append any new keys not previously present
     for key, val in merged.items():
         if key in seen_keys:
             continue
-        val_escaped = val.replace('"', r'\"')
+        val_escaped = val.replace('"', r"\"")
         out.append(f'{key}="{val_escaped}"')
 
     # Ensure trailing newline
@@ -135,14 +135,25 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Refresh Twitch access token and update .env")
     parser.add_argument("env_path", help="Path to .env (will be created/updated)")
-    parser.add_argument("--buffer-seconds", type=int, default=int(os.getenv("TOKEN_REFRESH_BUFFER", "300")),
-                        help="Refresh when expires_at is within this buffer (default: 300)")
-    parser.add_argument("--scope", default=os.getenv("TWITCH_SCOPE", "user:read:broadcast"),
-                        help="Scope for client_credentials (default: env TWITCH_SCOPE or user:read:broadcast)")
-    parser.add_argument("--client-id", default=None,
-                        help="Twitch Client ID (or set TWITCH_CLIENT_ID env var, or CLIENT_ID in .env)")
-    parser.add_argument("--client-secret", default=None,
-                        help="Twitch Client Secret (or set TWITCH_CLIENT_SECRET env var, or CLIENT_SECRET in .env)")
+    parser.add_argument(
+        "--buffer-seconds",
+        type=int,
+        default=int(os.getenv("TOKEN_REFRESH_BUFFER", "300")),
+        help="Refresh when expires_at is within this buffer (default: 300)",
+    )
+    parser.add_argument(
+        "--scope",
+        default=os.getenv("TWITCH_SCOPE", "user:read:broadcast"),
+        help="Scope for client_credentials (default: env TWITCH_SCOPE or user:read:broadcast)",
+    )
+    parser.add_argument(
+        "--client-id", default=None, help="Twitch Client ID (or set TWITCH_CLIENT_ID env var, or CLIENT_ID in .env)"
+    )
+    parser.add_argument(
+        "--client-secret",
+        default=None,
+        help="Twitch Client Secret (or set TWITCH_CLIENT_SECRET env var, or CLIENT_SECRET in .env)",
+    )
     args = parser.parse_args()
 
     # クライアント認証情報の読み込み優先順位:
@@ -159,16 +170,8 @@ def main() -> int:
             env_client_id = env_kv.get("CLIENT_ID", "").strip() or None
             env_client_secret = env_kv.get("CLIENT_SECRET", "").strip() or None
 
-    client_id = (
-        args.client_id
-        or os.getenv("TWITCH_CLIENT_ID")
-        or env_client_id
-    )
-    client_secret = (
-        args.client_secret
-        or os.getenv("TWITCH_CLIENT_SECRET")
-        or env_client_secret
-    )
+    client_id = args.client_id or os.getenv("TWITCH_CLIENT_ID") or env_client_id
+    client_secret = args.client_secret or os.getenv("TWITCH_CLIENT_SECRET") or env_client_secret
 
     if not client_id or not client_secret:
         raise SystemExit(

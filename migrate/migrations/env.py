@@ -17,9 +17,7 @@ target_metadata = None
 def get_database_url() -> str:
     database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
-        raise RuntimeError(
-            "DATABASE_URL is not set. Set DATABASE_URL before running alembic migrations."
-        )
+        raise RuntimeError("DATABASE_URL is not set. Set DATABASE_URL before running alembic migrations.")
     return database_url
 
 

@@ -4,6 +4,7 @@ Revision ID: 20260225_0002
 Revises: 20260222_0001
 Create Date: 2026-02-25 00:00:00
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence

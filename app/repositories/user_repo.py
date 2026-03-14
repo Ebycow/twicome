@@ -8,22 +8,27 @@ from sqlalchemy import text
 
 def find_user(db, login: str, platform: str) -> dict | None:
     """Login + platform でユーザーを1件取得。存在しなければ None。"""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT user_id, login, display_name, profile_image_url
             FROM users
             WHERE platform = :platform AND login = :login
             LIMIT 1
         """),
-        {"platform": platform, "login": login},
-    ).mappings().first()
+            {"platform": platform, "login": login},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
 def fetch_index_users(db) -> list[dict]:
     """トップページ検索用のユーザー一覧（コメント数・最終コメント日時付き）。"""
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT
                 u.login,
                 u.display_name,
@@ -41,7 +46,10 @@ def fetch_index_users(db) -> list[dict]:
             WHERE u.platform = 'twitch'
             ORDER BY u.login
         """)
-    ).mappings().all()
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]
 
 
@@ -51,21 +59,26 @@ def fetch_quick_links(db, logins: list[str]) -> list[dict]:
         return []
     placeholders = ", ".join([f":login_{i}" for i in range(len(logins))])
     params = {f"login_{i}": login for i, login in enumerate(logins)}
-    rows = db.execute(
-        text(f"""
+    rows = (
+        db.execute(
+            text(f"""
             SELECT login, display_name, profile_image_url
             FROM users
             WHERE platform = 'twitch' AND login IN ({placeholders})
         """),
-        params,
-    ).mappings().all()
+            params,
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]
 
 
 def fetch_streamers(db) -> list[dict]:
     """VOD を持つ配信者一覧（login, display_name）。"""
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT u.login, u.display_name
             FROM users u
             JOIN vods v ON v.owner_user_id = u.user_id
@@ -73,7 +86,10 @@ def fetch_streamers(db) -> list[dict]:
             GROUP BY u.user_id, u.login, u.display_name
             ORDER BY u.login
         """),
-    ).mappings().all()
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]
 
 
@@ -97,8 +113,9 @@ def fetch_commenters_for_streamer(db, streamer_login: str) -> list[str]:
 def fetch_user_vod_options(db, uid: int, owner_user_id: int | None) -> list[dict]:
     """ユーザーがコメントした VOD の選択肢（owner でフィルタ可能）。"""
     if owner_user_id is None:
-        rows = db.execute(
-            text("""
+        rows = (
+            db.execute(
+                text("""
                 SELECT v.vod_id, v.title, sub.last_commented_at
                 FROM (
                     SELECT c.vod_id, MAX(c.comment_created_at_utc) AS last_commented_at
@@ -110,11 +127,15 @@ def fetch_user_vod_options(db, uid: int, owner_user_id: int | None) -> list[dict
                 ORDER BY sub.last_commented_at DESC
                 LIMIT 300
             """),
-            {"uid": uid},
-        ).mappings().all()
+                {"uid": uid},
+            )
+            .mappings()
+            .all()
+        )
     else:
-        rows = db.execute(
-            text("""
+        rows = (
+            db.execute(
+                text("""
                 SELECT v.vod_id, v.title, MAX(c.comment_created_at_utc) AS last_commented_at
                 FROM comments c
                 JOIN vods v ON v.vod_id = c.vod_id
@@ -123,15 +144,19 @@ def fetch_user_vod_options(db, uid: int, owner_user_id: int | None) -> list[dict
                 ORDER BY last_commented_at DESC
                 LIMIT 300
             """),
-            {"uid": uid, "owner_user_id": owner_user_id},
-        ).mappings().all()
+                {"uid": uid, "owner_user_id": owner_user_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def fetch_user_owner_options(db, uid: int) -> list[dict]:
     """ユーザーがコメントした配信者の選択肢。"""
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT DISTINCT u.user_id, u.login, u.display_name
             FROM users u
             JOIN vods v ON v.owner_user_id = u.user_id
@@ -139,6 +164,9 @@ def fetch_user_owner_options(db, uid: int) -> list[dict]:
             WHERE c.commenter_user_id = :uid
             ORDER BY u.login
         """),
-        {"uid": uid},
-    ).mappings().all()
+            {"uid": uid},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]

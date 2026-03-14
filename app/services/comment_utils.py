@@ -151,7 +151,8 @@ def render_comment_body_html(raw_json, fallback_body):
             url2 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="2.0"), quote=True)
             url3 = html.escape(EMOTE_URL_TEMPLATE.format(emote_id=emote_id_url, scale="3.0"), quote=True)
             parts.append(
-                f'<img class="emote" src="{url1}" srcset="{url2} 2x, {url3} 3x" alt="{escaped}" title="{escaped}" loading="lazy" decoding="async">'
+                f'<img class="emote" src="{url1}" srcset="{url2} 2x, {url3} 3x"'
+                f' alt="{escaped}" title="{escaped}" loading="lazy" decoding="async">'
             )
         else:
             parts.append(html.escape(text))

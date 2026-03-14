@@ -11,8 +11,7 @@ def base_data(db):
     """各テストで使う共通ベースデータ。"""
     seed_user(db, user_id=1, login="streamer", platform="twitch")
     seed_user(db, user_id=2, login="viewer", platform="twitch")
-    seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信",
-             url="https://www.twitch.tv/videos/100")
+    seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信", url="https://www.twitch.tv/videos/100")
 
 
 class TestCountComments:
@@ -50,8 +49,9 @@ class TestFetchComments:
 
     def test_pagination(self, db):
         for i in range(5):
-            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2,
-                         body=f"コメント{i}", offset_seconds=i * 10)
+            seed_comment(
+                db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, body=f"コメント{i}", offset_seconds=i * 10
+            )
         rows = comment_repo.fetch_comments(db, uid=2, limit=2, offset=0)
         assert len(rows) == 2
 
@@ -116,7 +116,7 @@ class TestFetchQuizTargetComments:
         assert all(r["body"] == "mine" for r in rows)
 
     def test_filters_short_bodies(self, db):
-        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="ok")   # 2文字
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="ok")  # 2文字
         seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, body="長いコメント")
         rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=10)
         assert len(rows) == 1
@@ -124,8 +124,9 @@ class TestFetchQuizTargetComments:
 
     def test_respects_limit(self, db):
         for i in range(5):
-            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2,
-                         body=f"コメント{i}", offset_seconds=i * 10)
+            seed_comment(
+                db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, body=f"コメント{i}", offset_seconds=i * 10
+            )
         rows = comment_repo.fetch_quiz_target_comments(db, uid=2, limit=3)
         assert len(rows) == 3
 
@@ -166,7 +167,7 @@ class TestFetchQuizOtherComments:
     def test_filters_short_bodies(self, db):
         seed_user(db, user_id=3, login="other", platform="twitch")
         seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="trigger")
-        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="ok")   # 2文字
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=3, body="ok")  # 2文字
         seed_comment(db, comment_id="c3", vod_id=100, commenter_user_id=3, body="長いコメント")
         rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=10)
         assert len(rows) == 1
@@ -176,8 +177,9 @@ class TestFetchQuizOtherComments:
         seed_user(db, user_id=3, login="other", platform="twitch")
         seed_comment(db, comment_id="c0", vod_id=100, commenter_user_id=2, body="trigger")
         for i in range(5):
-            seed_comment(db, comment_id=f"c{i+1}", vod_id=100, commenter_user_id=3,
-                         body=f"コメント{i}", offset_seconds=i * 10)
+            seed_comment(
+                db, comment_id=f"c{i + 1}", vod_id=100, commenter_user_id=3, body=f"コメント{i}", offset_seconds=i * 10
+            )
         rows = comment_repo.fetch_quiz_other_comments(db, uid=2, limit=3)
         assert len(rows) == 3
 

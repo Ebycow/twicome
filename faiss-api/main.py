@@ -154,7 +154,7 @@ class UserIndex:
                     all_vectors[i] = self.index.reconstruct(i)
                 D, _ = self.index.search(all_vectors, k + 1)  # +1 は自分自身を含む
                 # D[:, 0] ≈ 1.0（自分自身）を除いて平均
-                self.knn_densities = D[:, 1:k + 1].mean(axis=1).tolist()
+                self.knn_densities = D[:, 1 : k + 1].mean(axis=1).tolist()
             else:
                 self.knn_densities = [1.0] * n_total
 
@@ -197,7 +197,7 @@ class UserIndex:
         total = len(pairs)
         max_offset = max(0, total - top_k)
         offset = min(int(position * max_offset), max_offset)
-        selected = pairs[offset:offset + top_k]
+        selected = pairs[offset : offset + top_k]
         return [(self.comment_ids[idx], sim) for idx, sim in selected]
 
 
@@ -256,16 +256,16 @@ class EmotionSearchRequest(BaseModel):
 class SubclusterRequest(BaseModel):
     """サブクラスタリングリクエスト。"""
 
-    centroid: list[float]        # 親クラスタの正規化済み重心ベクトル
-    n_members: int               # 親クラスタのサイズ（検索上限として使用）
-    n_clusters: int = 4          # サブクラスタ数
+    centroid: list[float]  # 親クラスタの正規化済み重心ベクトル
+    n_members: int  # 親クラスタのサイズ（検索上限として使用）
+    n_clusters: int = 4  # サブクラスタ数
 
 
 class ClusterMembersRequest(BaseModel):
     """クラスタメンバー取得リクエスト。"""
 
-    centroid: list[float]        # クラスタの正規化済み重心ベクトル
-    n_members: int               # 取得する件数
+    centroid: list[float]  # クラスタの正規化済み重心ベクトル
+    n_members: int  # 取得する件数
 
 
 # --- 起動時処理 ---
@@ -379,12 +379,14 @@ def get_clusters(login: str, n_clusters: int = 8):
             sims = cluster_vecs @ centroid
             top_local = np.argsort(sims)[::-1][:10]
             rep_ids = [ui.comment_ids[mask[i]] for i in top_local]
-            clusters.append({
-                "cluster_id": int(c),
-                "size": int(len(mask)),
-                "representative_ids": rep_ids,
-                "centroid": centroid.tolist(),  # サブクラスタリング用
-            })
+            clusters.append(
+                {
+                    "cluster_id": int(c),
+                    "size": int(len(mask)),
+                    "representative_ids": rep_ids,
+                    "centroid": centroid.tolist(),  # サブクラスタリング用
+                }
+            )
 
         # 件数の多い順にソート
         clusters.sort(key=lambda x: x["size"], reverse=True)
@@ -436,12 +438,14 @@ def subcluster(login: str, req: SubclusterRequest):
             sims = sub_vecs @ sub_centroid
             top_local = np.argsort(sims)[::-1][:10]
             rep_ids = [ui.comment_ids[member_indices[sub_mask[i]]] for i in top_local]
-            subclusters.append({
-                "cluster_id": int(c),
-                "size": int(len(sub_mask)),
-                "representative_ids": rep_ids,
-                "centroid": sub_centroid.tolist(),
-            })
+            subclusters.append(
+                {
+                    "cluster_id": int(c),
+                    "size": int(len(sub_mask)),
+                    "representative_ids": rep_ids,
+                    "centroid": sub_centroid.tolist(),
+                }
+            )
 
         subclusters.sort(key=lambda x: x["size"], reverse=True)
 
@@ -484,7 +488,7 @@ def rebuild_densities(login: str):
             for i in range(n_total):
                 all_vectors[i] = ui.index.reconstruct(i)
             D, _ = ui.index.search(all_vectors, k + 1)
-            ui.knn_densities = D[:, 1:k + 1].mean(axis=1).tolist()
+            ui.knn_densities = D[:, 1 : k + 1].mean(axis=1).tolist()
         else:
             ui.knn_densities = [1.0] * n_total
 

@@ -1,4 +1,5 @@
 """投票（いいね・dislike）のデータアクセス層。"""
+
 from sqlalchemy import text
 
 

@@ -27,16 +27,19 @@ from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
 
+
 def _seed_basic(db, *, login: str = "viewer", comment_body: str = "テストコメント") -> None:
     """よく使うシードパターンをまとめたヘルパー。"""
     seed_user(db, user_id=1, login="streamer", platform="twitch")
     seed_user(db, user_id=2, login=login, platform="twitch")
     seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信")
-    seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
-                 commenter_login_snapshot=login, body=comment_body)
+    seed_comment(
+        db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot=login, body=comment_body
+    )
 
 
 # ── テスト群 ─────────────────────────────────────────────────────────────────
+
 
 class TestPageNotFound:
     """存在しないユーザーのページを開いたときの動作を確認するテスト群。"""
@@ -187,14 +190,26 @@ class TestFilterForm:
         seed_user(db, user_id=1, login="streamer", platform="twitch")
         seed_user(db, user_id=2, login="fan6", platform="twitch")
         seed_vod(db, vod_id=100, owner_user_id=1)
-        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2,
-                     commenter_login_snapshot="fan6", body="hello world",
-                     offset_seconds=10,
-                     created_at=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
-        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2,
-                     commenter_login_snapshot="fan6", body="goodbye",
-                     offset_seconds=20,
-                     created_at=datetime(2024, 6, 1, 10, 1, 0, tzinfo=UTC))
+        seed_comment(
+            db,
+            comment_id="c1",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="fan6",
+            body="hello world",
+            offset_seconds=10,
+            created_at=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC),
+        )
+        seed_comment(
+            db,
+            comment_id="c2",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="fan6",
+            body="goodbye",
+            offset_seconds=20,
+            created_at=datetime(2024, 6, 1, 10, 1, 0, tzinfo=UTC),
+        )
 
         # q=hello でフィルターして直接アクセス（フォーム送信の代わりに URL で指定）
         page.goto("/u/fan6?q=hello")

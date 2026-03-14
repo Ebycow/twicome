@@ -94,6 +94,7 @@ def cluster_comments_page(
 ):
     """クラスタ内のコメント一覧ページ（フォームPOSTで開く）"""
     import json as _json
+
     centroid_list = _json.loads(centroid)
 
     with SessionLocal() as db:

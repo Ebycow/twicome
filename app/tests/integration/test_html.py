@@ -11,11 +11,13 @@ HTML レンダリング統合テスト。
 - コミュニティノートの条件付きレンダリング
 - FAISS UI の非表示（FAISS_API_URL 未設定時）
 """
+
 from bs4 import BeautifulSoup
 
 from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 # ── ヘルパー ──────────────────────────────────────────────────────────────────
+
 
 def _soup(resp) -> BeautifulSoup:
     return BeautifulSoup(resp.text, "html.parser")
@@ -24,20 +26,24 @@ def _soup(resp) -> BeautifulSoup:
 def _setup_viewer(db, *, n_comments=1, comment_bodies=None):
     """streamer + viewer + vod + コメント n 件を作成して viewer の login を返す。"""
     seed_user(db, user_id=1, login="streamer", platform="twitch")
-    seed_user(db, user_id=2, login="viewer", platform="twitch",
-              display_name="ビューワー")
+    seed_user(db, user_id=2, login="viewer", platform="twitch", display_name="ビューワー")
     seed_vod(db, vod_id=100, owner_user_id=1, title="テスト配信タイトル")
     bodies = comment_bodies or [f"コメント{i}" for i in range(n_comments)]
     for i, body in enumerate(bodies):
         seed_comment(
-            db, comment_id=f"c{i}", vod_id=100,
-            commenter_user_id=2, commenter_login_snapshot="viewer",
-            body=body, offset_seconds=i * 10,
+            db,
+            comment_id=f"c{i}",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            body=body,
+            offset_seconds=i * 10,
         )
     return "viewer"
 
 
 # ── ページ骨格 ────────────────────────────────────────────────────────────────
+
 
 class TestPageStructure:
     def test_title_contains_user_login(self, client, db):
@@ -54,10 +60,8 @@ class TestPageStructure:
         """JavaScript が参照する JSON スクリプトタグが全て存在する。"""
         _setup_viewer(db)
         soup = _soup(client.get("/u/viewer"))
-        for tag_id in ("filters-data", "root-path-data", "page-data",
-                       "pages-data", "user-data"):
-            assert soup.find("script", {"id": tag_id}) is not None, \
-                f"<script id='{tag_id}'> が見つからない"
+        for tag_id in ("filters-data", "root-path-data", "page-data", "pages-data", "user-data"):
+            assert soup.find("script", {"id": tag_id}) is not None, f"<script id='{tag_id}'> が見つからない"
 
     def test_user_data_script_contains_login(self, client, db):
         _setup_viewer(db)
@@ -71,6 +75,7 @@ class TestPageStructure:
 
 
 # ── フィルターフォーム ────────────────────────────────────────────────────────
+
 
 class TestFilterForm:
     def test_filter_form_exists(self, client, db):
@@ -126,8 +131,7 @@ class TestFilterForm:
         soup = _soup(client.get("/u/viewer"))
         select = soup.find(id="select-sort")
         values = [o.get("value") for o in select.find_all("option")]
-        for expected in ("created_at", "vod_time", "likes", "dislikes",
-                         "community_note", "danger", "random"):
+        for expected in ("created_at", "vod_time", "likes", "dislikes", "community_note", "danger", "random"):
             assert expected in values, f"sort オプション '{expected}' が見つからない"
 
     def test_owner_filtered_vod_options_loaded_even_when_quick_link_meta_cached(self, client, db, monkeypatch):
@@ -138,10 +142,8 @@ class TestFilterForm:
         seed_user(db, user_id=3, login="viewer", platform="twitch")
         seed_vod(db, vod_id=100, owner_user_id=1, title="配信1")
         seed_vod(db, vod_id=101, owner_user_id=2, title="配信2")
-        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=3,
-                     commenter_login_snapshot="viewer")
-        seed_comment(db, comment_id="c2", vod_id=101, commenter_user_id=3,
-                     commenter_login_snapshot="viewer")
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=3, commenter_login_snapshot="viewer")
+        seed_comment(db, comment_id="c2", vod_id=101, commenter_user_id=3, commenter_login_snapshot="viewer")
 
         monkeypatch.setattr(comments_router, "QUICK_LINK_LOGINS", ["viewer"])
         monkeypatch.setattr(
@@ -172,6 +174,7 @@ class TestFilterForm:
 
 # ── コメントカード ────────────────────────────────────────────────────────────
 
+
 class TestCommentCards:
     def test_comment_cards_rendered(self, client, db):
         """seed したコメント数と .comment 要素の個数が一致する。"""
@@ -190,8 +193,9 @@ class TestCommentCards:
         seed_user(db, user_id=1, login="streamer", platform="twitch")
         seed_user(db, user_id=2, login="viewer", platform="twitch")
         seed_vod(db, vod_id=100, owner_user_id=1)
-        seed_comment(db, comment_id="test_comment_id_abc", vod_id=100,
-                     commenter_user_id=2, commenter_login_snapshot="viewer")
+        seed_comment(
+            db, comment_id="test_comment_id_abc", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer"
+        )
         soup = _soup(client.get("/u/viewer"))
         assert soup.find(id="test_comment_id_abc") is not None
 
@@ -204,8 +208,7 @@ class TestCommentCards:
             deferred = card.find(attrs={"data-vote-controls": "deferred"})
             assert deferred is not None, f"comment #{card.get('id')} の deferred vote container が見つからない"
             vote_btns = card.find_all(class_="vote-btn")
-            assert len(vote_btns) == 2, \
-                f"comment #{card.get('id')} の初期 HTML に vote-btn が {len(vote_btns)} 個ある"
+            assert len(vote_btns) == 2, f"comment #{card.get('id')} の初期 HTML に vote-btn が {len(vote_btns)} 個ある"
             assert vote_btns[0].get_text(strip=True) == "😂 0"
             assert vote_btns[1].get_text(strip=True) == "❓ 0"
 
@@ -232,15 +235,22 @@ class TestCommentCards:
 
 # ── コミュニティノート ────────────────────────────────────────────────────────
 
+
 class TestCommunityNotes:
     def _seed_with_note(self, db):
         from sqlalchemy import text
+
         seed_user(db, user_id=1, login="streamer", platform="twitch")
         seed_user(db, user_id=2, login="viewer", platform="twitch")
         seed_vod(db, vod_id=100, owner_user_id=1)
-        seed_comment(db, comment_id="cn_comment", vod_id=100,
-                     commenter_user_id=2, commenter_login_snapshot="viewer",
-                     body="ノート付きコメント")
+        seed_comment(
+            db,
+            comment_id="cn_comment",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            body="ノート付きコメント",
+        )
         db.execute(
             text("""
                 INSERT INTO community_notes (
@@ -279,6 +289,7 @@ class TestCommunityNotes:
 
 
 # ── FAISS UI の非表示 ────────────────────────────────────────────────────────
+
 
 class TestFaissUiDisabled:
     """conftest.py で FAISS_API_URL="" に設定されているため、

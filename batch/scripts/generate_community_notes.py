@@ -53,15 +53,11 @@ try:
     SYSTEM_PROMPT = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
 except FileNotFoundError as e:
     raise RuntimeError(
-        f"SYSTEM_PROMPT file is not found: {SYSTEM_PROMPT_PATH}. "
-        "Set COMMUNITY_NOTE_SYSTEM_PROMPT_PATH in .env."
+        f"SYSTEM_PROMPT file is not found: {SYSTEM_PROMPT_PATH}. Set COMMUNITY_NOTE_SYSTEM_PROMPT_PATH in .env."
     ) from e
 
 if not SYSTEM_PROMPT:
-    raise RuntimeError(
-        f"SYSTEM_PROMPT file is empty: {SYSTEM_PROMPT_PATH}. "
-        "Set a non-empty prompt text."
-    )
+    raise RuntimeError(f"SYSTEM_PROMPT file is empty: {SYSTEM_PROMPT_PATH}. Set a non-empty prompt text.")
 
 REQUEST_INTERVAL_SEC = 1
 MAX_RETRIES = 2
@@ -113,10 +109,7 @@ def backup_old_notes(notes: list[tuple[str, str]]):
     os.makedirs(BACKUP_DIR, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     path = os.path.join(BACKUP_DIR, f"backup_{timestamp}.json")
-    data = [
-        {"comment_id": cid, "old_note_json": body}
-        for cid, body in notes
-    ]
+    data = [{"comment_id": cid, "old_note_json": body} for cid, body in notes]
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"バックアップ保存: {path} ({len(data)} 件)")
@@ -242,8 +235,7 @@ def save_community_note(cur, comment_id: str, note_data: dict):
 def main():
     """コミュニティノート生成バッチのエントリーポイント。"""
     parser = argparse.ArgumentParser(description="コミュニティノート生成バッチ")
-    parser.add_argument("-f", "--force", action="store_true",
-                        help="生成済みのコミュニティノートも含めて全件再生成する")
+    parser.add_argument("-f", "--force", action="store_true", help="生成済みのコミュニティノートも含めて全件再生成する")
     args = parser.parse_args()
 
     if not OPENROUTER_API_KEY:
@@ -280,10 +272,19 @@ def main():
                     conn.commit()
                     note_text = note_data.get("note", "")
                     scores = note_data.get("scores", {})
-                    danger = (scores.get("harm_risk", 0) + scores.get("exaggeration", 0) + scores.get("evidence_gap", 0) + scores.get("subjectivity", 0)) / 4
+                    danger = (
+                        scores.get("harm_risk", 0)
+                        + scores.get("exaggeration", 0)
+                        + scores.get("evidence_gap", 0)
+                        + scores.get("subjectivity", 0)
+                    ) / 4
                     print(f"    -> {note_text[:60]}...")
                     subj = scores.get("subjectivity", 0)
-                    print(f"       eligible={note_data.get('eligible')}, status={note_data.get('status')}, danger={danger:.0f}, subjectivity={subj}")
+                    print(
+                        f"       eligible={note_data.get('eligible')},"
+                        f" status={note_data.get('status')},"
+                        f" danger={danger:.0f}, subjectivity={subj}"
+                    )
                     success += 1
                 else:
                     print("    -> 空のレスポンスまたはパース失敗、スキップ")

@@ -24,11 +24,13 @@ def iter_comments(root: Any) -> Iterator[dict[str, Any]]:
         return
     raise ValueError("Unsupported JSON shape: expected {'comments':[...]} or [...]")
 
+
 def normalize_name(s: str | None, ignore_case: bool) -> str | None:
     """名前文字列を正規化する。ignore_case=True の場合は小文字に変換。"""
     if s is None:
         return None
     return s.lower() if ignore_case else s
+
 
 def to_row(c: dict[str, Any]) -> dict[str, Any]:
     """コメント dict を CSV/テキスト出力用の行 dict に変換する。"""
@@ -43,19 +45,16 @@ def to_row(c: dict[str, Any]) -> dict[str, Any]:
         "_id": c.get("_id"),
     }
 
+
 def main() -> None:
     """コメント抽出コマンドのエントリーポイント。"""
-    p = argparse.ArgumentParser(
-        description="Extract Twitch VOD comments by commenter.name from comments.json"
-    )
+    p = argparse.ArgumentParser(description="Extract Twitch VOD comments by commenter.name from comments.json")
     p.add_argument("name", nargs="?", help="抽出したい commenter.name（例: jinx_pp）")
     p.add_argument("-i", "--input", default="comments.json", help="入力JSON (default: comments.json)")
     p.add_argument("-o", "--output", default="-", help="出力先 (default: stdout) 例: out.csv")
-    p.add_argument("--format", choices=["text", "jsonl", "csv"], default="text",
-                   help="出力形式 (default: text)")
+    p.add_argument("--format", choices=["text", "jsonl", "csv"], default="text", help="出力形式 (default: text)")
     p.add_argument("--ignore-case", action="store_true", help="name の大小文字を無視")
-    p.add_argument("--list-names", action="store_true",
-                   help="含まれる commenter.name を出現回数つきで表示して終了")
+    p.add_argument("--list-names", action="store_true", help="含まれる commenter.name を出現回数つきで表示して終了")
     p.add_argument("--top", type=int, default=50, help="--list-names の表示上位件数 (default: 50)")
     args = p.parse_args()
 
@@ -105,6 +104,7 @@ def main() -> None:
     finally:
         if out_fh is not sys.stdout:
             out_fh.close()
+
 
 if __name__ == "__main__":
     main()

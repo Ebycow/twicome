@@ -51,9 +51,10 @@ def parse_dt_utc(dt_str: str | None) -> datetime | None:
     return dt_utc.replace(tzinfo=None)
 
 
-def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: str | None,
-                profile_image_url: str | None, platform: str) -> None:
-    """users テーブルにユーザーを upsert する。"""
+def upsert_user(
+    cur: MySQLCursor, user_id: int, login: str, display_name: str | None, profile_image_url: str | None, platform: str
+) -> None:
+    """Users テーブルにユーザーを upsert する。"""
     sql = """
     INSERT INTO users (user_id, login, display_name, profile_image_url, platform, created_at, updated_at)
     VALUES (%s, %s, %s, %s, %s, NOW(6), NOW(6))
@@ -68,7 +69,7 @@ def upsert_user(cur: MySQLCursor, user_id: int, login: str, display_name: str | 
 
 
 def upsert_vod(cur: MySQLCursor, vod: dict[str, Any], streamer: dict[str, Any], platform: str) -> int:
-    """vods テーブルに VOD を upsert して vod_id を返す。"""
+    """Vods テーブルに VOD を upsert して vod_id を返す。"""
     vod_id = int(vod["id"])
     owner_user_id = int(streamer["id"])
 
@@ -106,16 +107,28 @@ def upsert_vod(cur: MySQLCursor, vod: dict[str, Any], streamer: dict[str, Any], 
       url = COALESCE(VALUES(url), url),
       ingested_at = NOW(6)
     """
-    cur.execute(sql, (
-        vod_id, owner_user_id, title, description, created_at_utc,
-        length_seconds, start_seconds, end_seconds, view_count, game_name,
-        platform, url
-    ))
+    cur.execute(
+        sql,
+        (
+            vod_id,
+            owner_user_id,
+            title,
+            description,
+            created_at_utc,
+            length_seconds,
+            start_seconds,
+            end_seconds,
+            view_count,
+            game_name,
+            platform,
+            url,
+        ),
+    )
     return vod_id
 
 
 def insert_comment(cur: MySQLCursor, vod_id: int, c: dict[str, Any], platform: str) -> None:
-    """comments テーブルにコメントを upsert する。"""
+    """Comments テーブルにコメントを upsert する。"""
     comment_id = c["_id"]
     offset_seconds = int(c.get("content_offset_seconds", 0))
     created_at_utc = parse_dt_utc(c.get("created_at"))
@@ -157,7 +170,8 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: dict[str, Any], platform: s
       comment_created_at_utc = COALESCE(VALUES(comment_created_at_utc), comment_created_at_utc),
       commenter_user_id = COALESCE(VALUES(commenter_user_id), commenter_user_id),
       commenter_login_snapshot = COALESCE(VALUES(commenter_login_snapshot), commenter_login_snapshot),
-      commenter_display_name_snapshot = COALESCE(VALUES(commenter_display_name_snapshot), commenter_display_name_snapshot),
+      commenter_display_name_snapshot = COALESCE(
+          VALUES(commenter_display_name_snapshot), commenter_display_name_snapshot),
       body = VALUES(body),
       body_html = VALUES(body_html),
       body_html_version = VALUES(body_html_version),
@@ -166,11 +180,24 @@ def insert_comment(cur: MySQLCursor, vod_id: int, c: dict[str, Any], platform: s
       raw_json = VALUES(raw_json),
       ingested_at = NOW(6)
     """
-    cur.execute(sql, (
-        comment_id, vod_id, offset_seconds, created_at_utc,
-        commenter_user_id, commenter_login, commenter_display,
-        body, body_html, BODY_HTML_RENDER_VERSION, user_color, bits_spent, raw_json_str
-    ))
+    cur.execute(
+        sql,
+        (
+            comment_id,
+            vod_id,
+            offset_seconds,
+            created_at_utc,
+            commenter_user_id,
+            commenter_login,
+            commenter_display,
+            body,
+            body_html,
+            BODY_HTML_RENDER_VERSION,
+            user_color,
+            bits_spent,
+            raw_json_str,
+        ),
+    )
 
 
 def vod_already_ingested(cur: MySQLCursor, vod_id: int) -> bool:
@@ -206,8 +233,7 @@ def get_vod_ingest_marker(cur: MySQLCursor, vod_id: int) -> tuple[str, int] | No
     except mysql.connector.Error as e:
         if e.errno == errorcode.ER_NO_SUCH_TABLE:
             raise RuntimeError(
-                "Table `vod_ingest_markers` does not exist. "
-                "Run `alembic -c app/alembic.ini upgrade head` first."
+                "Table `vod_ingest_markers` does not exist. Run `alembic -c app/alembic.ini upgrade head` first."
             ) from e
         raise
 
@@ -268,9 +294,7 @@ def resolve_input_dir(raw_path: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     """コマンドライン引数をパースして返す。"""
-    parser = argparse.ArgumentParser(
-        description="Import VOD comment JSON files into MySQL."
-    )
+    parser = argparse.ArgumentParser(description="Import VOD comment JSON files into MySQL.")
     parser.add_argument(
         "--comments-dir",
         default=COMMENTS_DIR,
@@ -300,7 +324,9 @@ def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -
 
     vod_id_in_json = int(vod.get("id"))
     if vod_id_in_json != expected_vod_id:
-        raise ValueError(f"{filename}: ファイル名vod_id({expected_vod_id})とJSON video.id({vod_id_in_json})が不一致😾🦐")
+        raise ValueError(
+            f"{filename}: ファイル名vod_id({expected_vod_id})とJSON video.id({vod_id_in_json})が不一致😾🦐"
+        )
 
     cur = conn.cursor()
 
@@ -389,7 +415,9 @@ def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
                 print(f"❌ {filename}: {e}")
                 continue
 
-        print(f"\n🎉 Done. total_files={total_files}, ingested={ingested}, skipped={skipped}, comments={total_comments}")
+        print(
+            f"\n🎉 Done. total_files={total_files}, ingested={ingested}, skipped={skipped}, comments={total_comments}"
+        )
 
     finally:
         conn.close()

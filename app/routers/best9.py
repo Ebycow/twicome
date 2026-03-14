@@ -25,7 +25,7 @@ def _decompress_ids(z: str) -> list[str]:
 @router.get("/best9", response_class=HTMLResponse)
 def best9_page(
     request: Request,
-    z: str | None = Query(None),    # 圧縮版（新形式）
+    z: str | None = Query(None),  # 圧縮版（新形式）
     ids: str | None = Query(None),  # レガシー互換
     login: str | None = Query(None),
 ):
@@ -46,8 +46,9 @@ def best9_page(
     params = {f"id_{i}": cid for i, cid in enumerate(id_list)}
 
     with SessionLocal() as db:
-        rows = db.execute(
-            text(f"""
+        rows = (
+            db.execute(
+                text(f"""
                 SELECT
                     c.comment_id,
                     c.vod_id,
@@ -71,8 +72,11 @@ def best9_page(
                 JOIN users u ON u.user_id = v.owner_user_id
                 WHERE c.comment_id IN ({placeholders})
             """),
-            {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
-        ).mappings().all()
+                {**params, "body_html_version": BODY_HTML_RENDER_VERSION},
+            )
+            .mappings()
+            .all()
+        )
 
     now = datetime.utcnow()
     comment_map = {r["comment_id"]: decorate_comment(r, now) for r in rows}

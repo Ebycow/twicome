@@ -80,13 +80,12 @@ def client(db_engine):
     SessionLocal を差し替えてテスト用 DB を指すようにする。
     """
     import core.db as db_module
+
     original_engine = db_module.engine
     original_session_local = db_module.SessionLocal
 
     db_module.engine = db_engine
-    db_module.SessionLocal = sessionmaker(
-        bind=db_engine, autoflush=False, autocommit=False, future=True
-    )
+    db_module.SessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
 
     from fastapi.testclient import TestClient
 

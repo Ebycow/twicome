@@ -4,6 +4,7 @@ Revision ID: 20260310_0006
 Revises: 20260310_0005
 Create Date: 2026-03-10 00:00:00
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -24,10 +25,7 @@ def upgrade() -> None:
     existing = {col["name"] for col in inspect(conn).get_columns("comments")}
 
     if "body_html" not in existing:
-        op.execute(
-            "ALTER TABLE `comments` "
-            "ADD COLUMN `body_html` MEDIUMTEXT NULL AFTER `body`"
-        )
+        op.execute("ALTER TABLE `comments` ADD COLUMN `body_html` MEDIUMTEXT NULL AFTER `body`")
 
     if "body_html_version" not in existing:
         op.execute(

@@ -55,9 +55,7 @@ CHUNK_SIZE = 1000
 _batch_data_dir = os.getenv("BATCH_DATA_DIR", "")
 _app_env = os.getenv("APP_ENV", "development")
 FAISS_DATA_DIR = (
-    Path(_batch_data_dir) / "faiss_data"
-    if _batch_data_dir
-    else PROJECT_ROOT / "data" / _app_env / "faiss_data"
+    Path(_batch_data_dir) / "faiss_data" if _batch_data_dir else PROJECT_ROOT / "data" / _app_env / "faiss_data"
 )
 
 
@@ -108,7 +106,7 @@ def update_index_for_user(conn, login: str):
 
     total_added = 0
     for i in range(0, len(new_rows), CHUNK_SIZE):
-        chunk = new_rows[i:i + CHUNK_SIZE]
+        chunk = new_rows[i : i + CHUNK_SIZE]
         chunk_ids = [r["comment_id"] for r in chunk]
         chunk_texts = [r["body"] for r in chunk]
 

@@ -3,6 +3,7 @@
 REDIS_URL が設定されていない場合はすべての操作が no-op になり、
 呼び出し元は DB フォールバックを使う。
 """
+
 import json
 import os
 from datetime import UTC, datetime
@@ -37,11 +38,7 @@ def _compute_render_version() -> str:
     mtimes: list[int] = []
     for candidate in candidates:
         if candidate.is_dir():
-            mtimes.extend(
-                int(path.stat().st_mtime_ns)
-                for path in candidate.rglob("*")
-                if path.is_file()
-            )
+            mtimes.extend(int(path.stat().st_mtime_ns) for path in candidate.rglob("*") if path.is_file())
         elif candidate.exists():
             mtimes.append(int(candidate.stat().st_mtime_ns))
 

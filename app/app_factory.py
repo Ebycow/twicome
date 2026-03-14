@@ -42,7 +42,7 @@ def service_worker():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    """favicon を返す。"""
+    """Favicon を返す。"""
     return FileResponse("static/icons/favicon.ico", media_type="image/x-icon")
 
 

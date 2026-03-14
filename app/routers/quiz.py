@@ -23,7 +23,13 @@ def quiz_page(
         if not user_row:
             return templates.TemplateResponse(
                 "quiz.html",
-                {"request": request, "error": "ユーザが見つかりませんでした", "user": None, "comment_count": 0, "platform": platform},
+                {
+                    "request": request,
+                    "error": "ユーザが見つかりませんでした",
+                    "user": None,
+                    "comment_count": 0,
+                    "platform": platform,
+                },
                 status_code=404,
             )
         comment_count = comment_repo.count_comments(db, user_row["user_id"])
@@ -60,23 +66,29 @@ def quiz_start_api(
 
         questions = []
         for r in target_comments:
-            questions.append({
-                "body": r["body"],
-                "body_html": get_comment_body_html(r),
-                "is_target": True,
-                "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
-                "vod_title": r["vod_title"],
-                "user_color": r["user_color"],
-            })
+            questions.append(
+                {
+                    "body": r["body"],
+                    "body_html": get_comment_body_html(r),
+                    "is_target": True,
+                    "actual_commenter_display_name": r["commenter_display_name_snapshot"]
+                    or r["commenter_login_snapshot"],
+                    "vod_title": r["vod_title"],
+                    "user_color": r["user_color"],
+                }
+            )
         for r in other_comments:
-            questions.append({
-                "body": r["body"],
-                "body_html": get_comment_body_html(r),
-                "is_target": False,
-                "actual_commenter_display_name": r["commenter_display_name_snapshot"] or r["commenter_login_snapshot"],
-                "vod_title": r["vod_title"],
-                "user_color": r["user_color"],
-            })
+            questions.append(
+                {
+                    "body": r["body"],
+                    "body_html": get_comment_body_html(r),
+                    "is_target": False,
+                    "actual_commenter_display_name": r["commenter_display_name_snapshot"]
+                    or r["commenter_login_snapshot"],
+                    "vod_title": r["vod_title"],
+                    "user_color": r["user_color"],
+                }
+            )
 
         random.shuffle(questions)
 
