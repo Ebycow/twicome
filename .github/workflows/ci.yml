@@ -389,6 +389,7 @@ jobs:
           coverage xml -o test-reports/combined/coverage.xml
           cp .ci-artifacts/unit/test-reports/unit/junit.xml test-reports/combined/junit-unit.xml
           cp .ci-artifacts/integration/test-reports/integration/junit.xml test-reports/combined/junit-integration.xml
+          cp .ci-artifacts/ui/test-reports/ui/junit.xml test-reports/combined/junit-ui.xml
           {
             echo "## Coverage Summary"
             echo
@@ -407,5 +408,6 @@ jobs:
             app/test-reports/combined/coverage.txt
             app/test-reports/combined/junit-unit.xml
             app/test-reports/combined/junit-integration.xml
+            app/test-reports/combined/junit-ui.xml
           if-no-files-found: warn
           retention-days: 14
