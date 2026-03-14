@@ -29,15 +29,17 @@ def _build_cluster_display(raw_clusters, db):
         return []
     all_rep_ids = [cid for cl in raw_clusters for cid in cl["representative_ids"]]
     bodies = comment_repo.fetch_comment_bodies_by_ids(db, all_rep_ids)
-    return [
-        {
+    result = []
+    for cl in raw_clusters:
+        entry: dict = {
             "size": cl["size"],
             "centroid": cl["centroid"],
-            "member_indices": cl.get("member_indices"),  # K-means実割り当て結果
             "representatives": [bodies[cid] for cid in cl["representative_ids"] if cid in bodies],
         }
-        for cl in raw_clusters
-    ]
+        if cl.get("member_indices") is not None:
+            entry["member_indices"] = cl["member_indices"]
+        result.append(entry)
+    return result
 
 
 @router.get("/u/{login}/clusters", response_class=HTMLResponse)

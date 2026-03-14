@@ -158,7 +158,8 @@ def get_subclusters(
 
     member_indices が渡された場合はそのインデックスのみを対象にする（正確）。
 
-    Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "member_indices": [...], "centroid": [...]}, ...] または None
+    Returns: [{"cluster_id": int, "size": int, "representative_ids": [...],
+               "member_indices": [...], "centroid": [...]}, ...] または None
     """
     if not _is_enabled():
         return None

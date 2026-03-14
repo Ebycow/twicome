@@ -481,12 +481,8 @@ def cluster_members(login: str, req: ClusterMembersRequest):
             for i, idx in enumerate(req.member_indices):
                 member_vecs[i] = ui.index.reconstruct(int(idx))
             sims = (member_vecs @ centroid.reshape(-1)).tolist()
-            sorted_pairs = sorted(zip(req.member_indices, sims), key=lambda x: x[1], reverse=True)
-            member_ids = [
-                ui.comment_ids[int(idx)]
-                for idx, _ in sorted_pairs
-                if 0 <= int(idx) < len(ui.comment_ids)
-            ]
+            sorted_pairs = sorted(zip(req.member_indices, sims, strict=False), key=lambda x: x[1], reverse=True)
+            member_ids = [ui.comment_ids[int(idx)] for idx, _ in sorted_pairs if 0 <= int(idx) < len(ui.comment_ids)]
         else:
             # フォールバック: 全インデックスから近傍検索（古いクライアント互換）
             n_members = min(req.n_members, ui.index.ntotal)
