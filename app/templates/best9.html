@@ -58,16 +58,5 @@
 
     </div>
 
-    <script>
-      const shareInput = document.getElementById('share-url');
-      shareInput.value = window.location.href;
-
-      document.getElementById('copy-btn').addEventListener('click', () => {
-        navigator.clipboard.writeText(shareInput.value).then(() => {
-          const btn = document.getElementById('copy-btn');
-          btn.textContent = 'コピーしました！';
-          setTimeout(() => { btn.textContent = 'URLをコピー'; }, 2000);
-        });
-      });
-    </script>
+    <script src="{{ root_path }}/static/js/best9.js?v={{ static_version }}"></script>
 {% endblock %}

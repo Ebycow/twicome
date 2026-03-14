@@ -13,14 +13,9 @@
   <body>
     {% block body %}{% endblock %}
     {% block scripts %}{% endblock %}
+    <script type="application/json" id="app-root-path">{{ root_path | tojson }}</script>
     {% block sw_script %}
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
-        });
-      }
-    </script>
+    <script src="{{ root_path }}/static/js/base.js?v={{ static_version }}"></script>
     {% endblock %}
   </body>
 </html>
