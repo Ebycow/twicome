@@ -505,7 +505,7 @@
         <h1>コメント当てクイズ</h1>
         <div class="user-info">
           {% if user.profile_image_url %}
-          <img src="{{ user.profile_image_url }}" class="user-avatar" alt="">
+          <img src="{{ user.profile_image_url }}" class="user-avatar" alt="" width="64" height="64">
           {% endif %}
           <div style="text-align:left;">
             <div class="user-name">{{ user.display_name or user.login }}</div>

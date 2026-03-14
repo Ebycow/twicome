@@ -652,7 +652,11 @@
             data-prefetch-platform="{{ quick_link.platform }}"
           >
             {% if quick_link.profile_image_url %}
-            <img class="quick-link-icon" src="{{ quick_link.profile_image_url }}" alt="{{ quick_link.alt }}">
+            <img class="quick-link-icon"
+                 src="{{ quick_link.profile_image_url }}"
+                 alt="{{ quick_link.alt }}"
+                 width="36"
+                 height="36">
             {% else %}
             <span class="quick-link-icon quick-link-icon-fallback">{{ quick_link.alt[0] | upper }}</span>
             {% endif %}
@@ -675,7 +679,12 @@
 
       <!-- PWA Banner (mobile only) -->
       <div id="pwa-banner" class="pwa-banner" role="button" tabindex="0" aria-label="ホーム画面に追加">
-        <div class="pwa-banner-icon"><img src="{{ root_path }}/static/icons/apple-touch-icon-120x120.png" alt="ツイコメ アイコン"></div>
+        <div class="pwa-banner-icon">
+          <img src="{{ root_path }}/static/icons/apple-touch-icon-120x120.png"
+               alt="ツイコメ アイコン"
+               width="56"
+               height="56">
+        </div>
         <div class="pwa-banner-body">
           <div class="pwa-banner-title" id="pwa-banner-title">ホーム画面に追加してみよう！</div>
           <div class="pwa-banner-sub" id="pwa-banner-sub">「共有」→「ホーム画面に追加」でアプリのように使えます</div>

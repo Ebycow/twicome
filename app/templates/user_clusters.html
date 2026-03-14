@@ -206,7 +206,7 @@
           {% endif %}
         </div>
         <div class="top-links">
-          <a href="{{ request.url_for('user_stats_page', login=login) }}{% if platform != 'twitch' %}?platform={{ platform }}{% endif %}">← 統計に戻る</a>
+          <a href="{{ request.url_for('user_stats_page', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 統計に戻る</a>
         </div>
       </div>
 
@@ -218,7 +218,7 @@
       <div class="controls">
         <label>グループ数:</label>
         {% for n in [6, 8, 12, 16, 24] %}
-        <a href="?n_clusters={{ n }}{% if platform != 'twitch' %}&platform={{ platform }}{% endif %}"
+        <a href="?n_clusters={{ n }}{{ '&platform=' ~ platform if platform != 'twitch' else '' }}"
            class="n-btn {% if n_clusters == n %}active{% endif %}">{{ n }}</a>
         {% endfor %}
       </div>
@@ -243,7 +243,7 @@
                     data-size="{{ cl.size }}"
                     onclick="drillDown(this, 4)">さらに分解 →</button>
             {% if cl.size <= 200 %}
-            <form method="POST" action="{{ request.url_for('cluster_comments_page', login=login) }}" target="_blank" style="margin-top:6px;">
+            <form method="post" action="{{ request.url_for('cluster_comments_page', login=login) }}" target="_blank" style="margin-top:6px;">
               <input type="hidden" name="centroid" value="{{ cl.centroid | tojson }}">
               <input type="hidden" name="n_members" value="{{ cl.size }}">
               <input type="hidden" name="platform" value="{{ platform }}">

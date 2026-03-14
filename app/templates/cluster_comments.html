@@ -96,7 +96,7 @@
           </div>
         </div>
         <div style="display:flex; gap:16px; align-items:center;">
-          <a href="{{ request.url_for('cluster_explorer', login=login) }}{% if platform != 'twitch' %}?platform={{ platform }}{% endif %}">← 発言パターン探索に戻る</a>
+          <a href="{{ request.url_for('cluster_explorer', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 発言パターン探索に戻る</a>
         </div>
       </div>
 

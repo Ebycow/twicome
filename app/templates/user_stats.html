@@ -312,7 +312,7 @@
         </div>
         <div class="top-links">
           {% if user %}
-          <a href="{{ request.url_for('cluster_explorer', login=user.login) }}{% if platform != 'twitch' %}?platform={{ platform }}{% endif %}">発言パターン探索</a>
+          <a href="{{ request.url_for('cluster_explorer', login=user.login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">発言パターン探索</a>
           {% endif %}
           <a href="{{ request.url_for('manual_page') }}">使い方ガイド</a>
           <a href="{{ request.url_for('index') }}">← 検索に戻る</a>
@@ -453,7 +453,7 @@
                   {% endif %}
                 {% endmacro %}
                 {% macro change_cell(val) %}
-                  <span style="font-weight:bold; {% if val < 0 %}color:#e74c3c{% elif val > 0 %}color:#2ecc71{% endif %}">{{ val }}%</span>
+                  <span style="font-weight:bold;{{ ' color:#e74c3c;' if val < 0 else ' color:#2ecc71;' if val > 0 else '' }}">{{ val }}%</span>
                 {% endmacro %}
                 {% for item in impact_stats %}
                 <tr>
