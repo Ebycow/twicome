@@ -695,5 +695,7 @@ docker stats --no-stream twicome-faiss-api-1
 - [ ] 追加後に対象コメンターへの LIKE 検索レイテンシを実測する
 
 ## 開発メモ
+### LLM縛りについて
+このプロジェクトは、Kilo / Claude Code / Codex CLI を含む LLM によるコーディングのみで開発されています。  
+開発者（Ebycow）の人力の関与は、要求をLLMに伝えコードを書かせるほか、ごく一部のUIテキストの記述のみです。プロジェクトに対する開発者の全ての入力は自然言語に限られています。  
 
-このプロジェクトは、Kilo / Claude Code / Codex CLI を含む LLM を活用して開発されています。
