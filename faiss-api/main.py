@@ -257,15 +257,17 @@ class SubclusterRequest(BaseModel):
     """サブクラスタリングリクエスト。"""
 
     centroid: list[float]  # 親クラスタの正規化済み重心ベクトル
-    n_members: int  # 親クラスタのサイズ（検索上限として使用）
+    n_members: int  # 親クラスタのサイズ（member_indices が無い場合の上限）
     n_clusters: int = 4  # サブクラスタ数
+    member_indices: list[int] | None = None  # K-means割り当て済みの実メンバーインデックス
 
 
 class ClusterMembersRequest(BaseModel):
     """クラスタメンバー取得リクエスト。"""
 
     centroid: list[float]  # クラスタの正規化済み重心ベクトル
-    n_members: int  # 取得する件数
+    n_members: int  # member_indices が無い場合の取得件数
+    member_indices: list[int] | None = None  # K-means割り当て済みの実メンバーインデックス
 
 
 # --- 起動時処理 ---
@@ -384,6 +386,7 @@ def get_clusters(login: str, n_clusters: int = 8):
                     "cluster_id": int(c),
                     "size": int(len(mask)),
                     "representative_ids": rep_ids,
+                    "member_indices": mask.tolist(),  # K-means実割り当て結果
                     "centroid": centroid.tolist(),  # サブクラスタリング用
                 }
             )
@@ -405,14 +408,20 @@ def subcluster(login: str, req: SubclusterRequest):
         raise HTTPException(status_code=404, detail="index_not_available")
 
     centroid = np.array(req.centroid, dtype=np.float32).reshape(1, -1)
-    n_members = min(req.n_members, ui.index.ntotal)
-    actual_k = min(req.n_clusters, n_members)
 
     with ui.lock:
         dim = ui.index.d
-        # 親クラスタの重心に近い上位 n_members 件を取得
-        D, index = ui.index.search(centroid, n_members)
-        member_indices = index[0]
+
+        if req.member_indices is not None:
+            # K-meansで確定した実メンバーを使用（正確）
+            member_indices = np.array(req.member_indices, dtype=np.int64)
+        else:
+            # フォールバック: 近傍検索（古いクライアント互換）
+            n_members = min(req.n_members, ui.index.ntotal)
+            _, idx_arr = ui.index.search(centroid, n_members)
+            member_indices = idx_arr[0]
+
+        actual_k = min(req.n_clusters, len(member_indices))
 
         member_vecs = np.empty((len(member_indices), dim), dtype=np.float32)
         for i, idx in enumerate(member_indices):
@@ -438,11 +447,13 @@ def subcluster(login: str, req: SubclusterRequest):
             sims = sub_vecs @ sub_centroid
             top_local = np.argsort(sims)[::-1][:10]
             rep_ids = [ui.comment_ids[member_indices[sub_mask[i]]] for i in top_local]
+            sub_member_indices = [int(member_indices[i]) for i in sub_mask]
             subclusters.append(
                 {
                     "cluster_id": int(c),
                     "size": int(len(sub_mask)),
                     "representative_ids": rep_ids,
+                    "member_indices": sub_member_indices,  # K-means実割り当て結果
                     "centroid": sub_centroid.tolist(),
                 }
             )
@@ -460,11 +471,27 @@ def cluster_members(login: str, req: ClusterMembersRequest):
         raise HTTPException(status_code=404, detail="index_not_available")
 
     centroid = np.array(req.centroid, dtype=np.float32).reshape(1, -1)
-    n_members = min(req.n_members, ui.index.ntotal)
 
     with ui.lock:
-        _, index = ui.index.search(centroid, n_members)
-        member_ids = [ui.comment_ids[int(idx)] for idx in index[0] if 0 <= int(idx) < len(ui.comment_ids)]
+        if req.member_indices is not None:
+            # K-meansで確定した実メンバーを使用（正確）
+            # 重心に近い順にソートして返す
+            dim = ui.index.d
+            member_vecs = np.empty((len(req.member_indices), dim), dtype=np.float32)
+            for i, idx in enumerate(req.member_indices):
+                member_vecs[i] = ui.index.reconstruct(int(idx))
+            sims = (member_vecs @ centroid.reshape(-1)).tolist()
+            sorted_pairs = sorted(zip(req.member_indices, sims), key=lambda x: x[1], reverse=True)
+            member_ids = [
+                ui.comment_ids[int(idx)]
+                for idx, _ in sorted_pairs
+                if 0 <= int(idx) < len(ui.comment_ids)
+            ]
+        else:
+            # フォールバック: 全インデックスから近傍検索（古いクライアント互換）
+            n_members = min(req.n_members, ui.index.ntotal)
+            _, idx_arr = ui.index.search(centroid, n_members)
+            member_ids = [ui.comment_ids[int(idx)] for idx in idx_arr[0] if 0 <= int(idx) < len(ui.comment_ids)]
 
     return {"comment_ids": member_ids}
 

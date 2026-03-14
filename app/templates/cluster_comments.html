@@ -15,6 +15,18 @@
             {{ login }}{% if user and user.display_name %}（{{ user.display_name }}）{% endif %}
             — {{ comments | length }} 件
           </div>
+          {% if cluster_path %}
+          <div class="meta cluster-path">
+            {% set indices = cluster_path.split(',') %}
+            {% for idx in indices %}
+              {% if loop.first %}
+                {{ n_clusters_top }}グループ分類の #{{ idx | int + 1 }}
+              {% else %}
+                → サブグループ #{{ idx | int + 1 }}
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
         <div style="display:flex; gap:16px; align-items:center;">
           <a href="{{ request.url_for('cluster_explorer', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 発言パターン探索に戻る</a>

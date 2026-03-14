@@ -51,14 +51,12 @@
             <button class="drill-btn"
                     data-centroid="{{ cl.centroid | tojson }}"
                     data-size="{{ cl.size }}"
-                    onclick="drillDown(this, 4)">さらに分解 →</button>
+                    data-path="{{ loop.index0 }}"
+                    data-member-indices="{{ cl.member_indices | tojson if cl.member_indices else 'null' }}"
+                    onclick="drillDown(this, 4, this.dataset.path)">さらに分解 →</button>
             {% if cl.size <= 200 %}
-            <form method="post" action="{{ request.url_for('cluster_comments_page', login=login) }}" target="_blank" style="margin-top:6px;">
-              <input type="hidden" name="centroid" value="{{ cl.centroid | tojson }}">
-              <input type="hidden" name="n_members" value="{{ cl.size }}">
-              <input type="hidden" name="platform" value="{{ platform }}">
-              <button type="submit" class="view-btn">コメント一覧を見る ({{ cl.size }} 件)</button>
-            </form>
+            <a href="{{ request.url_for('cluster_comments_page', login=login) }}?n_clusters={{ n_clusters }}&path={{ loop.index0 }}{{ '&platform=' ~ platform if platform != 'twitch' else '' }}"
+               target="_blank" class="view-btn">コメント一覧を見る ({{ cl.size }} 件)</a>
             {% endif %}
           </div>
         </div>
@@ -72,6 +70,7 @@
 
     <script type="application/json" id="clusters-login-data">{{ login | tojson }}</script>
     <script type="application/json" id="clusters-platform-data">{{ platform | tojson }}</script>
+    <script type="application/json" id="clusters-n-data">{{ n_clusters }}</script>
     <script src="{{ root_path }}/static/js/user-clusters.js?v={{ static_version }}"></script>
 {% endblock %}
 

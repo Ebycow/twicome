@@ -1,0 +1,2 @@
+lintとtestはdocker-compose.dev.ymlで実行
+docker-compose.dev.ymlはtwicome/app/ではなくtwicomeルートディレクトリにある

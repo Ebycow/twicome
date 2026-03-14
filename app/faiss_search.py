@@ -115,17 +115,28 @@ def get_clusters(login: str, n_clusters: int = 8) -> list[dict] | None:
         raise RuntimeError(f"faiss get_clusters failed: {e}") from e
 
 
-def get_cluster_members(login: str, centroid: list[float], n_members: int) -> list[str] | None:
-    """クラスタの重心に近い上位 n_members 件のコメントIDを返す。
+def get_cluster_members(
+    login: str,
+    centroid: list[float],
+    n_members: int,
+    member_indices: list[int] | None = None,
+) -> list[str] | None:
+    """クラスタメンバーのコメントIDを返す。
+
+    member_indices が渡された場合はそのインデックスのみを対象にする（正確）。
+    渡されない場合は重心近傍をグローバル検索するフォールバック（不正確）。
 
     Returns: [comment_id, ...] または None
     """
     if not _is_enabled():
         return None
     try:
+        payload: dict = {"centroid": centroid, "n_members": n_members}
+        if member_indices is not None:
+            payload["member_indices"] = member_indices
         resp = requests.post(
             f"{FAISS_API_URL}/index/cluster_members/{login}",
-            json={"centroid": centroid, "n_members": n_members},
+            json=payload,
             timeout=30,
         )
         if resp.status_code == 404:
@@ -136,17 +147,28 @@ def get_cluster_members(login: str, centroid: list[float], n_members: int) -> li
         raise RuntimeError(f"faiss get_cluster_members failed: {e}") from e
 
 
-def get_subclusters(login: str, centroid: list[float], n_members: int, n_clusters: int = 4) -> list[dict] | None:
+def get_subclusters(
+    login: str,
+    centroid: list[float],
+    n_members: int,
+    n_clusters: int = 4,
+    member_indices: list[int] | None = None,
+) -> list[dict] | None:
     """親クラスタの重心ベクトルを使ってサブクラスタリングを行う。
 
-    Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "centroid": [...]}, ...] または None
+    member_indices が渡された場合はそのインデックスのみを対象にする（正確）。
+
+    Returns: [{"cluster_id": int, "size": int, "representative_ids": [...], "member_indices": [...], "centroid": [...]}, ...] または None
     """
     if not _is_enabled():
         return None
     try:
+        payload: dict = {"centroid": centroid, "n_members": n_members, "n_clusters": n_clusters}
+        if member_indices is not None:
+            payload["member_indices"] = member_indices
         resp = requests.post(
             f"{FAISS_API_URL}/index/subcluster/{login}",
-            json={"centroid": centroid, "n_members": n_members, "n_clusters": n_clusters},
+            json=payload,
             timeout=120,
         )
         if resp.status_code == 404:

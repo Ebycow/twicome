@@ -120,6 +120,8 @@
       .drill-btn:hover { background: var(--btn-hover); }
       .drill-btn:disabled { opacity: 0.5; cursor: default; }
       .view-btn {
+        display: block;
+        box-sizing: border-box;
         margin-top: 6px;
         padding: 5px 12px;
         border: 1px solid var(--link-color);
@@ -129,6 +131,8 @@
         cursor: pointer;
         font-size: 0.82rem;
         width: 100%;
+        text-align: center;
+        text-decoration: none;
       }
       .view-btn:hover { opacity: 0.75; }
 
