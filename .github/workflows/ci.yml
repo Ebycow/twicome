@@ -79,7 +79,7 @@ jobs:
       - name: Run Ruff format check
         run: ruff format . --check
 
-      - name: Run HTML/Jinja lint warnings
+      - name: Run HTML/Jinja lint
         run: djlint app/templates --lint
 
   # ── ユニットテスト（DB不要、高速） ──────────────────────────────────────────
