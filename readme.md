@@ -244,11 +244,14 @@ COMPOSE_DATABASE_URL="mysql+pymysql://appuser:apppass@host.docker.internal:3306/
 app/tests/
 ├── unit/
 │   └── test_comment_utils.py       # 純粋関数テスト（DB 不要・高速）
-└── integration/
-    ├── test_user_repo.py           # user_repo の SQL 検証
-    ├── test_comment_repo.py        # comment_repo の SQL 検証
-    ├── test_http.py                # API の契約テスト（ステータス・JSON 構造）
-    └── test_html.py                # HTML レンダリング・UI 構造テスト
+├── integration/
+│   ├── test_user_repo.py           # user_repo の SQL 検証
+│   ├── test_comment_repo.py        # comment_repo の SQL 検証
+│   ├── test_http.py                # API の契約テスト（ステータス・JSON 構造）
+│   └── test_html.py                # HTML レンダリング・UI 構造テスト
+└── ui/
+    ├── test_index_page.py          # Playwright によるトップページ UI テスト
+    └── test_user_comments_page.py  # Playwright によるコメントページ UI テスト
 ```
 
 テスト用 DB は `appdb_test`（本番・開発 DB とは別）を使います。
@@ -257,7 +260,7 @@ app/tests/
 ### Docker Compose でテストを実行する（推奨）
 
 ```bash
-# 全テスト（unit + integration）
+# 通常テスト（unit + integration）
 docker compose -f docker-compose.dev.yml run --rm test
 
 # unit テストのみ（DB 不要、高速）
@@ -272,10 +275,14 @@ docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration/
 # カバレッジ付き
 docker compose -f docker-compose.dev.yml run --rm test \
   pytest --cov=. --cov-config=.coveragerc --cov-report=term-missing
+
+# UI テスト（Playwright）
+docker compose -f docker-compose.dev.yml run --rm test-ui
 ```
 
 `appdb_test` は `db` サービスの healthcheck 時に自動作成・権限付与されます。
 `db` サービスが起動済みであれば `test` サービスは即時実行できます。
+Playwright を使う `tests/ui` は別サービス `test-ui` で実行してください。
 
 ### ローカル（仮想環境）でテストを実行する
 

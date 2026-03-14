@@ -158,7 +158,7 @@ services:
 
   # ── テスト実行用サービス ────────────────────────────────────────────────────
   # 使い方:
-  #   全テスト:        docker compose -f docker-compose.dev.yml run --rm test
+  #   通常テスト:      docker compose -f docker-compose.dev.yml run --rm test
   #   ユニットのみ:    docker compose -f docker-compose.dev.yml run --rm test pytest tests/unit
   #   統合テストのみ:  docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
   test:
