@@ -58,8 +58,8 @@
   let commentsPrefetchTransportMode = 'direct-fetch';
 
   /**
-   *
-   * @param timeoutMs
+   * @param timeoutMs - タイムアウトまでの待機時間（ミリ秒、デフォルト3000）
+   * @returns ServiceWorkerがcontrollerを取得できたかどうかを表すPromise
    */
   function waitForServiceWorkerControl(timeoutMs) {
     timeoutMs = timeoutMs || 3000;
@@ -74,8 +74,8 @@
         navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
         resolve(controlled);
       };
-      var onControllerChange = function () { finish(Boolean(navigator.serviceWorker.controller)); };
-      var timerId = window.setTimeout(function () { finish(Boolean(navigator.serviceWorker.controller)); }, timeoutMs);
+      const onControllerChange = function () { finish(Boolean(navigator.serviceWorker.controller)); };
+      const timerId = window.setTimeout(function () { finish(Boolean(navigator.serviceWorker.controller)); }, timeoutMs);
       navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
     });
   }
@@ -96,18 +96,18 @@
     : Promise.resolve(null);
 
   /**
-   *
-   * @param template
-   * @param login
+   * @param template - `__LOGIN_PLACEHOLDER__` を含むパステンプレート
+   * @param login - 置換するログイン名
+   * @returns ログイン名を埋め込んだパス文字列
    */
   function pathForLogin(template, login) {
     return template.replace('__LOGIN_PLACEHOLDER__', encodeURIComponent(login));
   }
 
   /**
-   *
-   * @param login
-   * @param platform
+   * @param login - ユーザのログイン名
+   * @param platform - プラットフォーム名（デフォルト: 'twitch'）
+   * @returns コメントページのURL文字列
    */
   function buildCommentsUrl(login, platform) {
     platform = platform || 'twitch';
@@ -115,9 +115,9 @@
   }
 
   /**
-   *
-   * @param login
-   * @param platform
+   * @param login - ユーザのログイン名
+   * @param platform - プラットフォーム名（デフォルト: 'twitch'）
+   * @returns 正規化されたプリフェッチキー文字列
    */
   function normalizePrefetchKey(login, platform) {
     platform = platform || 'twitch';
@@ -145,8 +145,8 @@
   }
 
   /**
-   *
-   * @param url
+   * @param url - プリフェッチ対象のコメントページURL
+   * @returns プリフェッチ完了を表すPromise
    */
   function prefetchCommentPageViaServiceWorker(url) {
     return commentsPrefetchTransportReadyPromise.then(function (registration) {
@@ -169,9 +169,8 @@
   }
 
   /**
-   *
-   * @param login
-   * @param platform
+   * @param login - プリフェッチ対象ユーザのログイン名
+   * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    */
   async function prefetchCommentPage(login, platform) {
     platform = platform || 'twitch';
@@ -235,9 +234,8 @@
   }
 
   /**
-   *
-   * @param login
-   * @param platform
+   * @param login - キューに追加するユーザのログイン名
+   * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    */
   function queueCommentPrefetch(login, platform) {
     platform = platform || 'twitch';
@@ -293,17 +291,15 @@
   }
 
   /**
-   *
-   * @param link
-   * @param enabled
+   * @param link - 状態を変更するリンク要素
+   * @param enabled - trueなら有効、falseなら無効（aria-disabled）
    */
   function setLinkState(link, enabled) {
     link.setAttribute('aria-disabled', String(!enabled));
   }
 
   /**
-   *
-   * @param enabled
+   * @param enabled - trueなら統計・クイズリンクを有効化、falseなら無効化
    */
   function setActionLinkState(enabled) {
     const disabled = String(!enabled);
@@ -312,8 +308,7 @@
   }
 
   /**
-   *
-   * @param login
+   * @param login - リンク先を設定するユーザのログイン名
    */
   function setActionLinks(login) {
     statsLink.href = `${pathForLogin(statsPathTemplate, login)  }?platform=twitch`;
@@ -321,8 +316,7 @@
   }
 
   /**
-   *
-   * @param message
+   * @param message - 候補リストに表示するメッセージ文字列
    */
   function showCandidateMessage(message) {
     loginSearchResults.innerHTML = `<div class="search-empty">${  message  }</div>`;
@@ -337,9 +331,9 @@
   }
 
   /**
-   *
-   * @param route
-   * @param login
+   * @param route - チェック対象のルート名（'comments', 'stats', 'quiz'）
+   * @param login - ユーザのログイン名
+   * @returns オフラインでアクセス可能かどうか
    */
   function hasOfflineRouteAccess(route, login) {
     if (!offlineMode) {return true;}
@@ -347,7 +341,7 @@
   }
 
   /**
-   *
+   * @returns オフラインでコメントページを開けるユーザ数
    */
   function countOfflineCommentUsers() {
     if (!usersLoaded) {return offlineAccessibleRoutes.comments.size;}
@@ -373,8 +367,7 @@
   }
 
   /**
-   *
-   * @param opts
+   * @param opts - オプション（`rerender: true` で候補リストを再描画）
    */
   function refreshOfflineState(opts) {
     opts = opts || {};
@@ -387,8 +380,7 @@
   }
 
   /**
-   *
-   * @param rawUsers
+   * @param rawUsers - APIから受け取ったユーザ配列
    */
   function hydrateUsers(rawUsers) {
     const normalizedUsers = Array.isArray(rawUsers) ? rawUsers.map(function (user) {
@@ -419,7 +411,7 @@
   }
 
   /**
-   *
+   * @returns ユーザインデックスの読み込み完了を表すPromise
    */
   async function ensureUsersLoaded() {
     if (usersLoaded) {return indexedUsers;}
@@ -443,8 +435,8 @@
   }
 
   /**
-   *
-   * @param isoStr
+   * @param isoStr - ISO形式の日時文字列
+   * @returns 表示用の相対時間文字列。日時がない場合はnull
    */
   function formatRelativeTime(isoStr) {
     if (!isoStr) {return null;}
@@ -461,8 +453,8 @@
   }
 
   /**
-   *
-   * @param user
+   * @param user - 候補表示に使うユーザ情報オブジェクト
+   * @returns 候補一覧に表示するラベル文字列
    */
   function formatCandidateLabel(user) {
     if (!user.displayName || user.displayLower === user.loginLower) {return user.login;}
@@ -470,8 +462,8 @@
   }
 
   /**
-   *
-   * @param input
+   * @param input - 入力欄に現在入っている文字列
+   * @returns 一意に解決できたログイン名。解決できない場合は空文字列
    */
   function resolveLogin(input) {
     if (!usersLoaded) {return '';}
@@ -485,8 +477,8 @@
   }
 
   /**
-   *
-   * @param users
+   * @param users - フィルタ前のユーザ配列
+   * @returns 配信者フィルタ適用後のユーザ配列
    */
   function applyStreamerFilter(users) {
     if (streamerFilterSet === null) {return users;}
@@ -495,8 +487,8 @@
   }
 
   /**
-   *
-   * @param users
+   * @param users - フィルタ前のユーザ配列
+   * @returns オフライン閲覧可能なユーザだけに絞った配列
    */
   function applyOfflineAvailabilityFilter(users) {
     if (!offlineMode) {return users;}
@@ -504,8 +496,8 @@
   }
 
   /**
-   *
-   * @param users
+   * @param users - 並び替え対象のユーザ配列
+   * @returns 現在のソート条件で並び替えた新しい配列
    */
   function applySort(users) {
     const sorted = users.slice();
@@ -525,8 +517,8 @@
   }
 
   /**
-   *
-   * @param input
+   * @param input - 検索欄に入力された文字列
+   * @returns 表示候補となるユーザ配列
    */
   function getCandidates(input) {
     const q = input.trim().toLowerCase();
@@ -560,8 +552,8 @@
   }
 
   /**
-   *
-   * @param user
+   * @param user - 候補として描画するユーザ情報
+   * @returns 候補一覧に追加するボタン要素
    */
   function buildCandidateItem(user) {
     const btn = document.createElement('button');
@@ -618,8 +610,7 @@
   function hideCandidates() { loginSearchResults.hidden = true; }
 
   /**
-   *
-   * @param login
+   * @param login - 選択されたユーザのログイン名
    */
   function selectLogin(login) {
     loginInput.value = login;
@@ -632,8 +623,7 @@
   }
 
   /**
-   *
-   * @param input
+   * @param input - 候補抽出に使う現在の入力値
    */
   async function renderCandidates(input) {
     if (!usersLoaded) {showCandidateMessage('候補を読み込み中...');}

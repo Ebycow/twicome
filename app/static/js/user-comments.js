@@ -54,8 +54,8 @@
   let isSpecialMode = false;
 
   /**
-   *
-   * @param str
+   * @param str - HTMLエスケープする文字列
+   * @returns HTMLエスケープ済みの文字列
    */
   function escapeHtml(str) {
     if (str == null) {return '';}
@@ -68,8 +68,8 @@
   }
 
   /**
-   *
-   * @param comment
+   * @param comment - 描画対象のコメントオブジェクト
+   * @returns コメント本文として表示するHTML文字列
    */
   function renderBody(comment) {
     if (comment && comment.body_html) {return comment.body_html;}
@@ -77,8 +77,8 @@
   }
 
   /**
-   *
-   * @param comment
+   * @param comment - コミュニティノート情報を含むコメントオブジェクト
+   * @returns コミュニティノート表示用のHTML文字列
    */
   function renderCommunityNote(comment) {
     if (!comment.community_note_body) {return '';}
@@ -115,9 +115,9 @@
   }
 
   /**
-   *
-   * @param comment
-   * @param options
+   * @param comment - 描画対象のコメントオブジェクト
+   * @param options - バッジ表示や強調表示を切り替える描画オプション
+   * @returns コメントリンク要素とコメント本体要素
    */
   function createCommentElement(comment, options) {
     options = options || {};
@@ -162,9 +162,8 @@
   }
 
   /**
-   *
-   * @param page
-   * @param cursor
+   * @param page - 現在表示中として反映するページ番号
+   * @param cursor - URLに残すカーソルID。未指定ならpageを使う
    */
   function updateURL(page, cursor) {
     const url = new URL(window.location);
@@ -192,10 +191,10 @@
   }
 
   /**
-   *
-   * @param commentId
-   * @param likesCount
-   * @param dislikesCount
+   * @param commentId - 対象コメントのID
+   * @param likesCount - いいね数
+   * @param dislikesCount - 疑問票数
+   * @returns 投票ボタン一式のHTML文字列
    */
   function renderVoteButtonsMarkup(commentId, likesCount, dislikesCount) {
     const safeCommentId = escapeHtml(commentId);
@@ -206,11 +205,10 @@
   }
 
   /**
-   *
-   * @param container
-   * @param commentId
-   * @param likesCount
-   * @param dislikesCount
+   * @param container - 投票ボタンを書き込むコンテナ要素
+   * @param commentId - 対象コメントのID
+   * @param likesCount - いいね数
+   * @param dislikesCount - 疑問票数
    */
   function setVoteControls(container, commentId, likesCount, dislikesCount) {
     if (!container) {return;}
@@ -218,8 +216,7 @@
   }
 
   /**
-   *
-   * @param containers
+   * @param containers - 遅延ハイドレーション対象の投票コンテナ配列
    */
   async function hydrateDeferredVoteControls(containers) {
     const targets = (containers || []).filter(function (container) { return container && container.dataset.commentId; });
@@ -266,10 +263,9 @@
   }
 
   /**
-   *
-   * @param page
-   * @param direction
-   * @param reset
+   * @param page - 読み込むページ番号
+   * @param direction - コメントの挿入方向（`append` または `prepend`）
+   * @param reset - trueなら既存一覧をリセットして再描画する
    */
   async function loadComments(page, direction, reset) {
     direction = direction || 'append';
@@ -368,8 +364,7 @@
   }
 
   /**
-   *
-   * @param button
+   * @param button - コンフェティを発生させる基点のボタン要素
    */
   function spawnConfetti(button) {
     const rect = button.getBoundingClientRect();
@@ -400,10 +395,9 @@
   const VOTE_DEBOUNCE_MS = 500;
 
   /**
-   *
-   * @param button
-   * @param commentId
-   * @param type
+   * @param button - クリックされた投票ボタン要素
+   * @param commentId - 投票対象コメントのID
+   * @param type - 投票種別（`like` または `dislike`）
    */
   function vote(button, commentId, type) {
     spawnConfetti(button);
@@ -425,8 +419,7 @@
   }
 
   /**
-   *
-   * @param key
+   * @param key - 投票バッファを識別する `{commentId}-{type}` 形式のキー
    */
   async function flushVote(key) {
     const pending = votePending.get(key);
@@ -451,9 +444,8 @@
   const best9Bar = document.getElementById('best9-bar');
 
   /**
-   *
-   * @param commentId
-   * @param commentDiv
+   * @param commentId - Best9候補として保存するコメントID
+   * @param commentDiv - コメント本文を抽出するDOM要素
    */
   function captureBest9Text(commentId, commentDiv) {
     if (best9Data.has(commentId)) {return;}
@@ -462,8 +454,7 @@
   }
 
   /**
-   *
-   * @param commentDiv
+   * @param commentDiv - Best9操作ボタンを追加するコメント要素
    */
   function addBest9Button(commentDiv) {
     if (commentDiv.querySelector('.best9-add-btn')) {return;}
@@ -505,10 +496,9 @@
   }
 
   /**
-   *
-   * @param commentId
-   * @param btn
-   * @param commentDiv
+   * @param commentId - 切り替え対象のコメントID
+   * @param btn - 状態表示を更新するBest9ボタン要素
+   * @param commentDiv - 選択状態を反映するコメント要素
    */
   function toggleBest9(commentId, btn, commentDiv) {
     if (best9Selected.has(commentId)) {
@@ -532,8 +522,8 @@
   }
 
   /**
-   *
-   * @param idArray
+   * @param idArray - URL短縮用に圧縮するコメントID配列
+   * @returns deflate圧縮したID文字列。未対応時はnull
    */
   async function compressIds(idArray) {
     if (!window.CompressionStream) {return null;}
@@ -560,7 +550,7 @@
   }
 
   /**
-   *
+   * @returns 現在のBest9共有URL
    */
   async function buildBest9Url() {
     const z = await compressIds(best9List);
@@ -659,7 +649,7 @@
     if (!grid) {return;}
     grid.innerHTML = '';
     for (let i = 0; i < 9; i++) {
-      var slot = document.createElement('div');
+      const slot = document.createElement('div');
       const id = best9List[i];
       if (id) {
         slot.className = 'best9-slot filled';
@@ -693,8 +683,7 @@
   }
 
   /**
-   *
-   * @param e
+   * @param e - ドラッグ開始イベント
    */
   function onSlotDragStart(e) {
     dragSrcIndex = parseInt(this.dataset.index);
@@ -703,8 +692,7 @@
   }
 
   /**
-   *
-   * @param e
+   * @param e - ドラッグオーバーイベント
    */
   function onSlotDragOver(e) {
     if (!this.classList.contains('filled')) {return;}
@@ -719,8 +707,7 @@
   function onSlotDragLeave() { this.classList.remove('drag-over'); }
 
   /**
-   *
-   * @param e
+   * @param e - ドロップイベント
    */
   function onSlotDrop(e) {
     e.preventDefault();
@@ -756,9 +743,8 @@
   const similarStatus = document.getElementById('similar-status');
 
   /**
-   *
-   * @param items
-   * @param badgeHtml
+   * @param items - 特殊検索結果として表示するコメント配列
+   * @param badgeHtml - 各コメントに付けるバッジHTML、または生成関数
    */
   function renderSearchResults(items, badgeHtml) {
     listElement.innerHTML = '';
@@ -840,14 +826,14 @@
   }
 
   // 典型度スライダー
-  var centroidDetails = document.getElementById('centroid-details');
-  var emotionDetails = document.getElementById('emotion-details');
+  const centroidDetails = document.getElementById('centroid-details');
+  const emotionDetails = document.getElementById('emotion-details');
   const centroidSlider = document.getElementById('centroid-slider');
   const centroidVal = document.getElementById('centroid-val');
   const centroidSearchBtn = document.getElementById('centroid-search-btn');
-  var centroidClear = document.getElementById('centroid-clear');
+  const centroidClear = document.getElementById('centroid-clear');
   const centroidClearBtn = document.getElementById('centroid-clear-btn');
-  var centroidStatus = document.getElementById('centroid-status');
+  const centroidStatus = document.getElementById('centroid-status');
   const centroidTopK = document.getElementById('centroid-top-k');
 
   if (centroidSlider) {
@@ -868,7 +854,10 @@
         isSpecialMode = true;
         centroidClear.style.display = 'block';
         centroidDetails.open = true;
-        const posLabel = position < 0.3 ? '典型的な発言' : position > 0.7 ? '珍しい発言' : '中間の発言';
+        let posLabel;
+        if (position < 0.3) { posLabel = '典型的な発言'; }
+        else if (position > 0.7) { posLabel = '珍しい発言'; }
+        else { posLabel = '中間の発言'; }
         centroidStatus.textContent = `${posLabel  } - ${  data.items.length  } 件`;
         renderSearchResults(data.items, function (c) {
           return `<span class="centroid-badge">重心類似度: ${  (c.similarity_score * 100).toFixed(1)  }%</span>`;
@@ -888,9 +877,9 @@
   const emotionSliders = document.querySelectorAll('#emotion-sliders input[type="range"]');
   const emotionSearchBtn = document.getElementById('emotion-search-btn');
   const emotionResetBtn = document.getElementById('emotion-reset-btn');
-  var emotionClear = document.getElementById('emotion-clear');
+  const emotionClear = document.getElementById('emotion-clear');
   const emotionClearBtn = document.getElementById('emotion-clear-btn');
-  var emotionStatus = document.getElementById('emotion-status');
+  const emotionStatus = document.getElementById('emotion-status');
   const emotionTopK = document.getElementById('emotion-top-k');
 
   if (emotionSliders.length) {
@@ -994,14 +983,14 @@
     let isRefreshing = false;
 
     /**
-     *
-     * @param version
+     * @param version - データバージョン文字列
+     * @returns 付加情報を除いた基底バージョン文字列
      */
     function versionBase(version) { return String(version || '').split(':')[0]; }
 
     /**
-     *
-     * @param version
+     * @param version - 表示対象のデータバージョン文字列
+     * @returns バナー表示用に整形したバージョン文字列
      */
     function formatVersion(version) {
       const base = versionBase(version);
@@ -1012,8 +1001,7 @@
     }
 
     /**
-     *
-     * @param visible
+     * @param visible - trueならバナーを表示し、falseなら非表示にする
      */
     function setBannerVisible(visible) {
       banner.hidden = !visible;
@@ -1021,8 +1009,7 @@
     }
 
     /**
-     *
-     * @param latestVersion
+     * @param latestVersion - サーバ側で取得した最新データバージョン
      */
     function showUpdateNotice(latestVersion) {
       if (!latestVersion || latestVersion === currentDataVersion) {return;}
@@ -1036,7 +1023,7 @@
     function hideUpdateNotice() { setBannerVisible(false); }
 
     /**
-     *
+     * @returns 現在ページに対応する削除候補キャッシュキーの配列
      */
     function getCurrentPageCacheCandidates() {
       const currentUrl = new URL(window.location.href);
@@ -1051,7 +1038,7 @@
     }
 
     /**
-     *
+     * @returns 現在ページに関連するキャッシュ削除が完了したかどうか
      */
     async function clearCurrentPageCaches() {
       if (!('caches' in window)) {return false;}
@@ -1068,8 +1055,8 @@
     }
 
     /**
-     *
-     * @param targetUrl
+     * @param targetUrl - Service Worker経由で更新したいページURL
+     * @returns Service Workerによる更新が成功したかどうか
      */
     async function refreshViaServiceWorker(targetUrl) {
       if (!('serviceWorker' in navigator)) {return false;}
@@ -1148,8 +1135,8 @@
     }
 
     /**
-     *
-     * @param offsetDays
+     * @param offsetDays - 当日からの加減日数
+     * @returns JST基準の `YYYY-MM-DD` 形式日付文字列
      */
     function getJSTDate(offsetDays) {
       const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -1158,8 +1145,7 @@
     }
 
     /**
-     *
-     * @param params
+     * @param params - エクスポートURLに付与するクエリパラメータ
      */
     function doExport(params) {
       const url = new URL(`${location.origin + rootPath  }/u/${  encodeURIComponent(userLogin)  }/export`);

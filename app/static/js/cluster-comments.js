@@ -4,8 +4,8 @@
   const voteCountsApiUrl = `${rootPath  }/api/comments/votes`;
 
   /**
-   *
-   * @param str
+   * @param str - エスケープ対象の文字列
+   * @returns HTMLエスケープされた文字列
    */
   function escapeHtml(str) {
     if (str == null) {return '';}
@@ -18,8 +18,7 @@
   }
 
   /**
-   *
-   * @param button
+   * @param button - コンフェティの発生起点となるボタン要素
    */
   function spawnConfetti(button) {
     const rect = button.getBoundingClientRect();
@@ -50,10 +49,9 @@
   const VOTE_DEBOUNCE_MS = 500;
 
   /**
-   *
-   * @param button
-   * @param commentId
-   * @param type
+   * @param button - クリックされた投票ボタン要素
+   * @param commentId - 投票対象のコメントID
+   * @param type - 投票種別（'like' または 'dislike'）
    */
   function vote(button, commentId, type) {
     spawnConfetti(button);
@@ -79,8 +77,7 @@
   }
 
   /**
-   *
-   * @param key
+   * @param key - 投票キー（`{commentId}-{type}` 形式）
    */
   async function flushVote(key) {
     const pending = votePending.get(key);
@@ -100,11 +97,10 @@
   }
 
   /**
-   *
-   * @param container
-   * @param commentId
-   * @param likesCount
-   * @param dislikesCount
+   * @param container - 投票ボタンを挿入するコンテナ要素
+   * @param commentId - コメントID
+   * @param likesCount - 現在のいいね数
+   * @param dislikesCount - 現在の？数
    */
   function setVoteControls(container, commentId, likesCount, dislikesCount) {
     if (!container) {return;}
@@ -115,8 +111,7 @@
   }
 
   /**
-   *
-   * @param containers
+   * @param containers - 遅延ハイドレーション対象のコンテナ要素の配列
    */
   async function hydrateDeferredVoteControls(containers) {
     const targets = (containers || []).filter(function (c) { return c && c.dataset.commentId; });

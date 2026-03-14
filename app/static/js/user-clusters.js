@@ -7,9 +7,8 @@
   const SUBCLUSTER_URL = `${location.pathname  }/subcluster`;
 
   /**
-   *
-   * @param btn
-   * @param nClusters
+   * @param btn - ドリルダウンボタン要素
+   * @param nClusters - サブクラスタ数
    */
   async function drillDown(btn, nClusters) {
     const centroid = JSON.parse(btn.dataset.centroid);

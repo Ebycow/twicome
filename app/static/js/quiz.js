@@ -48,8 +48,8 @@
   let answering = false;
 
   /**
-   *
-   * @param s
+   * @param s - エスケープ対象の文字列
+   * @returns HTMLエスケープされた文字列
    */
   function escapeHtml(s) {
     if (s == null) {return '';}
@@ -89,8 +89,7 @@
   }
 
   /**
-   *
-   * @param el
+   * @param el - アニメーションさせるコンフェティ要素
    */
   function animateConfetti(el) {
     const drift = (Math.random()-0.5)*200;
@@ -193,8 +192,7 @@
   btnOther.addEventListener('click', function () { handleAnswer(false); });
 
   /**
-   *
-   * @param guessedTarget
+   * @param guessedTarget - trueなら「この配信者の発言」と回答、falseなら「他の人の発言」と回答
    */
   function handleAnswer(guessedTarget) {
     if (answering) {return;}
@@ -215,8 +213,7 @@
   }
 
   /**
-   *
-   * @param q
+   * @param q - 正解した問題オブジェクト
    */
   function onCorrect(q) {
     score++; totalCorrect++; streak++;
@@ -231,8 +228,7 @@
   }
 
   /**
-   *
-   * @param q
+   * @param q - 不正解だった問題オブジェクト
    */
   function onWrong(q) {
     totalWrong++; lives--; streak = 0;
@@ -265,10 +261,9 @@
   }
 
   /**
-   *
-   * @param el
-   * @param target
-   * @param duration
+   * @param el - 数値を表示するDOM要素
+   * @param target - カウントアップの目標値
+   * @param duration - アニメーション時間（ミリ秒）
    */
   function animateCountUp(el, target, duration) {
     const start = performance.now();

@@ -268,7 +268,11 @@
                 afterBody (context) {
                   const idx = context[0].dataIndex;
                   const item = impactData[idx];
-                  const sig = item.p_value < 0.001 ? '***' : item.p_value < 0.01 ? '**' : item.p_value < 0.05 ? '*' : 'n.s.';
+                  let sig;
+                  if (item.p_value < 0.001) { sig = '***'; }
+                  else if (item.p_value < 0.01) { sig = '**'; }
+                  else if (item.p_value < 0.05) { sig = '*'; }
+                  else { sig = 'n.s.'; }
                   return `コメント変化率: ${  item.comment_change  }% (${  sig  }, p=${  item.p_value  })\n人数変化率: ${  item.unique_change  }% (p=${  item.p_value_unique  })`;
                 }
               }
