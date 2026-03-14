@@ -70,14 +70,27 @@ jobs:
           cache: "pip"
           cache-dependency-path: app/requirements.txt
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
       - name: Install dependencies
         run: pip install -r app/requirements.txt
+
+      - name: Install JS dependencies
+        run: npm ci
 
       - name: Run Ruff lint
         run: ruff check .
 
       - name: Run Ruff format check
         run: ruff format . --check
+
+      - name: Run JS lint
+        run: npx eslint app/static/js/
 
       - name: Run HTML/Jinja lint
         run: djlint app/templates --lint
