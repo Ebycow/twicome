@@ -27,6 +27,7 @@
 
   const statsLink = document.getElementById('stats-link');
   const quizLink = document.getElementById('quiz-link');
+  const goBtn = document.getElementById('go-btn');
   const quickLinkElements = Array.from(document.querySelectorAll('.quick-link[data-prefetch-login]'));
   const streamerFilter = document.getElementById('streamer-filter');
   const sortSelect = document.getElementById('sort-select');
@@ -714,10 +715,12 @@
 
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
+    if (goBtn) { goBtn.disabled = true; }
     try { await ensureUsersLoaded(); } catch (_) {
       loginInput.setCustomValidity('候補の読み込みに失敗しました。しばらくしてから再度お試しください');
       loginInput.reportValidity();
       loginInput.focus();
+      if (goBtn) { goBtn.disabled = false; }
       return;
     }
     if (offlineMode) {refreshOfflineAccessibleRoutes();}
@@ -729,6 +732,7 @@
       : '候補からTwitchユーザを選択してください');
     loginInput.reportValidity();
     loginInput.focus();
+    if (goBtn) { goBtn.disabled = false; }
   });
 
   if (streamerFilter) {

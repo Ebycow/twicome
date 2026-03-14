@@ -60,7 +60,7 @@ def build_index_context(db, data_version: str) -> dict:
     popular_comments = build_popular_comments(db)
     return {
         "selected_login": DEFAULT_LOGIN or "",
-        "selected_login_for_links": "__LOGIN_PLACEHOLDER__",
+        "selected_login_for_links": DEFAULT_LOGIN or "",
         "popular_comments": popular_comments,
         "quick_links": landing["quick_links"],
         "streamers": landing["streamers"],

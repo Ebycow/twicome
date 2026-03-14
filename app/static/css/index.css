@@ -229,7 +229,8 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       }
       .btn:active { transform: translateY(0); }
-      .btn[aria-disabled="true"] {
+      .btn[aria-disabled="true"],
+      .btn:disabled {
         opacity: 0.55;
         pointer-events: none;
       }
