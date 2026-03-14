@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}ツイコメ{% endblock %}</title>
+    {% include "partials/_head_meta_icons.html" %}
+    {% block extra_head %}{% endblock %}
+    {% block styles %}{% endblock %}
+  </head>
+  <body>
+    {% block body %}{% endblock %}
+    {% block scripts %}{% endblock %}
+    {% block sw_script %}
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
+        });
+      }
+    </script>
+    {% endblock %}
+  </body>
+</html>

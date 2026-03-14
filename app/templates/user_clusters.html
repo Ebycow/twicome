@@ -1,10 +1,8 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>発言パターン探索 - {{ user.login if user else 'Unknown' }}</title>
-    {% include "partials/_head_meta_icons.html" %}
+{% extends "base.html" %}
+
+{% block title %}発言パターン探索 - {{ user.login if user else 'Unknown' }}{% endblock %}
+
+{% block styles %}
     <style>
       :root {
         --bg-color: #ffffff;
@@ -196,8 +194,9 @@
         .clusters-grid { grid-template-columns: 1fr; }
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block body %}
     <main class="main">
       <div class="top">
         <div class="top-title">
@@ -338,5 +337,6 @@
         }
       }
     </script>
-  </body>
-</html>
+{% endblock %}
+
+{% block sw_script %}{% endblock %}

@@ -1,13 +1,14 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>#MyBest9{{ commenter_login }}</title>
-    {% include "partials/_head_meta_icons.html" %}
+{% extends "base.html" %}
+
+{% block title %}#MyBest9{{ commenter_login }}{% endblock %}
+
+{% block extra_head %}
     <meta property="og:title" content="#MyBest9{{ commenter_login }}" />
     <meta property="og:description" content="{{ commenter_login }} の発言から選ばれた Best {{ comments|length }} 件" />
     <meta name="twitter:card" content="summary" />
+{% endblock %}
+
+{% block styles %}
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -322,8 +323,9 @@
         .grid { grid-template-columns: repeat(2, 1fr); }
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block body %}
     <div class="bg-layer"></div>
 
     <div class="container">
@@ -381,12 +383,4 @@
         });
       });
     </script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
-        });
-      }
-    </script>
-  </body>
-</html>
+{% endblock %}

@@ -1,10 +1,8 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>コメント当てクイズ{% if user %} - {{ user.display_name or user.login }}{% endif %}</title>
-    {% include "partials/_head_meta_icons.html" %}
+{% extends "base.html" %}
+
+{% block title %}コメント当てクイズ{% if user %} - {{ user.display_name or user.login }}{% endif %}{% endblock %}
+
+{% block styles %}
     <style>
       :root {
         --bg-color: #ffffff;
@@ -478,8 +476,9 @@
         .rules { gap: 16px; }
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block body %}
     <div class="nav">
       <div class="nav-links">
         {% if user %}
@@ -911,12 +910,4 @@
     })();
     </script>
     {% endif %}
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
-        });
-      }
-    </script>
-  </body>
-</html>
+{% endblock %}

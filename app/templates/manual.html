@@ -1,10 +1,8 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>使い方ガイド - Twitch VOD コメント検索</title>
-    {% include "partials/_head_meta_icons.html" %}
+{% extends "base.html" %}
+
+{% block title %}使い方ガイド - Twitch VOD コメント検索{% endblock %}
+
+{% block styles %}
     <style>
       :root {
         --bg: #ffffff;
@@ -244,8 +242,9 @@
         font-size: 0.9rem;
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block body %}
     <main class="container">
       <header class="top">
         <div>
@@ -704,12 +703,4 @@
         <a href="{{ request.url_for('index') }}">← トップに戻る</a>
       </div>
     </main>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ root_path }}/sw.js', { scope: '{{ root_path }}/' }).catch(() => {});
-        });
-      }
-    </script>
-  </body>
-</html>
+{% endblock %}

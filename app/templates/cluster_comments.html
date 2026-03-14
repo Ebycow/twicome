@@ -1,10 +1,8 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>クラスタコメント - {{ login }}{% if user and user.display_name %}（{{ user.display_name }}）{% endif %}</title>
-    {% include "partials/_head_meta_icons.html" %}
+{% extends "base.html" %}
+
+{% block title %}クラスタコメント - {{ login }}{% if user and user.display_name %}（{{ user.display_name }}）{% endif %}{% endblock %}
+
+{% block styles %}
     <style>
       :root {
         --bg-color: #ffffff;
@@ -85,8 +83,9 @@
         body { margin: 12px; }
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block body %}
     <div style="max-width: 860px; margin: 0 auto;">
       <div class="top">
         <div>
@@ -280,5 +279,6 @@
         }
       }
     </script>
-  </body>
-</html>
+{% endblock %}
+
+{% block sw_script %}{% endblock %}
