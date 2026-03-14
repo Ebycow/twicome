@@ -1,32 +1,32 @@
 (function () {
   // markVisited
-  var userEl = document.getElementById('user-data');
-  var rootPathEl = document.getElementById('root-path-data');
+  const userEl = document.getElementById('user-data');
+  const rootPathEl = document.getElementById('root-path-data');
   if (userEl && rootPathEl && window.TwicomeOfflineAccess) {
-    var rawRootPath = JSON.parse(rootPathEl.textContent);
-    var rootPathForMark = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
-    var userLogin = JSON.parse(userEl.textContent);
+    const rawRootPath = JSON.parse(rootPathEl.textContent);
+    const rootPathForMark = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
+    const userLogin = JSON.parse(userEl.textContent);
     window.TwicomeOfflineAccess.markVisited(rootPathForMark, 'stats', userLogin);
   }
 
-  var isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var textColor = isDarkMode ? '#e0e0e0' : '#666';
-  var gridColor = isDarkMode ? '#444' : '#ddd';
+  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const textColor = isDarkMode ? '#e0e0e0' : '#666';
+  const gridColor = isDarkMode ? '#444' : '#ddd';
 
   // ---- コミュニティノート ----
-  var cnScoresEl = document.getElementById('cn-scores-data');
+  const cnScoresEl = document.getElementById('cn-scores-data');
   if (cnScoresEl) {
-    var cnScores = JSON.parse(cnScoresEl.textContent);
+    const cnScores = JSON.parse(cnScoresEl.textContent);
 
-    var distLabels = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'];
-    var distColors = cnScores.danger_dist.map(function (_, i) {
-      if (i < 3) return 'rgba(76,175,80,0.6)';
-      if (i < 6) return 'rgba(255,152,0,0.6)';
+    const distLabels = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'];
+    const distColors = cnScores.danger_dist.map(function (_, i) {
+      if (i < 3) {return 'rgba(76,175,80,0.6)';}
+      if (i < 6) {return 'rgba(255,152,0,0.6)';}
       return 'rgba(244,67,54,0.6)';
     });
-    var distBorders = cnScores.danger_dist.map(function (_, i) {
-      if (i < 3) return '#4caf50';
-      if (i < 6) return '#ff9800';
+    const distBorders = cnScores.danger_dist.map(function (_, i) {
+      if (i < 3) {return '#4caf50';}
+      if (i < 6) {return '#ff9800';}
       return '#f44336';
     });
     new Chart(document.getElementById('dangerDistChart').getContext('2d'), {
@@ -61,7 +61,7 @@
       }
     });
 
-    var ctxRadar = document.getElementById('cnRadarChart').getContext('2d');
+    const ctxRadar = document.getElementById('cnRadarChart').getContext('2d');
     new Chart(ctxRadar, {
       type: 'radar',
       data: {
@@ -101,12 +101,12 @@
     });
   }
 
-  var stats = JSON.parse(document.getElementById('stats-data').textContent);
-  var ctx = document.getElementById('statsChart').getContext('2d');
+  const stats = JSON.parse(document.getElementById('stats-data').textContent);
+  const ctx = document.getElementById('statsChart').getContext('2d');
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: Array.from({length: 24}, function (_, i) { return i + ':00'; }),
+      labels: Array.from({length: 24}, function (_, i) { return `${i  }:00`; }),
       datasets: [{
         label: 'コメント数',
         data: stats,
@@ -125,8 +125,8 @@
     }
   });
 
-  var weekdayStats = JSON.parse(document.getElementById('weekday-stats-data').textContent);
-  var ctxWeekday = document.getElementById('weekdayChart').getContext('2d');
+  const weekdayStats = JSON.parse(document.getElementById('weekday-stats-data').textContent);
+  const ctxWeekday = document.getElementById('weekdayChart').getContext('2d');
   new Chart(ctxWeekday, {
     type: 'doughnut',
     data: {
@@ -158,35 +158,35 @@
   });
 
   // ---- 配信者アクティブ状況テーブルのソート ----
-  var ownersTable = document.getElementById('ownersTable');
+  const ownersTable = document.getElementById('ownersTable');
   if (ownersTable) {
-    var ownersBody = ownersTable.tBodies[0];
-    var ownerHeaders = Array.from(ownersTable.querySelectorAll('th.sortable'));
-    var currentSortKey = null;
-    var currentSortDir = null;
+    const ownersBody = ownersTable.tBodies[0];
+    const ownerHeaders = Array.from(ownersTable.querySelectorAll('th.sortable'));
+    let currentSortKey = null;
+    let currentSortDir = null;
 
-    var numFromCell = function (row, cellIndex) {
-      var raw = row.cells[cellIndex].textContent.replace(/[%\s,]/g, '');
-      var val = Number.parseFloat(raw);
+    const numFromCell = function (row, cellIndex) {
+      const raw = row.cells[cellIndex].textContent.replace(/[%\s,]/g, '');
+      const val = Number.parseFloat(raw);
       return Number.isFinite(val) ? val : -1;
     };
 
-    var getSortValue = function (row, key) {
-      if (key === 'rank') return numFromCell(row, 0);
-      if (key === 'streamer') return row.cells[1].textContent.trim().toLowerCase();
-      if (key === 'count') return numFromCell(row, 2);
-      if (key === 'ratio') return numFromCell(row, 3);
-      if (key === 'active_rate') return numFromCell(row, 4);
-      if (key === 'inactive_rate') return numFromCell(row, 5);
+    const getSortValue = function (row, key) {
+      if (key === 'rank') {return numFromCell(row, 0);}
+      if (key === 'streamer') {return row.cells[1].textContent.trim().toLowerCase();}
+      if (key === 'count') {return numFromCell(row, 2);}
+      if (key === 'ratio') {return numFromCell(row, 3);}
+      if (key === 'active_rate') {return numFromCell(row, 4);}
+      if (key === 'inactive_rate') {return numFromCell(row, 5);}
       return numFromCell(row, 0);
     };
 
-    var sortOwnersTable = function (key, dir) {
-      var rows = Array.from(ownersBody.rows);
+    const sortOwnersTable = function (key, dir) {
+      const rows = Array.from(ownersBody.rows);
       rows.sort(function (a, b) {
-        var av = getSortValue(a, key);
-        var bv = getSortValue(b, key);
-        var cmp = 0;
+        const av = getSortValue(a, key);
+        const bv = getSortValue(b, key);
+        let cmp = 0;
         if (typeof av === 'string' && typeof bv === 'string') {
           cmp = av.localeCompare(bv, 'ja');
         } else {
@@ -205,9 +205,9 @@
 
     ownerHeaders.forEach(function (header) {
       header.addEventListener('click', function () {
-        var key = header.dataset.sortKey;
-        var defaultDir = header.dataset.defaultDir || 'asc';
-        var nextDir = defaultDir;
+        const key = header.dataset.sortKey;
+        const defaultDir = header.dataset.defaultDir || 'asc';
+        let nextDir = defaultDir;
         if (currentSortKey === key) {
           nextDir = currentSortDir === 'asc' ? 'desc' : 'asc';
         }
@@ -223,15 +223,15 @@
   }
 
   // ---- コメント影響度チャート ----
-  var impactStatsEl = document.getElementById('impact-stats-data');
+  const impactStatsEl = document.getElementById('impact-stats-data');
   if (impactStatsEl) {
-    var impactData = JSON.parse(impactStatsEl.textContent);
+    const impactData = JSON.parse(impactStatsEl.textContent);
     if (impactData && impactData.length > 0) {
-      var impactLabels = impactData.map(function (d) { return d.owner_display_name; });
-      var activeValues = impactData.map(function (d) { return d.avg_others_active; });
-      var inactiveValues = impactData.map(function (d) { return d.avg_others_inactive; });
+      const impactLabels = impactData.map(function (d) { return d.owner_display_name; });
+      const activeValues = impactData.map(function (d) { return d.avg_others_active; });
+      const inactiveValues = impactData.map(function (d) { return d.avg_others_inactive; });
 
-      var ctxImpact = document.getElementById('impactChart').getContext('2d');
+      const ctxImpact = document.getElementById('impactChart').getContext('2d');
       new Chart(ctxImpact, {
         type: 'bar',
         data: {
@@ -265,11 +265,11 @@
             legend: { labels: { color: textColor } },
             tooltip: {
               callbacks: {
-                afterBody: function (context) {
-                  var idx = context[0].dataIndex;
-                  var item = impactData[idx];
-                  var sig = item.p_value < 0.001 ? '***' : item.p_value < 0.01 ? '**' : item.p_value < 0.05 ? '*' : 'n.s.';
-                  return 'コメント変化率: ' + item.comment_change + '% (' + sig + ', p=' + item.p_value + ')\n人数変化率: ' + item.unique_change + '% (p=' + item.p_value_unique + ')';
+                afterBody (context) {
+                  const idx = context[0].dataIndex;
+                  const item = impactData[idx];
+                  const sig = item.p_value < 0.001 ? '***' : item.p_value < 0.01 ? '**' : item.p_value < 0.05 ? '*' : 'n.s.';
+                  return `コメント変化率: ${  item.comment_change  }% (${  sig  }, p=${  item.p_value  })\n人数変化率: ${  item.unique_change  }% (p=${  item.p_value_unique  })`;
                 }
               }
             }
