@@ -71,8 +71,11 @@ def _build_where(
     return " AND ".join(where), params
 
 
-def _build_order(sort: str) -> str:
-    """ORDER BY 句の SQL 文字列を返す。"""
+def _build_user_comment_order(sort: str) -> str:
+    """ORDER BY 句の SQL 文字列を返す（ユーザーコメント一覧用）。
+
+    コミュニティノート・危険度・ランダムを含む全ソート種別に対応する。
+    """
     if sort == "created_at":
         return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
     if sort == "likes":
@@ -89,6 +92,14 @@ def _build_order(sort: str) -> str:
     if sort == "random":
         return "ORDER BY RAND()"
     return "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
+
+
+def _build_vod_order() -> str:
+    """ORDER BY 句の SQL 文字列を返す（VOD 内コメント一覧用）。
+
+    VOD 内コメントは再生順（投稿日時降順）のみで整列する。
+    """
+    return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
 
 
 def count_comments(
@@ -167,7 +178,7 @@ def fetch_comments(
         date_from_utc=date_from_utc,
         date_to_utc=date_to_utc,
     )
-    order_sql = _build_order(sort)
+    order_sql = _build_user_comment_order(sort)
     params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
 
     use_subquery = (
@@ -231,12 +242,11 @@ def fetch_comments_in_vod(
     db,
     vod_id: int,
     *,
-    sort: str = "created_at",
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
     """カーソルページネーション用：VOD 内の全コメントをソート順で取得。"""
-    order_sql = _build_order(sort)
+    order_sql = _build_vod_order()
     rows = (
         db.execute(
             text(f"""

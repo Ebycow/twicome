@@ -108,7 +108,7 @@ def fetch_user_comment_page(
             half = page_size // 2
             offset = max(0, cursor_pos - half)
             page = (offset // page_size) + 1
-            rows = comment_repo.fetch_comments_in_vod(db, cursor_vod_id, sort=sort, limit=page_size, offset=offset)
+            rows = comment_repo.fetch_comments_in_vod(db, cursor_vod_id, limit=page_size, offset=offset)
             pages = 0  # カーソルモードではページ数を返さない
         else:
             # カーソルが見つからない場合はフォールバック
