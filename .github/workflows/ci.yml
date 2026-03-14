@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - CICD
+      - radical-refactoring
 
 jobs:
   # ── 軽量 broken code detection（構文エラー検知） ────────────────────────────
