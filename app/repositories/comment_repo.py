@@ -562,6 +562,64 @@ def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def count_user_comments(db, uid: int) -> int:
+    """ユーザーの全コメント総数（フィルタなし）。タスク API の資格チェック用。"""
+    return db.execute(
+        text("SELECT COUNT(*) FROM comments WHERE commenter_user_id = :uid"),
+        {"uid": uid},
+    ).scalar() or 0
+
+
+def fetch_eligible_other_user_ids(db, uid: int, min_comments: int, count: int) -> list[int]:
+    """min_comments 件以上のコメントを持つ uid 以外のランダムなユーザー ID を返す。
+
+    GROUP BY 後の集計結果（ユーザー単位）に ORDER BY RAND() を適用するため、
+    コメント行全体の ORDER BY RAND() より遥かに軽い。
+    """
+    rows = (
+        db.execute(
+            text("""
+            SELECT commenter_user_id
+            FROM comments
+            WHERE commenter_user_id != :uid
+            GROUP BY commenter_user_id
+            HAVING COUNT(*) >= :min_comments
+            ORDER BY RAND()
+            LIMIT :lim
+        """),
+            {"uid": uid, "min_comments": min_comments, "lim": count},
+        )
+        .mappings()
+        .all()
+    )
+    return [r["commenter_user_id"] for r in rows]
+
+
+def fetch_recent_comments_by_users(db, user_ids: list[int], limit_per_user: int) -> dict[int, list[str]]:
+    """各ユーザーの最新 limit_per_user 件のコメント本文を返す。{user_id: [body, ...]}
+
+    idx_comments_user_created (commenter_user_id, comment_created_at_utc) を使う個別クエリ。
+    100 クエリ × 高速インデックス scan でウィンドウ関数より安定して速い。
+    """
+    result: dict[int, list[str]] = {}
+    for uid in user_ids:
+        rows = (
+            db.execute(
+                text("""
+                SELECT body FROM comments
+                WHERE commenter_user_id = :uid
+                ORDER BY comment_created_at_utc DESC
+                LIMIT :lim
+            """),
+                {"uid": uid, "lim": limit_per_user},
+            )
+            .mappings()
+            .all()
+        )
+        result[uid] = [r["body"] for r in rows]
+    return result
+
+
 def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
     """いいね・dislike の合計が多い順でコメントを取得（トップページ用）。"""
     from services.comment_utils import build_comment_body_select_sql

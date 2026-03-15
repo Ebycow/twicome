@@ -1,7 +1,7 @@
 """ランダム予測ベースライン
 
-API フローの最小実装。予測ロジックをここに差し替えることでカスタム実装のスケルトンになる。
-期待正答率: 50%（クラス比 1:1 のためコインフリップと同じ）
+API フローの最小実装。候補の中からランダムに 1 件を選び、残りを任意順で並べる。
+Top-1 期待正答率: 1/100 = 1%、MRR 期待値: ≈ 0.019
 
 使い方:
     python baseline_random.py --login someuser --base-url http://localhost:8000/twicome
@@ -12,13 +12,10 @@ import random
 
 import requests
 
-TRAIN_COUNT = 200
-TEST_COUNT = 100
-
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -31,16 +28,22 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
 
 
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
-    """予測ロジック。このサンプルはランダム予測。ここを実装してください。
+    """予測ロジック。このサンプルはランダムな順位付け。ここを実装してください。
 
     Args:
-        training: ラベル付き学習データ。各要素は {"body": str, "is_target": bool}
-        test:     ラベルなしテストデータ。各要素は {"id": int, "body": str}
+        training: ラベル付き学習データ。各要素は {"body": str, "is_target": bool, "user_idx": int}
+        test:     テスト問題リスト。各要素は {"id": int, "candidates": [{"candidate_id": int, "body": str}, ...]}
 
     Returns:
-        [{"id": int, "prediction": bool}, ...] — test と同じ順序・件数でなくてよいが全 id が必要
+        [{"id": int, "ranked_candidates": [candidate_id, ...]}, ...]
+        ranked_candidates は予測確信度降順（先頭が本人と思われる候補）の全候補 ID リスト。
     """
-    return [{"id": item["id"], "prediction": random.choice([True, False])} for item in test]
+    answers = []
+    for question in test:
+        cids = [c["candidate_id"] for c in question["candidates"]]
+        random.shuffle(cids)
+        answers.append({"id": question["id"], "ranked_candidates": cids})
+    return answers
 
 
 def main():
@@ -51,7 +54,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     answers = predict(task["training"], task["test"])
 
@@ -59,7 +62,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """TF-IDF + Gradient Boosting ベースライン
 
-文字 n-gram (1〜3文字) で TF-IDF ベクトル化し、勾配ブースティングで分類する。
-HistGradientBoostingClassifier は scikit-learn 実装の高速版 GBM。
+文字 n-gram (1〜3文字) で TF-IDF ベクトル化し、HistGradientBoostingClassifier で分類する。
+100k 規模では学習に数分かかる場合がある。
 
 依存パッケージ:
     pip install requests scikit-learn
@@ -16,17 +16,13 @@ import numpy as np
 import requests
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
-
-TRAIN_COUNT = 200
-TEST_COUNT = 100
 
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -39,7 +35,6 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
 
 
 def _to_dense(matrix):
-    """HistGradientBoostingClassifier 用に疎行列を dense に変換する。"""
     if hasattr(matrix, "toarray"):
         return matrix.toarray()
     return np.asarray(matrix)
@@ -48,14 +43,8 @@ def _to_dense(matrix):
 def build_model(n_features: int = 3000) -> Pipeline:
     """文字 n-gram TF-IDF + HistGradientBoostingClassifier。
 
-    GBM は TF-IDF の高次元スパース行列が苦手なため、次元削減が重要。
-    ここでは max_features で上位 n_features 個に絞り、
-    さらに dense 行列へ変換して HistGBM に渡す。
-
-    max_iter=200: ブースティングの反復回数（木の本数に相当）。
-    learning_rate=0.1: 各ステップの学習率。小さいほど慎重に学習。
-    max_depth=4: 各木の深さ。浅めにして過学習を防ぐ。
-    l2_regularization=1.0: L2 正則化。
+    class_weight="balanced": 学習データの本人:別人比 1:99 を自動補正。
+    max_iter=100: 100k 規模ではイテレーション数を抑えて速度を確保。
     """
     return Pipeline([
         ("tfidf", TfidfVectorizer(
@@ -67,10 +56,11 @@ def build_model(n_features: int = 3000) -> Pipeline:
         )),
         ("to_dense", FunctionTransformer(_to_dense, accept_sparse=True)),
         ("clf", HistGradientBoostingClassifier(
-            max_iter=200,
+            max_iter=100,
             learning_rate=0.1,
             max_depth=4,
             l2_regularization=1.0,
+            class_weight="balanced",
             random_state=42,
         )),
     ])
@@ -79,17 +69,18 @@ def build_model(n_features: int = 3000) -> Pipeline:
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
     X_train = [item["body"] for item in training]
     y_train = [item["is_target"] for item in training]
-    X_test = [item["body"] for item in test]
 
     model = build_model()
-
-    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="accuracy")
-    print(f"  交差検証 (5-fold): {cv_scores.mean():.1%} ± {cv_scores.std():.1%}")
-
     model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
 
-    return [{"id": item["id"], "prediction": bool(pred)} for item, pred in zip(test, y_pred)]
+    answers = []
+    for question in test:
+        candidates = question["candidates"]
+        X_q = [c["body"] for c in candidates]
+        scores = model.predict_proba(X_q)[:, 1]
+        ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
+        answers.append({"id": question["id"], "ranked_candidates": ranked})
+    return answers
 
 
 def main():
@@ -100,7 +91,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -109,12 +100,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
-
-    false_positives = [d for d in result["details"] if d["prediction"] and not d["actual"]]
-    false_negatives = [d for d in result["details"] if not d["prediction"] and d["actual"]]
-    print(f"偽陽性 (別人→本人と判定): {len(false_positives)} 件")
-    print(f"偽陰性 (本人→別人と判定): {len(false_negatives)} 件")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":

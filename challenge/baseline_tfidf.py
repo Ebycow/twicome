@@ -1,7 +1,7 @@
 """TF-IDF + ロジスティック回帰ベースライン
 
 文字 n-gram (1〜3文字) で TF-IDF ベクトル化し、ロジスティック回帰で分類する。
-GPU 不要・依存パッケージ最小。
+各テスト問題の 100 候補に predict_proba を適用し、本人確率降順でランク付けする。
 
 依存パッケージ:
     pip install requests scikit-learn
@@ -15,17 +15,12 @@ import argparse
 import requests
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report
-from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
-
-TRAIN_COUNT = 200
-TEST_COUNT = 100
 
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -41,10 +36,9 @@ def build_model() -> Pipeline:
     """文字 n-gram TF-IDF + ロジスティック回帰。
 
     analyzer="char_wb": 単語境界パディング付き文字 n-gram。
-        "草" → " 草 " として分解するため、単語の前後文脈が含まれる。
     ngram_range=(1, 3): 1〜3文字の組み合わせを特徴量に使う。
     sublinear_tf=True: TF を log(1 + tf) でスケールし、高頻度語の影響を抑える。
-    C=1.0: 正則化強度。小さくすると正則化が強まりオーバーフィットを抑えられる。
+    C=1.0: 正則化強度。
     """
     return Pipeline([
         ("tfidf", TfidfVectorizer(
@@ -58,21 +52,21 @@ def build_model() -> Pipeline:
 
 
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
-    """学習データで訓練し、テストデータを予測する。"""
+    """学習データで訓練し、各問題の候補を本人確率降順でランク付けする。"""
     X_train = [item["body"] for item in training]
     y_train = [item["is_target"] for item in training]
-    X_test = [item["body"] for item in test]
 
     model = build_model()
-
-    # 交差検証でトレーニングセット内のスコアを確認（参考値）
-    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="accuracy")
-    print(f"  交差検証 (5-fold): {cv_scores.mean():.1%} ± {cv_scores.std():.1%}")
-
     model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
 
-    return [{"id": item["id"], "prediction": bool(pred)} for item, pred in zip(test, y_pred)]
+    answers = []
+    for question in test:
+        candidates = question["candidates"]
+        X_q = [c["body"] for c in candidates]
+        scores = model.predict_proba(X_q)[:, 1]
+        ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
+        answers.append({"id": question["id"], "ranked_candidates": ranked})
+    return answers
 
 
 def main():
@@ -83,7 +77,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -92,13 +86,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
-
-    # 誤答の内訳
-    false_positives = [d for d in result["details"] if d["prediction"] and not d["actual"]]
-    false_negatives = [d for d in result["details"] if not d["prediction"] and d["actual"]]
-    print(f"偽陽性 (別人→本人と判定): {len(false_positives)} 件")
-    print(f"偽陰性 (本人→別人と判定): {len(false_negatives)} 件")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":

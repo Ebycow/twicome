@@ -1,4 +1,4 @@
-# 🎉 Twicome Quiz Challenge 🎉
+# 🎉 Twicome Quiz Challenge "Who Wrote This?"🎉
 
 Twitch コメントの書き手を当てるバイナリ分類タスクです。
 このディレクトリには、タスク API を使ったサンプルコードが含まれています。

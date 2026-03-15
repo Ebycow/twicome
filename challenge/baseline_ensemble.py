@@ -1,11 +1,11 @@
-"""アンサンブル (投票) ベースライン
+"""アンサンブル (ソフト投票) ベースライン
 
-複数の異なるモデルの予測を多数決（ソフト投票）で統合する。
-個々のモデルの弱点を補い合い、単一モデルより安定した性能を期待できる。
+複数モデルの本人確率スコアを重み付き平均し、降順でランク付けする。
+SVM は decision_function をシグモイド変換してスコア化する。
 
 構成モデル:
     1. 文字 n-gram TF-IDF + LogisticRegression
-    2. 文字 n-gram TF-IDF + LinearSVC (calibrated)
+    2. 文字 n-gram TF-IDF + LinearSVC (decision_function)
     3. 文字 n-gram TF-IDF + ComplementNB
     4. 文字+単語 n-gram TF-IDF + LogisticRegression
 
@@ -18,24 +18,19 @@
 
 import argparse
 
+import numpy as np
 import requests
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import VotingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
 from sklearn.naive_bayes import ComplementNB
-from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn.svm import LinearSVC
-
-TRAIN_COUNT = 200
-TEST_COUNT = 100
 
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -47,31 +42,32 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
     return resp.json()
 
 
-def _char_tfidf(ngram=(1, 3), **kwargs):
-    return TfidfVectorizer(analyzer="char_wb", ngram_range=ngram, min_df=1, sublinear_tf=True, **kwargs)
+def _char_tfidf(ngram=(1, 3)):
+    return TfidfVectorizer(analyzer="char_wb", ngram_range=ngram, min_df=1, sublinear_tf=True)
 
 
-def build_model() -> Pipeline:
-    """4つのモデルをソフト投票でアンサンブル。
+def _sigmoid(x: np.ndarray) -> np.ndarray:
+    """decision_function の値を [0, 1] にスケールする。"""
+    return 1.0 / (1.0 + np.exp(-x))
 
-    voting="soft": 各モデルの確率の平均を取って最終予測を決定。
-        "hard" (多数決) より確率的に安定している。
-    weights=[2, 2, 1, 2]: LR と SVM を重めに、NB を軽めに。
-        データや対象ユーザーによって最適な重みは変わる。
 
-    各モデルの特徴:
-        lr_char:   文字 n-gram の主力モデル
-        svm_char:  SVM は決定境界が LR と異なる視点を提供
-        nb_char:   Naive Bayes は過学習しにくく安定役
-        lr_both:   文字+単語の結合ベクトルで語彙パターンも捉える
+def predict(training: list[dict], test: list[dict]) -> list[dict]:
+    """4 モデルのスコアを重み付き平均してランク付けする。
+
+    LR と NB は predict_proba の is_target 列を使用。
+    SVM は decision_function をシグモイド変換してスコア化。
+    weights=[2, 2, 1, 2]: LR×2、SVM×2、NB×1、LR_both×2。
     """
+    X_train = [item["body"] for item in training]
+    y_train = [item["is_target"] for item in training]
+
     lr_char = Pipeline([
         ("tfidf", _char_tfidf()),
         ("clf", LogisticRegression(max_iter=1000, C=1.0)),
     ])
     svm_char = Pipeline([
         ("tfidf", _char_tfidf()),
-        ("clf", CalibratedClassifierCV(LinearSVC(max_iter=2000, C=0.5))),
+        ("clf", LinearSVC(max_iter=2000, C=0.5)),
     ])
     nb_char = Pipeline([
         ("tfidf", _char_tfidf()),
@@ -86,33 +82,28 @@ def build_model() -> Pipeline:
         ("clf", LogisticRegression(max_iter=1000, C=1.0)),
     ])
 
-    ensemble = VotingClassifier(
-        estimators=[
-            ("lr_char", lr_char),
-            ("svm_char", svm_char),
-            ("nb_char", nb_char),
-            ("lr_both", lr_both),
-        ],
-        voting="soft",
-        weights=[2, 2, 1, 2],
-    )
-    return ensemble
+    models = [lr_char, svm_char, nb_char, lr_both]
+    weights = [2.0, 2.0, 1.0, 2.0]
+    total_weight = sum(weights)
 
+    for m in models:
+        m.fit(X_train, y_train)
 
-def predict(training: list[dict], test: list[dict]) -> list[dict]:
-    X_train = [item["body"] for item in training]
-    y_train = [item["is_target"] for item in training]
-    X_test = [item["body"] for item in test]
+    answers = []
+    for question in test:
+        candidates = question["candidates"]
+        X_q = [c["body"] for c in candidates]
 
-    model = build_model()
+        scores = np.zeros(len(candidates))
+        scores += weights[0] * lr_char.predict_proba(X_q)[:, 1]
+        scores += weights[1] * _sigmoid(svm_char.decision_function(X_q))
+        scores += weights[2] * nb_char.predict_proba(X_q)[:, 1]
+        scores += weights[3] * lr_both.predict_proba(X_q)[:, 1]
+        scores /= total_weight
 
-    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="accuracy")
-    print(f"  交差検証 (5-fold): {cv_scores.mean():.1%} ± {cv_scores.std():.1%}")
-
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-
-    return [{"id": item["id"], "prediction": bool(pred)} for item, pred in zip(test, y_pred)]
+        ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
+        answers.append({"id": question["id"], "ranked_candidates": ranked})
+    return answers
 
 
 def main():
@@ -123,7 +114,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -132,12 +123,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
-
-    false_positives = [d for d in result["details"] if d["prediction"] and not d["actual"]]
-    false_negatives = [d for d in result["details"] if not d["prediction"] and d["actual"]]
-    print(f"偽陽性 (別人→本人と判定): {len(false_positives)} 件")
-    print(f"偽陰性 (本人→別人と判定): {len(false_negatives)} 件")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":

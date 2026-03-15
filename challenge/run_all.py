@@ -1,6 +1,6 @@
 """全ベースライン比較ランナー
 
-同一タスクトークンで全ベースラインを実行し、精度を比較する。
+同一タスクトークンで全ベースラインを実行し、Top-1 accuracy と MRR を比較する。
 タスクは一度だけ取得するため、全モデルが同じ問題セットで評価される。
 
 依存パッケージ:
@@ -28,9 +28,6 @@ import traceback
 
 import requests
 
-TRAIN_COUNT = 1000
-TEST_COUNT = 500
-
 
 # ---------------------------------------------------------------------------
 # API ヘルパー
@@ -38,7 +35,7 @@ TEST_COUNT = 500
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -70,15 +67,15 @@ BASELINES: list[tuple[str, str, callable]] = [
     ("svm",           "TF-IDF + LinearSVC",             _make_predict("baseline_svm")),
     ("nb",            "TF-IDF + ComplementNB",          _make_predict("baseline_nb")),
     ("rf",            "TF-IDF + RandomForest",          _make_predict("baseline_rf")),
-    ("gbm",           "TF-IDF + GradientBoosting",     _make_predict("baseline_gbm")),
+    ("gbm",           "TF-IDF + GradientBoosting",      _make_predict("baseline_gbm")),
     ("word_ngram",    "文字+単語 n-gram + LR",           _make_predict("baseline_word_ngram")),
-    ("centroid",      "Nearest Centroid",               _make_predict("baseline_centroid")),
+    ("centroid",      "Nearest Centroid (cosine)",       _make_predict("baseline_centroid")),
     ("handcrafted",   "手作り特徴量 + RBF SVM",          _make_predict("baseline_handcrafted")),
-    ("adaptive",      "適応ブレンド + 擬似ラベル",        _make_predict("baseline_adaptive")),
+    ("adaptive",      "適応ブレンド",                    _make_predict("baseline_adaptive")),
     ("ensemble",      "アンサンブル (ソフト投票)",         _make_predict("baseline_ensemble")),
     # sentence_bert はデフォルト除外 (--include sentence_bert で有効化)
-    ("sentence_bert", "Sentence-BERT + LR",            _make_predict("baseline_sentence_bert",
-                                                                      model_name="hotchpotch/static-embedding-japanese")),
+    ("sentence_bert", "Sentence-BERT + LR",             _make_predict("baseline_sentence_bert",
+                                                                       model_name="hotchpotch/static-embedding-japanese")),
 ]
 
 # デフォルトで除外するベースライン
@@ -90,39 +87,40 @@ DEFAULT_EXCLUDE = {"sentence_bert"}
 # ---------------------------------------------------------------------------
 
 def print_results(results: list[dict], total: int) -> None:
-    """結果を精度順のテーブルで表示する。"""
+    """結果を Top-1 accuracy 降順のテーブルで表示する。"""
     if not results:
         return
 
-    print("\n" + "=" * 65)
+    print("\n" + "=" * 75)
     print(" 精度比較結果")
-    print("=" * 65)
+    print("=" * 75)
+    print(f"  {'順位':>3}  {'Top-1':>6}  {'MRR':>6}  {'Bar (Top-1)':30}  名前")
+    print("-" * 75)
 
-    # 精度降順でソート（エラーは末尾）
-    ok = sorted([r for r in results if r["accuracy"] is not None], key=lambda r: -r["accuracy"])
-    err = [r for r in results if r["accuracy"] is None]
+    ok = sorted([r for r in results if r["top1"] is not None], key=lambda r: -r["top1"])
+    err = [r for r in results if r["top1"] is None]
 
     rank = 1
     for r in ok:
-        bar_len = int(r["accuracy"] * 30)
+        bar_len = int(r["top1"] * 30)
         bar = "█" * bar_len + "░" * (30 - bar_len)
         print(
-            f"  {rank:2d}. [{bar}] {r['accuracy']:5.1%}"
-            f"  ({r['correct']:3d}/{total})  {r['name']}"
-            f"  [{r['elapsed']:.1f}s]"
+            f"  {rank:3d}.  {r['top1']:5.1%}  {r['mrr']:6.4f}  [{bar}]  {r['name']}  [{r['elapsed']:.1f}s]"
         )
         rank += 1
 
     for r in err:
-        print(f"  --. {'ERROR':>36}  {r['name']}  [{r['error']}]")
+        print(f"  ---.  {'ERROR':>6}  {'--':>6}  {'':30}  {r['name']}  [{r['error']}]")
 
-    print("=" * 65)
+    print("=" * 75)
 
     if ok:
         best = ok[0]
-        random_acc = next((r["accuracy"] for r in ok if r["id"] == "random"), 0.5)
-        print(f"\n  最高スコア: {best['accuracy']:.1%}  ({best['name']})")
-        print(f"  ランダム比: +{best['accuracy'] - random_acc:.1%}")
+        random_top1 = next((r["top1"] for r in ok if r["id"] == "random"), 1.0 / total)
+        random_mrr = next((r["mrr"] for r in ok if r["id"] == "random"), None)
+        print(f"\n  最高 Top-1: {best['top1']:.1%}  ({best['name']})")
+        print(f"  最高 MRR:   {max(r['mrr'] for r in ok):.4f}  ({max(ok, key=lambda r: r['mrr'])['name']})")
+        print(f"  ランダム比 (Top-1): +{best['top1'] - random_top1:.1%}")
 
     print()
 
@@ -169,25 +167,28 @@ def main() -> None:
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
     total = task["test_count"]
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {total} 件")
+    n_cand = task["candidates_per_question"]
+    print(f"  学習データ: {task['train_count']} 件")
+    print(f"  テスト: {total} 問 × {n_cand} 候補")
     print(f"  実行するベースライン: {len(targets)} 本\n")
 
     results = []
 
     for bid, name, predict_fn in targets:
-        print(f"{'─' * 55}")
+        print(f"{'─' * 60}")
         print(f"[{bid}] {name}")
         t0 = time.perf_counter()
         try:
             answers = predict_fn(task["training"], task["test"])
             result = submit_answers(args.base_url, args.login, task["task_token"], answers)
             elapsed = time.perf_counter() - t0
-            acc = result["accuracy"]
-            correct = result["correct"]
-            print(f"  → 正答率: {acc:.1%}  ({correct}/{total})  [{elapsed:.1f}s]")
+            top1 = result["top1_accuracy"]
+            mrr = result["mrr"]
+            correct = result["correct_top1"]
+            print(f"  → Top-1: {top1:.1%}  ({correct}/{total})  MRR: {mrr:.4f}  [{elapsed:.1f}s]")
             results.append({
                 "id": bid, "name": name,
-                "accuracy": acc, "correct": correct,
+                "top1": top1, "mrr": mrr, "correct": correct,
                 "elapsed": elapsed, "error": None,
             })
         except Exception as e:
@@ -196,7 +197,7 @@ def main() -> None:
             traceback.print_exc()
             results.append({
                 "id": bid, "name": name,
-                "accuracy": None, "correct": None,
+                "top1": None, "mrr": None, "correct": None,
                 "elapsed": elapsed, "error": str(e),
             })
 

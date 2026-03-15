@@ -1,11 +1,7 @@
 """sentence-transformers 埋め込み + ロジスティック回帰ベースライン
 
 事前学習済み日本語モデルでコメントをベクトル化し、ロジスティック回帰で分類する。
-モデルはこのプロジェクトで使用している `hotchpotch/static-embedding-japanese`。
-静的埋め込み (static embeddings) のため非常に高速で GPU 不要。
-
-他の BERT 系モデル (encode に時間がかかるが精度が高い可能性) を使いたい場合:
-    MODEL_NAME = "cl-tohoku/bert-base-japanese-char-v3"  など
+デフォルトモデル: hotchpotch/static-embedding-japanese（静的埋め込み、GPU 不要・高速）
 
 依存パッケージ:
     pip install requests scikit-learn sentence-transformers
@@ -20,16 +16,13 @@ import argparse
 import numpy as np
 import requests
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
 
-TRAIN_COUNT = 200
-TEST_COUNT = 100
 DEFAULT_MODEL = "hotchpotch/static-embedding-japanese"
 
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -42,50 +35,49 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
 
 
 def load_encoder(model_name: str):
-    """SentenceTransformer モデルをロードして返す。"""
     from sentence_transformers import SentenceTransformer
     print(f"  モデルロード中: {model_name}")
     return SentenceTransformer(model_name)
 
 
 def encode(encoder, texts: list[str]) -> np.ndarray:
-    """テキストリストを埋め込みベクトル行列に変換する。"""
     return encoder.encode(texts, show_progress_bar=False, convert_to_numpy=True)
 
 
-def predict(training: list[dict], test: list[dict], model_name: str) -> list[dict]:
+def predict(training: list[dict], test: list[dict], model_name: str = DEFAULT_MODEL) -> list[dict]:
     """埋め込みを固定特徴量として使う "freeze + probe" アプローチ。
 
-    アルゴリズム:
-        1. 事前学習済みモデルでコメントを固定ベクトルに変換
-        2. そのベクトルを特徴量にロジスティック回帰を学習
-        3. テストデータを同様にベクトル化して予測
-
-    200 件の少データでは BERT の fine-tuning は過学習しやすいため、
-    モデルを凍結して線形分類器のみ学習する方が安定する。
-
-    C=5.0: 埋め込みベクトルは密で高品質なため、LR の正則化は緩めでよい。
+    1. 事前学習済みモデルでコメントを固定ベクトルに変換
+    2. そのベクトルを特徴量にロジスティック回帰を学習
+    3. 各問題の 100 候補を埋め込みベクトル化して predict_proba でスコアリング
     """
     encoder = load_encoder(model_name)
 
     X_train_texts = [item["body"] for item in training]
     y_train = [item["is_target"] for item in training]
-    X_test_texts = [item["body"] for item in test]
 
-    print("  学習データをエンコード中...")
+    print(f"  学習データをエンコード中 ({len(X_train_texts)} 件)...")
     X_train = encode(encoder, X_train_texts)
-    print("  テストデータをエンコード中...")
-    X_test = encode(encoder, X_test_texts)
 
     clf = LogisticRegression(max_iter=1000, C=5.0)
-
-    cv_scores = cross_val_score(clf, X_train, y_train, cv=5, scoring="accuracy")
-    print(f"  交差検証 (5-fold): {cv_scores.mean():.1%} ± {cv_scores.std():.1%}")
-
     clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
 
-    return [{"id": item["id"], "prediction": bool(pred)} for item, pred in zip(test, y_pred)]
+    # テスト候補を問題ごとにエンコードしてスコアリング
+    # 全候補をまとめてエンコードした方が速い
+    all_bodies = [c["body"] for q in test for c in q["candidates"]]
+    n_cand = len(test[0]["candidates"])
+
+    print(f"  テスト候補をエンコード中 ({len(all_bodies)} 件)...")
+    all_embeddings = encode(encoder, all_bodies)
+    all_scores = clf.predict_proba(all_embeddings)[:, 1]
+
+    answers = []
+    for q_idx, question in enumerate(test):
+        candidates = question["candidates"]
+        scores = all_scores[q_idx * n_cand : (q_idx + 1) * n_cand]
+        ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
+        answers.append({"id": question["id"], "ranked_candidates": ranked})
+    return answers
 
 
 def main():
@@ -97,7 +89,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"], args.model)
@@ -106,12 +98,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
-
-    false_positives = [d for d in result["details"] if d["prediction"] and not d["actual"]]
-    false_negatives = [d for d in result["details"] if not d["prediction"] and d["actual"]]
-    print(f"偽陽性 (別人→本人と判定): {len(false_positives)} 件")
-    print(f"偽陰性 (本人→別人と判定): {len(false_negatives)} 件")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":

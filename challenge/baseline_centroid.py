@@ -1,8 +1,8 @@
 """Nearest Centroid (プロトタイプ法) ベースライン
 
-各クラスの TF-IDF ベクトルの重心（セントロイド）を計算し、
-テストサンプルが最も近い重心のクラスに分類する。
-パラメータがほぼなく、学習データが少ない場合に過学習しにくい。
+本人コメントの TF-IDF ベクトル平均（重心）を計算し、
+各候補のコサイン類似度でランク付けする。
+NearestCentroid は predict_proba を持たないため、直接コサイン類似度を計算する。
 
 依存パッケージ:
     pip install requests scikit-learn
@@ -13,19 +13,15 @@
 
 import argparse
 
+import numpy as np
 import requests
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import cross_val_score
-from sklearn.neighbors import NearestCentroid
-from sklearn.pipeline import Pipeline
-
-TRAIN_COUNT = 200
-TEST_COUNT = 100
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
-    resp = requests.get(url, params={"train_count": TRAIN_COUNT, "test_count": TEST_COUNT})
+    resp = requests.get(url)
     resp.raise_for_status()
     return resp.json()
 
@@ -37,47 +33,40 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
     return resp.json()
 
 
-def build_model() -> Pipeline:
-    """文字 n-gram TF-IDF + NearestCentroid。
+def predict(training: list[dict], test: list[dict]) -> list[dict]:
+    """本人コメントの TF-IDF 重心とのコサイン類似度でランク付けする。
 
     アルゴリズム:
         1. 学習データを TF-IDF でベクトル化
-        2. True クラスと False クラスそれぞれのベクトル平均（重心）を計算
-        3. テストサンプルをより近い重心のクラスに分類
+        2. is_target=True コメントの平均ベクトル（重心）を計算
+        3. 各テスト候補と重心のコサイン類似度を計算
+        4. 類似度降順でランク付け
 
-    NearestCentroid は現行 scikit-learn では euclidean / manhattan のみ対応。
-    TF-IDF はデフォルトで L2 正規化されるため、euclidean でも
-    コサイン類似度に近い順位付けになる。
-        shrink_threshold=None: シュリンクなし（少データでは通常不要）。
-
-    このモデルは非常に軽量で、「そのユーザーらしい語彙のプロフィール」に
-    近いかどうかを純粋に測る直感的な手法。
+    TF-IDF は L2 正規化されるため cosine_similarity ≒ ドット積になる。
     """
-    return Pipeline([
-        ("tfidf", TfidfVectorizer(
-            analyzer="char_wb",
-            ngram_range=(1, 3),
-            min_df=1,
-            sublinear_tf=True,
-        )),
-        ("clf", NearestCentroid(metric="euclidean")),
-    ])
+    X_train_texts = [item["body"] for item in training]
+    y_train = np.array([item["is_target"] for item in training])
 
+    vectorizer = TfidfVectorizer(
+        analyzer="char_wb",
+        ngram_range=(1, 3),
+        min_df=1,
+        sublinear_tf=True,
+    )
+    X_train = vectorizer.fit_transform(X_train_texts)
 
-def predict(training: list[dict], test: list[dict]) -> list[dict]:
-    X_train = [item["body"] for item in training]
-    y_train = [item["is_target"] for item in training]
-    X_test = [item["body"] for item in test]
+    # 本人コメントの重心（平均ベクトル）
+    target_indices = np.where(y_train)[0]
+    target_centroid = np.asarray(X_train[target_indices].mean(axis=0))  # shape (1, n_features)
 
-    model = build_model()
-
-    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="accuracy")
-    print(f"  交差検証 (5-fold): {cv_scores.mean():.1%} ± {cv_scores.std():.1%}")
-
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-
-    return [{"id": item["id"], "prediction": bool(pred)} for item, pred in zip(test, y_pred)]
+    answers = []
+    for question in test:
+        candidates = question["candidates"]
+        X_q = vectorizer.transform([c["body"] for c in candidates])
+        scores = cosine_similarity(X_q, target_centroid).ravel()
+        ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
+        answers.append({"id": question["id"], "ranked_candidates": ranked})
+    return answers
 
 
 def main():
@@ -88,7 +77,7 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テストデータ: {task['test_count']} 件")
+    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -97,12 +86,8 @@ def main():
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
     print(f"\n--- 結果 ---")
-    print(f"正答率: {result['accuracy']:.1%}  ({result['correct']} / {result['total']})")
-
-    false_positives = [d for d in result["details"] if d["prediction"] and not d["actual"]]
-    false_negatives = [d for d in result["details"] if not d["prediction"] and d["actual"]]
-    print(f"偽陽性 (別人→本人と判定): {len(false_positives)} 件")
-    print(f"偽陰性 (本人→別人と判定): {len(false_negatives)} 件")
+    print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
+    print(f"MRR:            {result['mrr']:.4f}")
 
 
 if __name__ == "__main__":
