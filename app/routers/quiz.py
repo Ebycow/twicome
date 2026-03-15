@@ -18,7 +18,7 @@ from repositories import comment_repo, user_repo
 # ---------------------------------------------------------------------------
 
 _TRAIN_PER_USER = 1000       # 各ユーザーから取得する学習コメント数
-_TEST_PER_USER = 100         # テスト問題数（= 各ユーザーのテスト用コメント数）
+_TEST_PER_USER = 500         # テスト問題数（= 各ユーザーのテスト用コメント数）
 _OTHER_USER_COUNT = 99       # 別人ユーザー数
 _MIN_COMMENTS_REQUIRED = _TRAIN_PER_USER + _TEST_PER_USER  # 1100
 _CANDIDATES_PER_QUESTION = _OTHER_USER_COUNT + 1           # 100
@@ -280,7 +280,6 @@ def quiz_task_submit_api(login: str, body: _TaskSubmitRequest):
 
     pred_map = {a.id: a.ranked_candidates for a in body.answers}
 
-    details = []
     reciprocal_ranks = []
     correct_top1 = 0
 
@@ -301,19 +300,9 @@ def quiz_task_submit_api(login: str, body: _TaskSubmitRequest):
             return JSONResponse({"error": f"invalid_candidate_ids_for_id_{i}"}, status_code=400)
 
         rank = ranking.index(correct_cid) + 1  # 1始まり
-        rr = 1.0 / rank
-        reciprocal_ranks.append(rr)
-        is_top1 = rank == 1
-        if is_top1:
+        reciprocal_ranks.append(1.0 / rank)
+        if rank == 1:
             correct_top1 += 1
-
-        details.append({
-            "id": i,
-            "correct_candidate_id": correct_cid,
-            "predicted_rank": rank,
-            "reciprocal_rank": round(rr, 4),
-            "correct_top1": is_top1,
-        })
 
     total = len(true_answers)
     mrr = sum(reciprocal_ranks) / total if total > 0 else 0.0
@@ -324,5 +313,4 @@ def quiz_task_submit_api(login: str, body: _TaskSubmitRequest):
         "mrr": round(mrr, 4),
         "correct_top1": correct_top1,
         "total": total,
-        "details": details,
     }

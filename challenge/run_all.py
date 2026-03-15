@@ -70,7 +70,7 @@ BASELINES: list[tuple[str, str, callable]] = [
     ("gbm",           "TF-IDF + GradientBoosting",      _make_predict("baseline_gbm")),
     ("word_ngram",    "文字+単語 n-gram + LR",           _make_predict("baseline_word_ngram")),
     ("centroid",      "Nearest Centroid (cosine)",       _make_predict("baseline_centroid")),
-    ("handcrafted",   "手作り特徴量 + RBF SVM",          _make_predict("baseline_handcrafted")),
+    ("handcrafted",   "手作り特徴量 + LinearSVC",         _make_predict("baseline_handcrafted")),
     ("adaptive",      "適応ブレンド",                    _make_predict("baseline_adaptive")),
     ("ensemble",      "アンサンブル (ソフト投票)",         _make_predict("baseline_ensemble")),
     # sentence_bert はデフォルト除外 (--include sentence_bert で有効化)
