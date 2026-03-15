@@ -77,7 +77,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -85,7 +88,7 @@ def main():
     print("予測を提出中...")
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
-    print(f"\n--- 結果 ---")
+    print("\n--- 結果 ---")
     print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
     print(f"MRR:            {result['mrr']:.4f}")
 

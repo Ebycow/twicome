@@ -61,26 +61,39 @@ def predict(training: list[dict], test: list[dict]) -> list[dict]:
     X_train = [item["body"] for item in training]
     y_train = [item["is_target"] for item in training]
 
-    lr_char = Pipeline([
-        ("tfidf", _char_tfidf()),
-        ("clf", LogisticRegression(max_iter=1000, C=1.0)),
-    ])
-    svm_char = Pipeline([
-        ("tfidf", _char_tfidf()),
-        ("clf", LinearSVC(max_iter=2000, C=0.5)),
-    ])
-    nb_char = Pipeline([
-        ("tfidf", _char_tfidf()),
-        ("scaler", MaxAbsScaler()),
-        ("clf", ComplementNB(alpha=0.3)),
-    ])
-    lr_both = Pipeline([
-        ("features", FeatureUnion([
-            ("char", _char_tfidf()),
-            ("word", TfidfVectorizer(analyzer="word", ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
-        ])),
-        ("clf", LogisticRegression(max_iter=1000, C=1.0)),
-    ])
+    lr_char = Pipeline(
+        [
+            ("tfidf", _char_tfidf()),
+            ("clf", LogisticRegression(max_iter=1000, C=1.0)),
+        ]
+    )
+    svm_char = Pipeline(
+        [
+            ("tfidf", _char_tfidf()),
+            ("clf", LinearSVC(max_iter=2000, C=0.5)),
+        ]
+    )
+    nb_char = Pipeline(
+        [
+            ("tfidf", _char_tfidf()),
+            ("scaler", MaxAbsScaler()),
+            ("clf", ComplementNB(alpha=0.3)),
+        ]
+    )
+    lr_both = Pipeline(
+        [
+            (
+                "features",
+                FeatureUnion(
+                    [
+                        ("char", _char_tfidf()),
+                        ("word", TfidfVectorizer(analyzer="word", ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
+                    ]
+                ),
+            ),
+            ("clf", LogisticRegression(max_iter=1000, C=1.0)),
+        ]
+    )
 
     models = [lr_char, svm_char, nb_char, lr_both]
     weights = [2.0, 2.0, 1.0, 2.0]
@@ -114,7 +127,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -122,7 +138,7 @@ def main():
     print("予測を提出中...")
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
-    print(f"\n--- 結果 ---")
+    print("\n--- 結果 ---")
     print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
     print(f"MRR:            {result['mrr']:.4f}")
 

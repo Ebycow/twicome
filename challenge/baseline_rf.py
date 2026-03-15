@@ -39,23 +39,31 @@ def build_model() -> Pipeline:
     max_features=5000: 高次元スパース特徴を削減（RF は線形モデルより次元削減が効く）。
     class_weight="balanced": 学習データの本人:別人比 1:99 を自動補正。
     """
-    return Pipeline([
-        ("tfidf", TfidfVectorizer(
-            analyzer="char_wb",
-            ngram_range=(1, 3),
-            min_df=2,
-            sublinear_tf=True,
-            max_features=5000,
-        )),
-        ("clf", RandomForestClassifier(
-            n_estimators=200,
-            max_depth=None,
-            max_features="sqrt",
-            class_weight="balanced",
-            random_state=42,
-            n_jobs=-1,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    analyzer="char_wb",
+                    ngram_range=(1, 3),
+                    min_df=2,
+                    sublinear_tf=True,
+                    max_features=5000,
+                ),
+            ),
+            (
+                "clf",
+                RandomForestClassifier(
+                    n_estimators=200,
+                    max_depth=None,
+                    max_features="sqrt",
+                    class_weight="balanced",
+                    random_state=42,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
 
 
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
@@ -83,7 +91,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -91,7 +102,7 @@ def main():
     print("予測を提出中...")
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
-    print(f"\n--- 結果 ---")
+    print("\n--- 結果 ---")
     print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
     print(f"MRR:            {result['mrr']:.4f}")
 

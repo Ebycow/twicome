@@ -46,24 +46,32 @@ def build_model(n_features: int = 3000) -> Pipeline:
     class_weight="balanced": 学習データの本人:別人比 1:99 を自動補正。
     max_iter=100: 100k 規模ではイテレーション数を抑えて速度を確保。
     """
-    return Pipeline([
-        ("tfidf", TfidfVectorizer(
-            analyzer="char_wb",
-            ngram_range=(1, 3),
-            min_df=2,
-            sublinear_tf=True,
-            max_features=n_features,
-        )),
-        ("to_dense", FunctionTransformer(_to_dense, accept_sparse=True)),
-        ("clf", HistGradientBoostingClassifier(
-            max_iter=100,
-            learning_rate=0.1,
-            max_depth=4,
-            l2_regularization=1.0,
-            class_weight="balanced",
-            random_state=42,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    analyzer="char_wb",
+                    ngram_range=(1, 3),
+                    min_df=2,
+                    sublinear_tf=True,
+                    max_features=n_features,
+                ),
+            ),
+            ("to_dense", FunctionTransformer(_to_dense, accept_sparse=True)),
+            (
+                "clf",
+                HistGradientBoostingClassifier(
+                    max_iter=100,
+                    learning_rate=0.1,
+                    max_depth=4,
+                    l2_regularization=1.0,
+                    class_weight="balanced",
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
 
 
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
@@ -91,7 +99,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -99,7 +110,7 @@ def main():
     print("予測を提出中...")
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
-    print(f"\n--- 結果 ---")
+    print("\n--- 結果 ---")
     print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
     print(f"MRR:            {result['mrr']:.4f}")
 

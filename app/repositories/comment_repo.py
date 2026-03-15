@@ -446,7 +446,7 @@ _RAND_RATIO_MIN_LIMIT = 100
 
 
 def _fetch_comment_ids_random(db, count_sql: str, id_sql: str, params: dict, limit: int) -> list:
-    """COUNT で件数を調べ、大テーブルは RAND()<ratio フィルタ（ソートなし）、小テーブルは ORDER BY RAND() で ID を取得する。
+    """COUNT で件数を調べ、大テーブルは RAND()<ratio フィルタ、小テーブルは ORDER BY RAND() で ID を取得する。
 
     limit < _RAND_RATIO_MIN_LIMIT の場合は COUNT をスキップして直接 ORDER BY RAND() を使う。
     RAND()<ratio は全行をスキャンしつつ LIMIT で早期終了できるため、ORDER BY RAND() の O(n log n) ソートを回避できる。
@@ -454,10 +454,14 @@ def _fetch_comment_ids_random(db, count_sql: str, id_sql: str, params: dict, lim
     """
     if limit < _RAND_RATIO_MIN_LIMIT:
         # 小 limit: COUNT 不要、ORDER BY RAND() で十分速い
-        rows = db.execute(
-            text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
-            {**params, "_lim": limit},
-        ).mappings().all()
+        rows = (
+            db.execute(
+                text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
+                {**params, "_lim": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [r["comment_id"] for r in rows]
 
     total = db.execute(text(count_sql), params).scalar() or 0
@@ -466,17 +470,25 @@ def _fetch_comment_ids_random(db, count_sql: str, id_sql: str, params: dict, lim
 
     if total <= limit * 3:
         # 小テーブル: ORDER BY RAND() で確実に limit 件取得
-        rows = db.execute(
-            text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
-            {**params, "_lim": limit},
-        ).mappings().all()
+        rows = (
+            db.execute(
+                text(f"{id_sql} ORDER BY RAND() LIMIT :_lim"),
+                {**params, "_lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     else:
         # 大テーブル: RAND() < ratio でソートなしサンプリング (O(n)、早期終了あり)
         ratio = min(0.95, limit * 2.5 / total)
-        rows = db.execute(
-            text(f"{id_sql} AND RAND() < :_ratio LIMIT :_lim"),
-            {**params, "_ratio": ratio, "_lim": limit},
-        ).mappings().all()
+        rows = (
+            db.execute(
+                text(f"{id_sql} AND RAND() < :_ratio LIMIT :_lim"),
+                {**params, "_ratio": ratio, "_lim": limit},
+            )
+            .mappings()
+            .all()
+        )
 
     return [r["comment_id"] for r in rows]
 
@@ -520,28 +532,43 @@ def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
     """
     if limit < _RAND_RATIO_MIN_LIMIT:
         # 小 limit: COUNT 不要、ORDER BY RAND() で十分速い
-        id_rows = db.execute(
-            text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
-            {"uid": uid, "lim": limit},
-        ).mappings().all()
+        id_rows = (
+            db.execute(
+                text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
+                {"uid": uid, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     else:
-        total = db.execute(
-            text(f"SELECT COUNT(*) FROM comments WHERE {other_where}"),
-            {"uid": uid},
-        ).scalar() or 0
+        total = (
+            db.execute(
+                text(f"SELECT COUNT(*) FROM comments WHERE {other_where}"),
+                {"uid": uid},
+            ).scalar()
+            or 0
+        )
         if total == 0:
             return []
         if total <= limit * 3:
-            id_rows = db.execute(
-                text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
-                {"uid": uid, "lim": limit},
-            ).mappings().all()
+            id_rows = (
+                db.execute(
+                    text(f"SELECT comment_id FROM comments WHERE {other_where} ORDER BY RAND() LIMIT :lim"),
+                    {"uid": uid, "lim": limit},
+                )
+                .mappings()
+                .all()
+            )
         else:
             ratio = min(0.95, limit * 2.5 / total)
-            id_rows = db.execute(
-                text(f"SELECT comment_id FROM comments WHERE {other_where} AND RAND() < :ratio LIMIT :lim"),
-                {"uid": uid, "ratio": ratio, "lim": limit},
-            ).mappings().all()
+            id_rows = (
+                db.execute(
+                    text(f"SELECT comment_id FROM comments WHERE {other_where} AND RAND() < :ratio LIMIT :lim"),
+                    {"uid": uid, "ratio": ratio, "lim": limit},
+                )
+                .mappings()
+                .all()
+            )
 
     ids = [r["comment_id"] for r in id_rows]
     if not ids:
@@ -564,10 +591,13 @@ def fetch_quiz_other_comments(db, uid: int, limit: int) -> list[dict]:
 
 def count_user_comments(db, uid: int) -> int:
     """ユーザーの全コメント総数（フィルタなし）。タスク API の資格チェック用。"""
-    return db.execute(
-        text("SELECT COUNT(*) FROM comments WHERE commenter_user_id = :uid"),
-        {"uid": uid},
-    ).scalar() or 0
+    return (
+        db.execute(
+            text("SELECT COUNT(*) FROM comments WHERE commenter_user_id = :uid"),
+            {"uid": uid},
+        ).scalar()
+        or 0
+    )
 
 
 def fetch_eligible_other_user_ids(db, uid: int, min_comments: int, count: int) -> list[int]:

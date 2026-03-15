@@ -100,79 +100,121 @@ def _word_tfidf() -> TfidfVectorizer:
 
 
 def build_char_svm() -> Pipeline:
-    return Pipeline([
-        ("tfidf", _char_wb_tfidf(ngram_range=(1, 5))),
-        ("clf", CalibratedClassifierCV(
-            estimator=LinearSVC(C=0.7, max_iter=5000),
-            cv=3,
-            method="sigmoid",
-        )),
-    ])
+    return Pipeline(
+        [
+            ("tfidf", _char_wb_tfidf(ngram_range=(1, 5))),
+            (
+                "clf",
+                CalibratedClassifierCV(
+                    estimator=LinearSVC(C=0.7, max_iter=5000),
+                    cv=3,
+                    method="sigmoid",
+                ),
+            ),
+        ]
+    )
 
 
 def build_dual_char_lr() -> Pipeline:
-    return Pipeline([
-        ("features", FeatureUnion([
-            ("raw_char_wb", _char_wb_tfidf(ngram_range=(1, 5))),
-            ("norm_char", _char_tfidf(ngram_range=(2, 6), preprocessor=normalize_text)),
-        ])),
-        ("clf", LogisticRegression(
-            max_iter=2000,
-            C=3.0,
-            solver="liblinear",
-            random_state=RANDOM_STATE,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "features",
+                FeatureUnion(
+                    [
+                        ("raw_char_wb", _char_wb_tfidf(ngram_range=(1, 5))),
+                        ("norm_char", _char_tfidf(ngram_range=(2, 6), preprocessor=normalize_text)),
+                    ]
+                ),
+            ),
+            (
+                "clf",
+                LogisticRegression(
+                    max_iter=2000,
+                    C=3.0,
+                    solver="liblinear",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
 
 
 def build_token_mix_lr() -> Pipeline:
-    return Pipeline([
-        ("features", FeatureUnion([
-            ("char", _char_tfidf(ngram_range=(2, 5))),
-            ("char_norm", _char_wb_tfidf(ngram_range=(2, 5), preprocessor=normalize_text)),
-            ("word", _word_tfidf()),
-        ])),
-        ("clf", LogisticRegression(
-            max_iter=2000,
-            C=2.0,
-            solver="liblinear",
-            random_state=RANDOM_STATE,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "features",
+                FeatureUnion(
+                    [
+                        ("char", _char_tfidf(ngram_range=(2, 5))),
+                        ("char_norm", _char_wb_tfidf(ngram_range=(2, 5), preprocessor=normalize_text)),
+                        ("word", _word_tfidf()),
+                    ]
+                ),
+            ),
+            (
+                "clf",
+                LogisticRegression(
+                    max_iter=2000,
+                    C=2.0,
+                    solver="liblinear",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
 
 
 def build_char_nb() -> Pipeline:
-    return Pipeline([
-        ("tfidf", _char_wb_tfidf(ngram_range=(1, 4), preprocessor=normalize_text)),
-        ("scaler", MaxAbsScaler()),
-        ("clf", ComplementNB(alpha=0.15)),
-    ])
+    return Pipeline(
+        [
+            ("tfidf", _char_wb_tfidf(ngram_range=(1, 4), preprocessor=normalize_text)),
+            ("scaler", MaxAbsScaler()),
+            ("clf", ComplementNB(alpha=0.15)),
+        ]
+    )
 
 
 def build_style_hybrid_lr() -> Pipeline:
-    return Pipeline([
-        ("features", FeatureUnion([
-            ("char", _char_tfidf(ngram_range=(2, 5))),
-            ("style", Pipeline([
-                ("extract", HandcraftedFeatureTransformer()),
-                ("scale", MaxAbsScaler()),
-            ])),
-        ])),
-        ("clf", LogisticRegression(
-            max_iter=2000,
-            C=2.5,
-            solver="liblinear",
-            random_state=RANDOM_STATE,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "features",
+                FeatureUnion(
+                    [
+                        ("char", _char_tfidf(ngram_range=(2, 5))),
+                        (
+                            "style",
+                            Pipeline(
+                                [
+                                    ("extract", HandcraftedFeatureTransformer()),
+                                    ("scale", MaxAbsScaler()),
+                                ]
+                            ),
+                        ),
+                    ]
+                ),
+            ),
+            (
+                "clf",
+                LogisticRegression(
+                    max_iter=2000,
+                    C=2.5,
+                    solver="liblinear",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
 
 
 CANDIDATES: list[tuple[str, str, Callable[[], Pipeline]]] = [
-    ("char_svm",       "広め文字 n-gram + LinearSVC",    build_char_svm),
-    ("dual_char_lr",   "生文字+正規化文字 + LR",          build_dual_char_lr),
-    ("token_mix_lr",   "文字+空白トークン + LR",           build_token_mix_lr),
-    ("char_nb",        "正規化文字 + ComplementNB",        build_char_nb),
-    ("style_hybrid_lr","文字+手作り特徴量 + LR",           build_style_hybrid_lr),
+    ("char_svm", "広め文字 n-gram + LinearSVC", build_char_svm),
+    ("dual_char_lr", "生文字+正規化文字 + LR", build_dual_char_lr),
+    ("token_mix_lr", "文字+空白トークン + LR", build_token_mix_lr),
+    ("char_nb", "正規化文字 + ComplementNB", build_char_nb),
+    ("style_hybrid_lr", "文字+手作り特徴量 + LR", build_style_hybrid_lr),
 ]
 
 
@@ -228,12 +270,14 @@ def fit_models(selected_models: list[dict], X_train: list[str], y_train: list[bo
     for model in selected_models:
         fitted = model["builder"]()
         fitted.fit(X_train, y_train)
-        fitted_models.append({
-            "id": model["id"],
-            "name": model["name"],
-            "weight": model["weight"],
-            "model": fitted,
-        })
+        fitted_models.append(
+            {
+                "id": model["id"],
+                "name": model["name"],
+                "weight": model["weight"],
+                "model": fitted,
+            }
+        )
     return fitted_models
 
 
@@ -271,7 +315,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])

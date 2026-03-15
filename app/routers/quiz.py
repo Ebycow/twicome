@@ -17,16 +17,17 @@ from repositories import comment_repo, user_repo
 # タスク設定定数
 # ---------------------------------------------------------------------------
 
-_TRAIN_PER_USER = 1000       # 各ユーザーから取得する学習コメント数
-_TEST_PER_USER = 500         # テスト問題数（= 各ユーザーのテスト用コメント数）
-_OTHER_USER_COUNT = 99       # 別人ユーザー数
+_TRAIN_PER_USER = 1000  # 各ユーザーから取得する学習コメント数
+_TEST_PER_USER = 500  # テスト問題数（= 各ユーザーのテスト用コメント数）
+_OTHER_USER_COUNT = 99  # 別人ユーザー数
 _MIN_COMMENTS_REQUIRED = _TRAIN_PER_USER + _TEST_PER_USER  # 1100
-_CANDIDATES_PER_QUESTION = _OTHER_USER_COUNT + 1           # 100
+_CANDIDATES_PER_QUESTION = _OTHER_USER_COUNT + 1  # 100
 
 
 # ---------------------------------------------------------------------------
 # トークン
 # ---------------------------------------------------------------------------
+
 
 def _make_task_token(login: str, correct_candidate_ids: list[int]) -> str:
     """テスト正解候補 ID リストを HMAC-SHA256 で署名したトークンを生成する。"""
@@ -54,6 +55,7 @@ def _verify_task_token(token: str, login: str) -> list[int] | None:
 # ---------------------------------------------------------------------------
 # リクエストモデル
 # ---------------------------------------------------------------------------
+
 
 class _RankedAnswer(BaseModel):
     id: int
@@ -209,7 +211,7 @@ def quiz_task_api(
             )
 
         # 全ユーザーの最新 _MIN_COMMENTS_REQUIRED 件を取得（最新順、重複なし）
-        all_user_ids = [uid] + other_user_ids
+        all_user_ids = [uid, *other_user_ids]
         user_comments = comment_repo.fetch_recent_comments_by_users(
             db, all_user_ids, limit_per_user=_MIN_COMMENTS_REQUIRED
         )
@@ -217,10 +219,7 @@ def quiz_task_api(
 
     # 学習データ: 各ユーザーの先頭 _TRAIN_PER_USER 件（= より最新の投稿）
     # user_idx=0 がターゲット本人、user_idx=1..99 が各別人
-    training = [
-        {"body": body, "is_target": True, "user_idx": 0}
-        for body in target_comments[:_TRAIN_PER_USER]
-    ]
+    training = [{"body": body, "is_target": True, "user_idx": 0} for body in target_comments[:_TRAIN_PER_USER]]
     for u_idx, other_uid in enumerate(other_user_ids, start=1):
         training += [
             {"body": body, "is_target": False, "user_idx": u_idx}
@@ -247,12 +246,12 @@ def quiz_task_api(
         correct_cid = next(i for i, c in enumerate(raw) if c["is_target"])
         correct_candidate_ids.append(correct_cid)
 
-        test.append({
-            "id": q_id,
-            "candidates": [
-                {"candidate_id": i, "body": c["body"]} for i, c in enumerate(raw)
-            ],
-        })
+        test.append(
+            {
+                "id": q_id,
+                "candidates": [{"candidate_id": i, "body": c["body"]} for i, c in enumerate(raw)],
+            }
+        )
 
     return {
         "task_token": _make_task_token(login, correct_candidate_ids),

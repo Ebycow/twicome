@@ -28,10 +28,10 @@ import traceback
 
 import requests
 
-
 # ---------------------------------------------------------------------------
 # API ヘルパー
 # ---------------------------------------------------------------------------
+
 
 def fetch_task(base_url: str, login: str) -> dict:
     url = f"{base_url}/api/u/{login}/quiz/task"
@@ -51,31 +51,38 @@ def submit_answers(base_url: str, login: str, task_token: str, answers: list[dic
 # ベースライン定義
 # ---------------------------------------------------------------------------
 
+
 def _make_predict(module_name: str, **kwargs):
     """モジュールの predict 関数をインポートして、共通シグネチャのラッパーを返す。"""
+
     def runner(training, test):
         import importlib
+
         mod = importlib.import_module(module_name)
         return mod.predict(training, test, **kwargs)
+
     return runner
 
 
 BASELINES: list[tuple[str, str, callable]] = [
     # (id, 表示名, predict ラッパー)
-    ("random",        "ランダム予測",                   _make_predict("baseline_random")),
-    ("tfidf",         "TF-IDF + LogisticRegression",   _make_predict("baseline_tfidf")),
-    ("svm",           "TF-IDF + LinearSVC",             _make_predict("baseline_svm")),
-    ("nb",            "TF-IDF + ComplementNB",          _make_predict("baseline_nb")),
-    ("rf",            "TF-IDF + RandomForest",          _make_predict("baseline_rf")),
-    ("gbm",           "TF-IDF + GradientBoosting",      _make_predict("baseline_gbm")),
-    ("word_ngram",    "文字+単語 n-gram + LR",           _make_predict("baseline_word_ngram")),
-    ("centroid",      "Nearest Centroid (cosine)",       _make_predict("baseline_centroid")),
-    ("handcrafted",   "手作り特徴量 + LinearSVC",         _make_predict("baseline_handcrafted")),
-    ("adaptive",      "適応ブレンド",                    _make_predict("baseline_adaptive")),
-    ("ensemble",      "アンサンブル (ソフト投票)",         _make_predict("baseline_ensemble")),
+    ("random", "ランダム予測", _make_predict("baseline_random")),
+    ("tfidf", "TF-IDF + LogisticRegression", _make_predict("baseline_tfidf")),
+    ("svm", "TF-IDF + LinearSVC", _make_predict("baseline_svm")),
+    ("nb", "TF-IDF + ComplementNB", _make_predict("baseline_nb")),
+    ("rf", "TF-IDF + RandomForest", _make_predict("baseline_rf")),
+    ("gbm", "TF-IDF + GradientBoosting", _make_predict("baseline_gbm")),
+    ("word_ngram", "文字+単語 n-gram + LR", _make_predict("baseline_word_ngram")),
+    ("centroid", "Nearest Centroid (cosine)", _make_predict("baseline_centroid")),
+    ("handcrafted", "手作り特徴量 + LinearSVC", _make_predict("baseline_handcrafted")),
+    ("adaptive", "適応ブレンド", _make_predict("baseline_adaptive")),
+    ("ensemble", "アンサンブル (ソフト投票)", _make_predict("baseline_ensemble")),
     # sentence_bert はデフォルト除外 (--include sentence_bert で有効化)
-    ("sentence_bert", "Sentence-BERT + LR",             _make_predict("baseline_sentence_bert",
-                                                                       model_name="hotchpotch/static-embedding-japanese")),
+    (
+        "sentence_bert",
+        "Sentence-BERT + LR",
+        _make_predict("baseline_sentence_bert", model_name="hotchpotch/static-embedding-japanese"),
+    ),
 ]
 
 # デフォルトで除外するベースライン
@@ -85,6 +92,7 @@ DEFAULT_EXCLUDE = {"sentence_bert"}
 # ---------------------------------------------------------------------------
 # 結果表示
 # ---------------------------------------------------------------------------
+
 
 def print_results(results: list[dict], total: int) -> None:
     """結果を Top-1 accuracy 降順のテーブルで表示する。"""
@@ -104,9 +112,7 @@ def print_results(results: list[dict], total: int) -> None:
     for r in ok:
         bar_len = int(r["top1"] * 30)
         bar = "█" * bar_len + "░" * (30 - bar_len)
-        print(
-            f"  {rank:3d}.  {r['top1']:5.1%}  {r['mrr']:6.4f}  [{bar}]  {r['name']}  [{r['elapsed']:.1f}s]"
-        )
+        print(f"  {rank:3d}.  {r['top1']:5.1%}  {r['mrr']:6.4f}  [{bar}]  {r['name']}  [{r['elapsed']:.1f}s]")
         rank += 1
 
     for r in err:
@@ -117,7 +123,7 @@ def print_results(results: list[dict], total: int) -> None:
     if ok:
         best = ok[0]
         random_top1 = next((r["top1"] for r in ok if r["id"] == "random"), 1.0 / total)
-        random_mrr = next((r["mrr"] for r in ok if r["id"] == "random"), None)
+
         print(f"\n  最高 Top-1: {best['top1']:.1%}  ({best['name']})")
         print(f"  最高 MRR:   {max(r['mrr'] for r in ok):.4f}  ({max(ok, key=lambda r: r['mrr'])['name']})")
         print(f"  ランダム比 (Top-1): +{best['top1'] - random_top1:.1%}")
@@ -129,20 +135,27 @@ def print_results(results: list[dict], total: int) -> None:
 # メイン
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="全ベースライン比較ランナー")
     parser.add_argument("--login", required=True, help="対象ユーザーの login")
     parser.add_argument("--base-url", default="http://localhost:8000/twicome")
     parser.add_argument(
-        "--include", nargs="+", metavar="ID",
+        "--include",
+        nargs="+",
+        metavar="ID",
         help="デフォルト除外のベースラインを追加する (例: sentence_bert)",
     )
     parser.add_argument(
-        "--skip", nargs="+", metavar="ID",
+        "--skip",
+        nargs="+",
+        metavar="ID",
         help="実行しないベースラインの ID (例: rf gbm)",
     )
     parser.add_argument(
-        "--only", nargs="+", metavar="ID",
+        "--only",
+        nargs="+",
+        metavar="ID",
         help="指定したベースラインのみ実行 (--skip/--include を上書き)",
     )
     args = parser.parse_args()
@@ -186,20 +199,32 @@ def main() -> None:
             mrr = result["mrr"]
             correct = result["correct_top1"]
             print(f"  → Top-1: {top1:.1%}  ({correct}/{total})  MRR: {mrr:.4f}  [{elapsed:.1f}s]")
-            results.append({
-                "id": bid, "name": name,
-                "top1": top1, "mrr": mrr, "correct": correct,
-                "elapsed": elapsed, "error": None,
-            })
+            results.append(
+                {
+                    "id": bid,
+                    "name": name,
+                    "top1": top1,
+                    "mrr": mrr,
+                    "correct": correct,
+                    "elapsed": elapsed,
+                    "error": None,
+                }
+            )
         except Exception as e:
             elapsed = time.perf_counter() - t0
             print(f"  → エラー: {e}", file=sys.stderr)
             traceback.print_exc()
-            results.append({
-                "id": bid, "name": name,
-                "top1": None, "mrr": None, "correct": None,
-                "elapsed": elapsed, "error": str(e),
-            })
+            results.append(
+                {
+                    "id": bid,
+                    "name": name,
+                    "top1": None,
+                    "mrr": None,
+                    "correct": None,
+                    "elapsed": elapsed,
+                    "error": str(e),
+                }
+            )
 
     print_results(results, total)
 

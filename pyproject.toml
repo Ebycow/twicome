@@ -54,6 +54,8 @@ ignore = [
 "app/main.py" = ["D"]
 # バッチスクリプト: モジュール docstring は任意
 "batch/scripts/**/*.py" = ["D100"]
+# チャレンジ用スタンドアロンスクリプト: docstring 不要
+"challenge/**/*.py" = ["D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

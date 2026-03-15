@@ -41,15 +41,20 @@ def build_model() -> Pipeline:
     CalibratedClassifierCV を省くことで 100k 規模でも高速に学習できる。
     C=0.5: 正則化を少し強めにして短テキストの過学習を抑える。
     """
-    return Pipeline([
-        ("tfidf", TfidfVectorizer(
-            analyzer="char_wb",
-            ngram_range=(1, 3),
-            min_df=1,
-            sublinear_tf=True,
-        )),
-        ("clf", LinearSVC(max_iter=2000, C=0.5)),
-    ])
+    return Pipeline(
+        [
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    analyzer="char_wb",
+                    ngram_range=(1, 3),
+                    min_df=1,
+                    sublinear_tf=True,
+                ),
+            ),
+            ("clf", LinearSVC(max_iter=2000, C=0.5)),
+        ]
+    )
 
 
 def predict(training: list[dict], test: list[dict]) -> list[dict]:
@@ -78,7 +83,10 @@ def main():
 
     print(f"タスク取得中: {args.login}")
     task = fetch_task(args.base_url, args.login)
-    print(f"  学習データ: {task['train_count']} 件, テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補")
+    print(
+        f"  学習データ: {task['train_count']} 件, "
+        f"テスト: {task['test_count']} 問 × {task['candidates_per_question']} 候補"
+    )
 
     print("モデルを訓練中...")
     answers = predict(task["training"], task["test"])
@@ -86,7 +94,7 @@ def main():
     print("予測を提出中...")
     result = submit_answers(args.base_url, args.login, task["task_token"], answers)
 
-    print(f"\n--- 結果 ---")
+    print("\n--- 結果 ---")
     print(f"Top-1 accuracy: {result['top1_accuracy']:.1%}  ({result['correct_top1']} / {result['total']})")
     print(f"MRR:            {result['mrr']:.4f}")
 
