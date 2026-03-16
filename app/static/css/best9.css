@@ -73,7 +73,6 @@
         background: linear-gradient(135deg, #ffe599 0%, #ffd700 30%, #c8860a 55%, #ffd700 75%, #ffe599 100%);
         background-clip: text;
         -webkit-text-fill-color: transparent;
-        background-clip: text;
         filter: drop-shadow(0 0 28px rgba(255,200,0,0.25));
         letter-spacing: -0.01em;
       }

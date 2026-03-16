@@ -8,7 +8,7 @@
 #   ./ci-local.sh compile lint-py 指定したステップのみ実行
 #
 # 利用可能なステップ名:
-#   compile, lint-py, lint-format, lint-html, lint-js,
+#   compile, lint-py, lint-format, lint-html, lint-js, lint-css,
 #   db-migrate, unit, integration, ui
 #
 # 環境:
@@ -138,6 +138,10 @@ do_lint_js() {
     $DC --profile lint run --rm lint-js
 }
 
+do_lint_css() {
+    $DC --profile lint run --rm lint-css
+}
+
 do_db_migrate() {
     echo "DB 起動 + appdb_dev マイグレーション..."
     # migrate サービスが depends_on で db を待ってから実行される
@@ -173,6 +177,7 @@ step lint-py      do_lint_py
 step lint-format  do_lint_format
 step lint-html    do_lint_html
 step lint-js      do_lint_js
+step lint-css     do_lint_css
 step db-migrate   do_db_migrate
 step unit         do_unit
 step integration  do_integration
