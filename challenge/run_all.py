@@ -5,14 +5,18 @@
 
 依存パッケージ:
     pip install requests scikit-learn
-    pip install sentence-transformers  # --include sentence_bert 時のみ
+    pip install sentence-transformers  # --include sentence_bert_suite 時のみ
+    pip install janome  # --include janome 時のみ
 
 使い方:
-    # 全ベースライン実行 (sentence_bert は除外)
+    # 全ベースライン実行 (sentence_bert 系 / janome は除外)
     python run_all.py --login someuser --base-url http://localhost:8000/twicome
 
-    # sentence_bert も含めて実行
-    python run_all.py --login someuser --include sentence_bert
+    # sentence_bert 系も含めて実行
+    python run_all.py --login someuser --include sentence_bert_suite
+
+    # 追加依存があるベースラインを全部含めて実行
+    python run_all.py --login someuser --include sentence_bert_suite janome
 
     # 特定のベースラインのみ実行
     python run_all.py --login someuser --only tfidf svm ensemble
@@ -75,18 +79,72 @@ BASELINES: list[tuple[str, str, callable]] = [
     ("word_ngram", "文字+単語 n-gram + LR", _make_predict("baseline_word_ngram")),
     ("centroid", "Nearest Centroid (cosine)", _make_predict("baseline_centroid")),
     ("handcrafted", "手作り特徴量 + LinearSVC", _make_predict("baseline_handcrafted")),
+    ("janome", "Janome 分かち書き + 特徴量融合 + LinearSVC", _make_predict("baseline_janome")),
     ("adaptive", "適応ブレンド", _make_predict("baseline_adaptive")),
     ("ensemble", "アンサンブル (ソフト投票)", _make_predict("baseline_ensemble")),
-    # sentence_bert はデフォルト除外 (--include sentence_bert で有効化)
+    # sentence_bert 系と janome はデフォルト除外 (--include ... で有効化)
     (
         "sentence_bert",
         "Sentence-BERT + LR",
         _make_predict("baseline_sentence_bert", model_name="hotchpotch/static-embedding-japanese"),
     ),
+    (
+        "sentence_bert_knn",
+        "Sentence-BERT + top-k 近傍",
+        _make_predict("baseline_sentence_bert_knn", model_name="hotchpotch/static-embedding-japanese"),
+    ),
+    (
+        "sentence_bert_margin",
+        "Sentence-BERT + target/other margin",
+        _make_predict("baseline_sentence_bert_margin", model_name="hotchpotch/static-embedding-japanese"),
+    ),
+    (
+        "sentence_bert_multiview",
+        "Sentence-BERT + short-text multi-view",
+        _make_predict("baseline_sentence_bert_multiview", model_name="hotchpotch/static-embedding-japanese"),
+    ),
+    (
+        "sentence_bert_bucketed",
+        "Sentence-BERT + バケット別プロトタイプ",
+        _make_predict("baseline_sentence_bert_bucketed", model_name="hotchpotch/static-embedding-japanese"),
+    ),
+    (
+        "sentence_bert_rerank",
+        "Sentence-BERT + 二段階 rerank",
+        _make_predict("baseline_sentence_bert_rerank", model_name="hotchpotch/static-embedding-japanese"),
+    ),
+    (
+        "sentence_bert_contrastive",
+        "Sentence-BERT + 対照学習アダプタ",
+        _make_predict("baseline_sentence_bert_contrastive", model_name="hotchpotch/static-embedding-japanese"),
+    ),
 ]
 
+OPTIONAL_GROUPS = {
+    "sentence_bert_suite": {
+        "sentence_bert",
+        "sentence_bert_knn",
+        "sentence_bert_margin",
+        "sentence_bert_multiview",
+        "sentence_bert_bucketed",
+        "sentence_bert_rerank",
+        "sentence_bert_contrastive",
+    }
+}
+
+
+def expand_ids(values: list[str] | None) -> set[str]:
+    if not values:
+        return set()
+
+    expanded = set()
+    for value in values:
+        expanded |= OPTIONAL_GROUPS.get(value, {value})
+    return expanded
+
+
 # デフォルトで除外するベースライン
-DEFAULT_EXCLUDE = {"sentence_bert"}
+DEFAULT_EXCLUDE = OPTIONAL_GROUPS["sentence_bert_suite"] | {"janome"}
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +202,7 @@ def main() -> None:
         "--include",
         nargs="+",
         metavar="ID",
-        help="デフォルト除外のベースラインを追加する (例: sentence_bert)",
+        help="デフォルト除外のベースライン/グループを追加する (例: sentence_bert_suite janome)",
     )
     parser.add_argument(
         "--skip",
@@ -156,19 +214,20 @@ def main() -> None:
         "--only",
         nargs="+",
         metavar="ID",
-        help="指定したベースラインのみ実行 (--skip/--include を上書き)",
+        help="指定したベースライン/グループのみ実行 (--skip/--include を上書き)",
     )
     args = parser.parse_args()
 
     # 実行対象を決定
     exclude = set(DEFAULT_EXCLUDE)
     if args.include:
-        exclude -= set(args.include)
+        exclude -= expand_ids(args.include)
     if args.skip:
-        exclude |= set(args.skip)
+        exclude |= expand_ids(args.skip)
 
     if args.only:
-        targets = [(bid, name, fn) for bid, name, fn in BASELINES if bid in args.only]
+        only_ids = expand_ids(args.only)
+        targets = [(bid, name, fn) for bid, name, fn in BASELINES if bid in only_ids]
     else:
         targets = [(bid, name, fn) for bid, name, fn in BASELINES if bid not in exclude]
 

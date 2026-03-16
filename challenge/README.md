@@ -196,8 +196,11 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 # 必須パッケージ (全ベースライン共通)
 pip install requests scikit-learn numpy scipy
 
-# baseline_sentence_bert.py を使う場合のみ追加
+# baseline_sentence_bert 系を使う場合のみ追加
 pip install sentence-transformers
+
+# baseline_janome.py を使う場合のみ追加
+pip install janome
 ```
 
 または `requirements.txt` から一括インストール:
@@ -215,11 +218,14 @@ pip install -r requirements.txt
 同一タスクで全ベースラインを一括実行し、Top-1 accuracy と MRR を表で比較します。
 
 ```bash
-# 全ベースラインを実行 (sentence_bert 以外)
+# 全ベースラインを実行 (sentence_bert 系 / janome 以外)
 python run_all.py --login someuser --base-url http://localhost:8000
 
-# sentence_bert も含めて実行
-python run_all.py --login someuser --base-url http://localhost:8000 --include sentence_bert
+# sentence_bert 系も含めて実行
+python run_all.py --login someuser --base-url http://localhost:8000 --include sentence_bert_suite
+
+# 追加依存があるベースラインを全部含めて実行
+python run_all.py --login someuser --base-url http://localhost:8000 --include sentence_bert_suite janome
 
 # 特定のベースラインのみ実行
 python run_all.py --login someuser --only svm ensemble adaptive
@@ -330,6 +336,16 @@ python baseline_centroid.py --login someuser --base-url http://localhost:8000
 python baseline_handcrafted.py --login someuser --base-url http://localhost:8000
 ```
 
+#### baseline_janome.py — Janome 分かち書き + 特徴量融合 + LinearSVC
+
+Janome で日本語を分かち書きし、単語・原形/品詞 n-gram に加えて文字 n-gram と手作り特徴量を結合する上級ベースラインです。
+語彙だけでなく、助詞の使い方や語尾、記号の混ぜ方といったスタイル差もまとめて捉えられます。
+
+```bash
+pip install janome
+python baseline_janome.py --login someuser --base-url http://localhost:8000
+```
+
 #### baseline_ensemble.py — アンサンブル (ソフト投票)
 
 LR・SVM・NB・単語 n-gram の 4 モデルのスコアを重み付き平均してランク付けします。
@@ -358,6 +374,60 @@ python baseline_sentence_bert.py --login someuser --base-url http://localhost:80
 
 # 別のモデルを使う場合
 python baseline_sentence_bert.py --login someuser --model cl-tohoku/bert-base-japanese-char-v3
+```
+
+#### baseline_sentence_bert_knn.py — Sentence-BERT + top-k 近傍
+
+本人コメント埋め込みとの類似度を top-k 近傍で集約するベースラインです。
+短文チャットでは「意味の平均」よりも、似た言い回しやスタンプ名への局所一致が効くケースを狙います。
+
+```bash
+python baseline_sentence_bert_knn.py --login someuser --base-url http://localhost:8000
+```
+
+#### baseline_sentence_bert_margin.py — Sentence-BERT + target/other margin
+
+本人コメントへの近さに加えて、`user_idx` ごとにまとめた別人重心へ近すぎないこともスコア化します。
+「誰でも言いそうな短文」を落としたいときに向く variant です。
+
+```bash
+python baseline_sentence_bert_margin.py --login someuser --base-url http://localhost:8000
+```
+
+#### baseline_sentence_bert_multiview.py — Sentence-BERT + short-text multi-view
+
+raw テキストと正規化テキストの両方を埋め込み、`w/ｗ/wwww` や全半角の揺れを吸収します。
+短文特有の表記揺れに強くしたいときの variant です。
+
+```bash
+python baseline_sentence_bert_multiview.py --login someuser --base-url http://localhost:8000
+```
+
+#### baseline_sentence_bert_bucketed.py — Sentence-BERT + バケット別プロトタイプ
+
+候補コメントを「笑い系」「疑問文」「超短文」などに分け、同タイプの本人コメント重心と比較します。
+短文のスタイル差を明示的に使う variant です。
+
+```bash
+python baseline_sentence_bert_bucketed.py --login someuser --base-url http://localhost:8000
+```
+
+#### baseline_sentence_bert_rerank.py — Sentence-BERT + 二段階 rerank
+
+1段目で近傍類似度から top 候補を拾い、2段目で margin・bucket 類似度・長さなど少数特徴で並べ替えます。
+検索と識別を分けて考える sentence_bert 系の実験用ベースラインです。
+
+```bash
+python baseline_sentence_bert_rerank.py --login someuser --base-url http://localhost:8000
+```
+
+#### baseline_sentence_bert_contrastive.py — Sentence-BERT + 対照学習アダプタ
+
+固定 Sentence-BERT 埋め込みの上に軽量な線形アダプタを学習し、本人同士を近づけて本人/別人を引き離します。
+フル fine-tuning より軽く、対照学習の方向性を試すための variant です。
+
+```bash
+python baseline_sentence_bert_contrastive.py --login someuser --base-url http://localhost:8000
 ```
 
 ---
@@ -392,7 +462,10 @@ ranked = [candidates[i]["candidate_id"] for i in scores.argsort()[::-1]]
 | 文字 n-gram        | 1〜5 文字の組み合わせ。日本語の形態素解析なしで使える             |
 | 単語 n-gram        | スペース・句読点でトークナイズ。スタンプ名の一致に有効             |
 | 文字種の比率        | 全角英数・半角・絵文字・ひらがな・カタカナの割合                  |
+| 形態素解析 + 品詞 n-gram | Janome などで分かち書きし、原形・品詞列・助詞の癖を特徴量化       |
 | 事前学習モデル      | sentence-transformers 等で埋め込みベクトル化                    |
+| 埋め込み + top-k 近傍 | 本人コメント群との局所一致をスコア化し、短文の言い回し重視で比較   |
+| 埋め込み + multi-view | raw/正規化テキストの両方を埋め込み、短文の表記ゆれを吸収         |
 | user_idx の活用   | 別人 99 人をそれぞれモデル化し、テスト候補が「誰でもない」ことを確認 |
 
 ### NN を使う場合

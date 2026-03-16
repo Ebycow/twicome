@@ -2,5 +2,8 @@
 requests
 scikit-learn
 
-# baseline_sentence_bert.py のみ必要 (任意)
+# baseline_sentence_bert 系のみに必要 (任意)
 # sentence-transformers
+
+# baseline_janome.py のみ必要 (任意)
+# janome
