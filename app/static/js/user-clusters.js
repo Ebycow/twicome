@@ -10,6 +10,7 @@
   const CLUSTER_COMMENTS_BASE = location.pathname.replace('/clusters', '/cluster-comments');
 
   /**
+   * クラスタをサブクラスタに分解してAPIを呼び出し結果カードをDOMに挿入する。
    * @param btn - ドリルダウンボタン要素
    * @param nClusters - サブクラスタ数
    * @param parentPath - 親までのパス文字列（例: "2" または "2,1"）

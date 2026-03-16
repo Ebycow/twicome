@@ -54,6 +54,7 @@
   let isSpecialMode = false;
 
   /**
+   * 文字列内のHTML特殊文字をエスケープする。
    * @param str - HTMLエスケープする文字列
    * @returns HTMLエスケープ済みの文字列
    */
@@ -68,6 +69,7 @@
   }
 
   /**
+   * コメントオブジェクトから本文HTMLを生成する。body_htmlがあればそのまま返し、なければテキストをエスケープする。
    * @param comment - 描画対象のコメントオブジェクト
    * @returns コメント本文として表示するHTML文字列
    */
@@ -77,6 +79,7 @@
   }
 
   /**
+   * コメントのコミュニティノート情報からHTML文字列を生成する。ノートがなければ空文字を返す。
    * @param comment - コミュニティノート情報を含むコメントオブジェクト
    * @returns コミュニティノート表示用のHTML文字列
    */
@@ -115,6 +118,7 @@
   }
 
   /**
+   * コメントオブジェクトからDOM要素（リンクとコメント本体）を生成して返す。
    * @param comment - 描画対象のコメントオブジェクト
    * @param options - バッジ表示や強調表示を切り替える描画オプション
    * @returns コメントリンク要素とコメント本体要素
@@ -162,6 +166,7 @@
   }
 
   /**
+   * ブラウザのURLをページ番号またはカーソルIDに基づいて履歴に積む形で更新する。
    * @param page - 現在表示中として反映するページ番号
    * @param cursor - URLに残すカーソルID。未指定ならpageを使う
    */
@@ -178,7 +183,7 @@
   }
 
   /**
-   *
+   * 前ページ読み込みボタンの表示/非表示をカーソルモードと現在ページ番号に応じて切り替える。
    */
   function updatePrevButton() {
     const btn = document.getElementById('load-prev');
@@ -191,6 +196,7 @@
   }
 
   /**
+   * 投票ボタン（いいね・疑問）のHTML文字列を生成して返す。
    * @param commentId - 対象コメントのID
    * @param likesCount - いいね数
    * @param dislikesCount - 疑問票数
@@ -205,6 +211,7 @@
   }
 
   /**
+   * コンテナ要素内に投票ボタンHTMLをセットする。
    * @param container - 投票ボタンを書き込むコンテナ要素
    * @param commentId - 対象コメントのID
    * @param likesCount - いいね数
@@ -216,6 +223,7 @@
   }
 
   /**
+   * APIから最新の投票数を取得して遅延ハイドレーション対象の投票ボタンを更新する。
    * @param containers - 遅延ハイドレーション対象の投票コンテナ配列
    */
   async function hydrateDeferredVoteControls(containers) {
@@ -249,7 +257,7 @@
   }
 
   /**
-   *
+   * アイドル時またはタイムアウト後に遅延投票ハイドレーションをスケジュールする。
    */
   function scheduleDeferredVoteHydration() {
     const containers = Array.from(document.querySelectorAll('[data-vote-controls="deferred"]'));
@@ -263,6 +271,7 @@
   }
 
   /**
+   * 指定ページのコメントをAPIから取得してリストに追加または差し替える。
    * @param page - 読み込むページ番号
    * @param direction - コメントの挿入方向（`append` または `prepend`）
    * @param reset - trueなら既存一覧をリセットして再描画する
@@ -364,6 +373,7 @@
   }
 
   /**
+   * ボタンの位置を起点にコンフェティアニメーションを生成する。
    * @param button - コンフェティを発生させる基点のボタン要素
    */
   function spawnConfetti(button) {
@@ -395,6 +405,7 @@
   const VOTE_DEBOUNCE_MS = 500;
 
   /**
+   * 投票ボタンのクリック時にカウントを即時更新しデバウンス付きでAPIへ送信する。
    * @param button - クリックされた投票ボタン要素
    * @param commentId - 投票対象コメントのID
    * @param type - 投票種別（`like` または `dislike`）
@@ -419,6 +430,7 @@
   }
 
   /**
+   * デバウンスキーに対応する保留中の投票をAPIへ送信する。
    * @param key - 投票バッファを識別する `{commentId}-{type}` 形式のキー
    */
   async function flushVote(key) {
@@ -444,6 +456,7 @@
   const best9Bar = document.getElementById('best9-bar');
 
   /**
+   * コメント本文テキストをBest9テキストキャッシュに保存する。
    * @param commentId - Best9候補として保存するコメントID
    * @param commentDiv - コメント本文を抽出するDOM要素
    */
@@ -454,6 +467,7 @@
   }
 
   /**
+   * コメント要素のメタ領域にBest9追加ボタンを挿入する。
    * @param commentDiv - Best9操作ボタンを追加するコメント要素
    */
   function addBest9Button(commentDiv) {
@@ -476,14 +490,14 @@
   }
 
   /**
-   *
+   * 現在のBest9リストをlocalStorageに保存する。
    */
   function saveBest9() {
     try { localStorage.setItem(`best9_${  userLogin}`, JSON.stringify(best9List)); } catch (e) {}
   }
 
   /**
-   *
+   * Best9トグルボタンのラベルをモードと選択件数に応じて更新する。
    */
   function updateBest9ToggleLabel() {
     if (!best9ToggleBtn) {return;}
@@ -496,6 +510,7 @@
   }
 
   /**
+   * コメントのBest9選択状態をトグルし、UIとlocalStorageを更新する。
    * @param commentId - 切り替え対象のコメントID
    * @param btn - 状態表示を更新するBest9ボタン要素
    * @param commentDiv - 選択状態を反映するコメント要素
@@ -522,6 +537,7 @@
   }
 
   /**
+   * コメントID配列をdeflate-raw圧縮してURL安全なBase64文字列に変換する。
    * @param idArray - URL短縮用に圧縮するコメントID配列
    * @returns deflate圧縮したID文字列。未対応時はnull
    */
@@ -550,6 +566,7 @@
   }
 
   /**
+   * 現在のBest9リストを元に共有用URLを生成して返す。
    * @returns 現在のBest9共有URL
    */
   async function buildBest9Url() {
@@ -559,7 +576,7 @@
   }
 
   /**
-   *
+   * Best9バーの件数表示と共有URLを最新の選択状態に更新する。
    */
   async function updateBest9Bar() {
     document.getElementById('best9-count').textContent = `${best9List.length  }/9`;
@@ -575,7 +592,7 @@
   }
 
   /**
-   *
+   * Best9モードのON/OFFに応じてトグルボタン・バー・各コメントへのボタン追加/削除を行う。
    */
   function applyBest9ModeUI() {
     if (!best9ToggleBtn) {return;}
@@ -642,7 +659,7 @@
   let dragSrcIndex = null;
 
   /**
-   *
+   * Best9プレビューグリッドを現在の選択リストで再描画する。
    */
   function renderPreviewGrid() {
     const grid = document.getElementById('best9-preview-grid');
@@ -683,6 +700,7 @@
   }
 
   /**
+   * Best9プレビュースロットのドラッグ開始時にソースインデックスを記録しスタイルを適用する。
    * @param e - ドラッグ開始イベント
    */
   function onSlotDragStart(e) {
@@ -692,6 +710,7 @@
   }
 
   /**
+   * Best9プレビュースロット上をドラッグ通過中にドロップ受け入れスタイルを適用する。
    * @param e - ドラッグオーバーイベント
    */
   function onSlotDragOver(e) {
@@ -702,11 +721,12 @@
   }
 
   /**
-   *
+   * Best9プレビュースロットからドラッグが離れた際にドロップ強調スタイルを除去する。
    */
   function onSlotDragLeave() { this.classList.remove('drag-over'); }
 
   /**
+   * Best9プレビュースロットへのドロップ時にリスト内の順序を入れ替えてグリッドを再描画する。
    * @param e - ドロップイベント
    */
   function onSlotDrop(e) {
@@ -723,7 +743,7 @@
   }
 
   /**
-   *
+   * Best9プレビュースロットのドラッグ終了時にドラッグ状態をリセットする。
    */
   function onSlotDragEnd() {
     this.classList.remove('dragging');
@@ -743,6 +763,7 @@
   const similarStatus = document.getElementById('similar-status');
 
   /**
+   * 検索結果のコメント配列をリスト要素に描画する。
    * @param items - 特殊検索結果として表示するコメント配列
    * @param badgeHtml - 各コメントに付けるバッジHTML、または生成関数
    */
@@ -760,7 +781,7 @@
   }
 
   /**
-   *
+   * 類似検索・典型度・感情検索などの特殊モードを終了して通常のコメント一覧に戻る。
    */
   function exitSpecialMode() {
     isSpecialMode = false;
@@ -785,7 +806,7 @@
   }
 
   /**
-   *
+   * 入力クエリでFAISS類似検索APIを呼び出して結果をコメントリストに描画する。
    */
   async function performSimilarSearch() {
     const query = similarInput.value.trim();
@@ -945,7 +966,7 @@
     const fabTop = document.getElementById('fab-top');
     if (!drawer) {return;}
     /**
-     *
+     * モバイル用サイドドロワーを開いてスクロールをロックする。
      */
     function openDrawer() {
       drawer.classList.add('open');
@@ -953,7 +974,7 @@
       document.body.style.overflow = 'hidden';
     }
     /**
-     *
+     * モバイル用サイドドロワーを閉じてスクロールロックを解除する。
      */
     function closeDrawer() {
       drawer.classList.remove('open');
@@ -983,12 +1004,14 @@
     let isRefreshing = false;
 
     /**
+     * データバージョン文字列からコロン以降の付加情報を除いた基底バージョンを返す。
      * @param version - データバージョン文字列
      * @returns 付加情報を除いた基底バージョン文字列
      */
     function versionBase(version) { return String(version || '').split(':')[0]; }
 
     /**
+     * 数字14桁形式のデータバージョン文字列を人が読みやすい日時形式に整形する。
      * @param version - 表示対象のデータバージョン文字列
      * @returns バナー表示用に整形したバージョン文字列
      */
@@ -1001,6 +1024,7 @@
     }
 
     /**
+     * データ更新バナーの表示/非表示を切り替える。
      * @param visible - trueならバナーを表示し、falseなら非表示にする
      */
     function setBannerVisible(visible) {
@@ -1009,6 +1033,7 @@
     }
 
     /**
+     * 最新バージョンが現在のバージョンと異なる場合にデータ更新バナーを表示する。
      * @param latestVersion - サーバ側で取得した最新データバージョン
      */
     function showUpdateNotice(latestVersion) {
@@ -1018,11 +1043,12 @@
     }
 
     /**
-     *
+     * データ更新バナーを非表示にする。
      */
     function hideUpdateNotice() { setBannerVisible(false); }
 
     /**
+     * 現在ページのURLに対応するキャッシュ削除候補のURLリストを返す。
      * @returns 現在ページに対応する削除候補キャッシュキーの配列
      */
     function getCurrentPageCacheCandidates() {
@@ -1038,6 +1064,7 @@
     }
 
     /**
+     * 現在ページに関連するすべてのキャッシュエントリを削除する。
      * @returns 現在ページに関連するキャッシュ削除が完了したかどうか
      */
     async function clearCurrentPageCaches() {
@@ -1055,6 +1082,7 @@
     }
 
     /**
+     * Service Worker経由で指定URLのキャッシュを更新する。
      * @param targetUrl - Service Worker経由で更新したいページURL
      * @returns Service Workerによる更新が成功したかどうか
      */
@@ -1080,7 +1108,7 @@
     }
 
     /**
-     *
+     * Service Workerまたはキャッシュ削除を経てコメントページをリロードする。
      */
     async function refreshCommentsPage() {
       if (isRefreshing) {return;}
@@ -1135,6 +1163,7 @@
     }
 
     /**
+     * JST基準で当日または指定オフセット日数後のYYYY-MM-DD形式の日付文字列を返す。
      * @param offsetDays - 当日からの加減日数
      * @returns JST基準の `YYYY-MM-DD` 形式日付文字列
      */
@@ -1145,6 +1174,7 @@
     }
 
     /**
+     * 指定パラメータでエクスポートURLを構築して画面遷移する。
      * @param params - エクスポートURLに付与するクエリパラメータ
      */
     function doExport(params) {

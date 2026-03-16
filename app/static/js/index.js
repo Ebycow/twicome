@@ -59,6 +59,7 @@
   let commentsPrefetchTransportMode = 'direct-fetch';
 
   /**
+   * Service Workerがページをコントロール下に置くまで待機し、タイムアウトした場合はfalseで解決する。
    * @param timeoutMs - タイムアウトまでの待機時間（ミリ秒、デフォルト3000）
    * @returns ServiceWorkerがcontrollerを取得できたかどうかを表すPromise
    */
@@ -97,6 +98,7 @@
     : Promise.resolve(null);
 
   /**
+   * パステンプレートのプレースホルダをエンコードされたログイン名で置換する。
    * @param template - `__LOGIN_PLACEHOLDER__` を含むパステンプレート
    * @param login - 置換するログイン名
    * @returns ログイン名を埋め込んだパス文字列
@@ -106,6 +108,7 @@
   }
 
   /**
+   * ログイン名とプラットフォームからコメントページのURLを組み立てる。
    * @param login - ユーザのログイン名
    * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    * @returns コメントページのURL文字列
@@ -116,6 +119,7 @@
   }
 
   /**
+   * ログイン名とプラットフォームを正規化してプリフェッチ重複チェック用のキーを生成する。
    * @param login - ユーザのログイン名
    * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    * @returns 正規化されたプリフェッチキー文字列
@@ -129,7 +133,7 @@
   }
 
   /**
-   *
+   * アイドル時またはタイムアウト後にコメントプリフェッチキューの処理をスケジュールする。
    */
   function scheduleCommentPrefetchFlush() {
     if (commentPrefetchFlushScheduled || offlineMode) {return;}
@@ -146,6 +150,7 @@
   }
 
   /**
+   * Service Worker経由でコメントページをキャッシュにプリフェッチする。
    * @param url - プリフェッチ対象のコメントページURL
    * @returns プリフェッチ完了を表すPromise
    */
@@ -170,6 +175,7 @@
   }
 
   /**
+   * Service Workerまたは直接フェッチでコメントページをプリフェッチしキャッシュに保存する。
    * @param login - プリフェッチ対象ユーザのログイン名
    * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    */
@@ -215,7 +221,7 @@
   }
 
   /**
-   *
+   * 同時実行数の上限を守りながらコメントプリフェッチキューを順次処理する。
    */
   async function flushCommentPrefetchQueue() {
     if (offlineMode) {return;}
@@ -235,6 +241,7 @@
   }
 
   /**
+   * 指定ユーザのコメントページをプリフェッチキューに追加してフラッシュをスケジュールする。
    * @param login - キューに追加するユーザのログイン名
    * @param platform - プラットフォーム名（デフォルト: 'twitch'）
    */
@@ -264,7 +271,7 @@
   };
 
   /**
-   *
+   * 入力欄の現在値を解決して対応するコメントページのプリフェッチをデバウンス付きでスケジュールする。
    */
   function scheduleResolvedInputPrefetch() {
     if (resolvedInputPrefetchTimer) {window.clearTimeout(resolvedInputPrefetchTimer);}
@@ -277,7 +284,7 @@
   }
 
   /**
-   *
+   * ページ読み込み直後にデフォルトユーザとクイックリンクのコメントページをプリフェッチキューに追加する。
    */
   function primeInitialCommentPrefetches() {
     const defaultLogin = form.dataset.defaultLogin || loginInput.value.trim();
@@ -292,6 +299,7 @@
   }
 
   /**
+   * リンク要素のaria-disabled属性を設定して有効/無効状態を切り替える。
    * @param link - 状態を変更するリンク要素
    * @param enabled - trueなら有効、falseなら無効（aria-disabled）
    */
@@ -300,6 +308,7 @@
   }
 
   /**
+   * 統計ページとクイズページへのリンクを一括で有効/無効にする。
    * @param enabled - trueなら統計・クイズリンクを有効化、falseなら無効化
    */
   function setActionLinkState(enabled) {
@@ -309,6 +318,7 @@
   }
 
   /**
+   * 統計ページとクイズページへのリンクhrefを指定ユーザのURLに更新する。
    * @param login - リンク先を設定するユーザのログイン名
    */
   function setActionLinks(login) {
@@ -317,6 +327,7 @@
   }
 
   /**
+   * 候補リストの代わりにメッセージを表示する。
    * @param message - 候補リストに表示するメッセージ文字列
    */
   function showCandidateMessage(message) {
@@ -325,13 +336,14 @@
   }
 
   /**
-   *
+   * localStorage からオフラインアクセス可能なルート情報を再読み込みする。
    */
   function refreshOfflineAccessibleRoutes() {
     offlineAccessibleRoutes = offlineAccess.read(rootPath);
   }
 
   /**
+   * 指定ルートとログイン名の組み合わせがオフラインでアクセス可能かどうかを返す。
    * @param route - チェック対象のルート名（'comments', 'stats', 'quiz'）
    * @param login - ユーザのログイン名
    * @returns オフラインでアクセス可能かどうか
@@ -342,6 +354,7 @@
   }
 
   /**
+   * オフラインでコメントページを開けるユーザ数を返す。
    * @returns オフラインでコメントページを開けるユーザ数
    */
   function countOfflineCommentUsers() {
@@ -354,7 +367,7 @@
   }
 
   /**
-   *
+   * オフライン状態に応じてステータス表示要素の内容と表示/非表示を更新する。
    */
   function updateOfflineStatus() {
     if (!offlineMode) { offlineStatus.hidden = true; return; }
@@ -368,6 +381,7 @@
   }
 
   /**
+   * オフラインアクセス情報を再読み込みし、ステータス表示・リンク・候補リストを更新する。
    * @param opts - オプション（`rerender: true` で候補リストを再描画）
    */
   function refreshOfflineState(opts) {
@@ -381,6 +395,7 @@
   }
 
   /**
+   * APIから受け取ったユーザ配列を正規化してindexedUsers・loginMap・displayMapを構築する。
    * @param rawUsers - APIから受け取ったユーザ配列
    */
   function hydrateUsers(rawUsers) {
@@ -412,6 +427,7 @@
   }
 
   /**
+   * ユーザインデックスが未読み込みの場合はAPIからフェッチして読み込む。
    * @returns ユーザインデックスの読み込み完了を表すPromise
    */
   async function ensureUsersLoaded() {
@@ -436,6 +452,7 @@
   }
 
   /**
+   * ISO日時文字列から現在時刻までの差分を日本語の相対時間文字列に変換する。
    * @param isoStr - ISO形式の日時文字列
    * @returns 表示用の相対時間文字列。日時がない場合はnull
    */
@@ -454,6 +471,7 @@
   }
 
   /**
+   * ユーザの表示名とログイン名からサジェスト候補に表示するラベル文字列を生成する。
    * @param user - 候補表示に使うユーザ情報オブジェクト
    * @returns 候補一覧に表示するラベル文字列
    */
@@ -463,6 +481,7 @@
   }
 
   /**
+   * 入力値をログインマップ・表示名マップと照合して一意に解決できるログイン名を返す。
    * @param input - 入力欄に現在入っている文字列
    * @returns 一意に解決できたログイン名。解決できない場合は空文字列
    */
@@ -478,6 +497,7 @@
   }
 
   /**
+   * 選択中の配信者フィルタをユーザ配列に適用して絞り込んだ配列を返す。
    * @param users - フィルタ前のユーザ配列
    * @returns 配信者フィルタ適用後のユーザ配列
    */
@@ -488,6 +508,7 @@
   }
 
   /**
+   * オフラインモード時にコメントページへアクセス可能なユーザだけに絞り込む。
    * @param users - フィルタ前のユーザ配列
    * @returns オフライン閲覧可能なユーザだけに絞った配列
    */
@@ -497,6 +518,7 @@
   }
 
   /**
+   * 現在のソート条件に従ってユーザ配列をソートした新しい配列を返す。
    * @param users - 並び替え対象のユーザ配列
    * @returns 現在のソート条件で並び替えた新しい配列
    */
@@ -518,6 +540,7 @@
   }
 
   /**
+   * 入力文字列に対してフィルタ・ソート・重複排除を適用して候補ユーザ配列を返す。
    * @param input - 検索欄に入力された文字列
    * @returns 表示候補となるユーザ配列
    */
@@ -553,6 +576,7 @@
   }
 
   /**
+   * ユーザ情報からサジェスト候補のボタン要素を生成する。
    * @param user - 候補として描画するユーザ情報
    * @returns 候補一覧に追加するボタン要素
    */
@@ -606,11 +630,12 @@
   }
 
   /**
-   *
+   * 候補リストを非表示にする。
    */
   function hideCandidates() { loginSearchResults.hidden = true; }
 
   /**
+   * 候補からユーザを選択して入力欄とアクションリンクを更新しプリフェッチをキューに追加する。
    * @param login - 選択されたユーザのログイン名
    */
   function selectLogin(login) {
@@ -624,6 +649,7 @@
   }
 
   /**
+   * 現在の入力値に基づいて候補リストをDOMに描画する。
    * @param input - 候補抽出に使う現在の入力値
    */
   async function renderCandidates(input) {
@@ -656,7 +682,7 @@
   }
 
   /**
-   *
+   * 入力欄の現在値を解決して統計・クイズリンクのhrefと有効/無効状態を同期する。
    */
   function syncActionLinksFromInput() {
     const currentValue = loginInput.value.trim();
@@ -677,7 +703,7 @@
   }
 
   /**
-   *
+   * 入力欄の値の有無に応じてクリアボタンの表示/非表示を切り替える。
    */
   function updateClearBtn() {
     loginSearchClear.style.display = loginInput.value ? 'flex' : 'none';

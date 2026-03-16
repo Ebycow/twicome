@@ -4,6 +4,7 @@
   const voteCountsApiUrl = `${rootPath  }/api/comments/votes`;
 
   /**
+   * 文字列内のHTML特殊文字をエスケープする。
    * @param str - エスケープ対象の文字列
    * @returns HTMLエスケープされた文字列
    */
@@ -18,6 +19,7 @@
   }
 
   /**
+   * ボタンを起点にコンフェティアニメーションを生成する。
    * @param button - コンフェティの発生起点となるボタン要素
    */
   function spawnConfetti(button) {
@@ -49,6 +51,7 @@
   const VOTE_DEBOUNCE_MS = 500;
 
   /**
+   * 投票ボタンのクリック時にUIを即時更新し、デバウンス送信をスケジュールする。
    * @param button - クリックされた投票ボタン要素
    * @param commentId - 投票対象のコメントID
    * @param type - 投票種別（'like' または 'dislike'）
@@ -77,6 +80,7 @@
   }
 
   /**
+   * デバウンスキーに対応する保留中の投票をAPIへ送信する。
    * @param key - 投票キー（`{commentId}-{type}` 形式）
    */
   async function flushVote(key) {
@@ -97,6 +101,7 @@
   }
 
   /**
+   * 指定コンテナに投票ボタンを生成してセットする。
    * @param container - 投票ボタンを挿入するコンテナ要素
    * @param commentId - コメントID
    * @param likesCount - 現在のいいね数
@@ -111,6 +116,7 @@
   }
 
   /**
+   * APIから最新の投票数を取得して遅延ハイドレーション対象のコントロールを更新する。
    * @param containers - 遅延ハイドレーション対象のコンテナ要素の配列
    */
   async function hydrateDeferredVoteControls(containers) {

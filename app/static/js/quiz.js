@@ -48,6 +48,7 @@
   let answering = false;
 
   /**
+   * 文字列内のHTML特殊文字をエスケープする。
    * @param s - エスケープ対象の文字列
    * @returns HTMLエスケープされた文字列
    */
@@ -57,7 +58,7 @@
   }
 
   /**
-   *
+   * ライフ表示のハートをリセットして初期状態（3個）に戻す。
    */
   function resetHearts() {
     livesContainer.innerHTML = '';
@@ -70,7 +71,7 @@
   }
 
   /**
-   *
+   * 正解時に画面全体にコンフェティアニメーションを生成する。
    */
   function spawnConfetti() {
     const colors = ['#f44336','#ff9800','#ffeb3b','#4caf50','#2196f3','#9c27b0','#e91e63'];
@@ -89,6 +90,7 @@
   }
 
   /**
+   * 1つのコンフェティ要素にフォールアニメーションを適用して終了後に削除する。
    * @param el - アニメーションさせるコンフェティ要素
    */
   function animateConfetti(el) {
@@ -118,7 +120,7 @@
   retryBtn.addEventListener('click', startGame);
 
   /**
-   *
+   * ゲームの状態をリセットしてAPIからクイズ問題を取得しゲームを開始する。
    */
   function startGame() {
     idx = 0; score = 0; lives = 3; streak = 0; bestStreak = 0;
@@ -163,7 +165,7 @@
   }
 
   /**
-   *
+   * 現在のインデックスの問題を画面に表示する。ゲームオーバー条件を満たす場合は終了画面へ遷移する。
    */
   function showQuestion() {
     if (idx >= questions.length || lives <= 0) {
@@ -192,6 +194,7 @@
   btnOther.addEventListener('click', function () { handleAnswer(false); });
 
   /**
+   * ユーザの回答を受け取り正誤判定を行い結果オーバーレイを表示して次の問題へ進む。
    * @param guessedTarget - trueなら「この配信者の発言」と回答、falseなら「他の人の発言」と回答
    */
   function handleAnswer(guessedTarget) {
@@ -213,6 +216,7 @@
   }
 
   /**
+   * 正解時のスコア・ストリークを更新しUIにフィードバックを反映する。
    * @param q - 正解した問題オブジェクト
    */
   function onCorrect(q) {
@@ -228,6 +232,7 @@
   }
 
   /**
+   * 不正解時にライフを減らしストリークをリセットしUIに反映する。
    * @param q - 不正解だった問題オブジェクト
    */
   function onWrong(q) {
@@ -239,7 +244,7 @@
   }
 
   /**
-   *
+   * ゲームオーバー画面を表示し最終スコアや統計をアニメーション付きで描画する。
    */
   function showGameOver() {
     gameScreen.style.display = 'none';
@@ -261,6 +266,7 @@
   }
 
   /**
+   * 指定DOM要素の数値を0から目標値までイージングアニメーションでカウントアップする。
    * @param el - 数値を表示するDOM要素
    * @param target - カウントアップの目標値
    * @param duration - アニメーション時間（ミリ秒）
