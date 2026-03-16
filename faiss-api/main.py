@@ -187,6 +187,72 @@ class UserIndex:
                 results.append((self.comment_ids[idx], float(score)))
         return results
 
+    def search_mmr(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int,
+        diversity: float = 0.5,
+    ) -> list[tuple[str, float]]:
+        """MMR (Maximal Marginal Relevance) 検索。
+
+        diversity=1.0 → 通常の類似度順と同じ（多様性なし）
+        diversity=0.5 → 関連性と多様性のバランス（推奨）
+        diversity=0.0 → 最大多様性（関連性を無視）
+
+        上位 top_k * 5 件を候補として取得し、その中から
+        MMR スコアで top_k 件を選ぶ。
+        """
+        fetch_k = min(top_k * 5, self.index.ntotal)
+        if query_embedding.ndim == 1:
+            query_embedding = query_embedding.reshape(1, -1)
+
+        scores, indices = self.index.search(query_embedding, fetch_k)
+
+        # 有効な候補だけ残す
+        candidates = [
+            (int(idx), float(score))
+            for score, idx in zip(scores[0], indices[0], strict=False)
+            if 0 <= idx < len(self.comment_ids)
+        ]
+        if not candidates:
+            return []
+
+        dim = self.index.d
+        cand_faiss_indices = [c[0] for c in candidates]
+        cand_query_scores = [c[1] for c in candidates]
+
+        # 候補ベクトルを一括取得
+        cand_vecs = np.empty((len(candidates), dim), dtype=np.float32)
+        for i, idx in enumerate(cand_faiss_indices):
+            cand_vecs[i] = self.index.reconstruct(idx)
+
+        # MMR 反復選択
+        selected: list[int] = []
+        remaining = list(range(len(candidates)))
+
+        while len(selected) < top_k and remaining:
+            if not selected:
+                # 最初は最高スコア（candidates はスコア降順）
+                selected.append(remaining.pop(0))
+                continue
+
+            selected_vecs = cand_vecs[selected]  # (n_selected, dim)
+            best_score = -np.inf
+            best_pos = 0
+
+            for pos, i in enumerate(remaining):
+                relevance = cand_query_scores[i]
+                # 選択済みコメントとの最大類似度（冗長性）
+                max_redundancy = float(np.max(cand_vecs[i] @ selected_vecs.T))
+                mmr = diversity * relevance - (1 - diversity) * max_redundancy
+                if mmr > best_score:
+                    best_score = mmr
+                    best_pos = pos
+
+            selected.append(remaining.pop(best_pos))
+
+        return [(self.comment_ids[cand_faiss_indices[i]], cand_query_scores[i]) for i in selected]
+
     def search_centroid(self, position: float, top_k: int) -> list[tuple[str, float]]:
         """典型度検索。position=0.0→典型的(密度高), 1.0→珍しい(密度低)"""
         if self.knn_densities is None:
@@ -237,6 +303,7 @@ class SimilarSearchRequest(BaseModel):
 
     query: str
     top_k: int = 20
+    diversity: float | None = None  # None → 通常検索, 0.0〜1.0 → MMR (0.5推奨)
 
 
 class CentroidSearchRequest(BaseModel):
@@ -541,7 +608,11 @@ def search_similar(login: str, req: SimilarSearchRequest):
     query_emb = np.array(query_emb, dtype=np.float32)
 
     with ui.lock:
-        results = ui.search(query_emb, req.top_k)
+        if req.diversity is not None:
+            diversity = max(0.0, min(1.0, req.diversity))
+            results = ui.search_mmr(query_emb, req.top_k, diversity=diversity)
+        else:
+            results = ui.search(query_emb, req.top_k)
 
     return {"results": [{"comment_id": cid, "score": score} for cid, score in results]}
 

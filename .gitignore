@@ -3,6 +3,8 @@ __pycache__
 .claude
 .playwright-mcp
 
+node_modules
+
 # config
 .env
 .env.lock

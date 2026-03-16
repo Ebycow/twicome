@@ -52,17 +52,26 @@ def get_emotion_axes() -> list[dict[str, str]]:
         return []
 
 
-def similar_search(login: str, query_text: str, top_k: int = 20) -> list[tuple[str, float]] | None:
+def similar_search(
+    login: str,
+    query_text: str,
+    top_k: int = 20,
+    diversity: float | None = None,
+) -> list[tuple[str, float]] | None:
     """意味的類似検索。
 
+    diversity: None → 通常検索, 0.0〜1.0 → MMR (0.5推奨)
     Returns: [(comment_id, score), ...] または None (インデックス未作成)
     """
     if not _is_enabled():
         return None
     try:
+        payload: dict = {"query": query_text, "top_k": top_k}
+        if diversity is not None:
+            payload["diversity"] = diversity
         resp = requests.post(
             f"{FAISS_API_URL}/search/similar/{login}",
-            json={"query": query_text, "top_k": top_k},
+            json=payload,
             timeout=_REQUEST_TIMEOUT,
         )
         if resp.status_code == 404:

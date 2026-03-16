@@ -761,6 +761,15 @@
   const similarClear = document.getElementById('similar-clear');
   const similarClearBtn = document.getElementById('similar-clear-btn');
   const similarStatus = document.getElementById('similar-status');
+  const diversitySlider = document.getElementById('diversity-slider');
+  const diversityVal = document.getElementById('diversity-val');
+
+  if (diversitySlider) {
+    diversitySlider.addEventListener('input', function () {
+      const v = parseInt(this.value, 10);
+      diversityVal.textContent = v === 100 ? 'OFF' : `${100 - v}%`;
+    });
+  }
 
   /**
    * 検索結果のコメント配列をリスト要素に描画する。
@@ -816,6 +825,12 @@
     similarStatus.textContent = '検索中...';
     try {
       const params = new URLSearchParams({ q: query, platform: filters.platform, top_k: similarTopK.value });
+      const diversityRaw = diversitySlider ? parseInt(diversitySlider.value, 10) : 100;
+      const useMmr = diversityRaw < 100;
+      if (useMmr) {
+        // スライダー値 (0=多様優先〜100=類似優先) を diversity (0.0〜1.0) に変換
+        params.set('diversity', (diversityRaw / 100).toFixed(2));
+      }
       const response = await fetch(`${rootPath  }/api/u/${  userLogin  }/similar?${  params}`);
       if (!response.ok) {
         const err = await response.json();
@@ -833,7 +848,8 @@
         similarStatus.textContent = '0 件の結果';
         return;
       }
-      similarStatus.textContent = `「${  escapeHtml(query)  }」に類似する ${  data.items.length  } 件の結果`;
+      const modeLabel = useMmr ? `（多様性 ${100 - diversityRaw}%）` : '';
+      similarStatus.textContent = `「${  escapeHtml(query)  }」に類似する ${  data.items.length  } 件の結果${modeLabel}`;
       renderSearchResults(data.items, function (c) {
         return `<span class="similarity-badge">類似度: ${  (c.similarity_score * 100).toFixed(1)  }%</span>`;
       });

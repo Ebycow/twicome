@@ -33,8 +33,9 @@ def similar_search_api(
     q: str = Query(..., min_length=1),
     platform: str = Query(DEFAULT_PLATFORM),
     top_k: int = Query(20, ge=1, le=100),
+    diversity: float | None = Query(None, ge=0.0, le=1.0),
 ):
-    """意味的に類似したコメントを検索する"""
+    """意味的に類似したコメントを検索する。diversity 指定時は MMR で多様性を確保する"""
     if not FAISS_ENABLED:
         return _faiss_unavailable_response()
 
@@ -65,7 +66,7 @@ def similar_search_api(
         )
 
     try:
-        results = similar_search(login, q, top_k)
+        results = similar_search(login, q, top_k, diversity=diversity)
     except RuntimeError:
         return _faiss_backend_error_response()
 
