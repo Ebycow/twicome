@@ -247,6 +247,7 @@ def emotion_search_api(
     login: str,
     platform: str = Query(DEFAULT_PLATFORM),
     top_k: int = Query(50, ge=1, le=100),
+    diversity: float | None = Query(None, ge=0.0, le=1.0),
     joy: float = Query(0.0, ge=0.0, le=1.0),
     surprise: float = Query(0.0, ge=0.0, le=1.0),
     admiration: float = Query(0.0, ge=0.0, le=1.0),
@@ -288,7 +289,7 @@ def emotion_search_api(
         return {"user": dict(user_row), "weights": weights, "total": 0, "items": []}
 
     try:
-        results = emotion_search(login, weights, top_k)
+        results = emotion_search(login, weights, top_k, diversity=diversity)
     except RuntimeError:
         return _faiss_backend_error_response()
     if results is None:

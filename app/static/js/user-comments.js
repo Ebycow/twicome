@@ -918,6 +918,15 @@
   const emotionClearBtn = document.getElementById('emotion-clear-btn');
   const emotionStatus = document.getElementById('emotion-status');
   const emotionTopK = document.getElementById('emotion-top-k');
+  const emotionDiversitySlider = document.getElementById('emotion-diversity-slider');
+  const emotionDiversityVal = document.getElementById('emotion-diversity-val');
+
+  if (emotionDiversitySlider) {
+    emotionDiversitySlider.addEventListener('input', function () {
+      const v = parseInt(this.value, 10);
+      emotionDiversityVal.textContent = v === 100 ? 'OFF' : `${100 - v}%`;
+    });
+  }
 
   if (emotionSliders.length) {
     emotionSliders.forEach(function (slider) {
@@ -947,6 +956,11 @@
       emotionStatus.textContent = '検索中...';
       try {
         const params = new URLSearchParams(Object.assign({ platform: filters.platform, top_k: emotionTopK.value }, weights));
+        const diversityRaw = emotionDiversitySlider ? parseInt(emotionDiversitySlider.value, 10) : 100;
+        const useMmr = diversityRaw < 100;
+        if (useMmr) {
+          params.set('diversity', (diversityRaw / 100).toFixed(2));
+        }
         const resp = await fetch(`${rootPath  }/api/u/${  userLogin  }/emotion?${  params}`);
         if (!resp.ok) {throw new Error('Failed');}
         const data = await resp.json();
@@ -956,7 +970,8 @@
         const labels = { joy:'笑い', surprise:'驚き', admiration:'称賛', anger:'怒り', sadness:'悲しみ', cheer:'応援' };
         const activeList = Object.entries(weights).filter(function (kv) { return kv[1] > 0; })
           .map(function (kv) { return `${labels[kv[0]] || kv[0]  }:${  Math.round(kv[1]*100)  }%`; }).join(' + ');
-        emotionStatus.textContent = `${activeList  } → ${  data.items.length  } 件`;
+        const modeLabel = useMmr ? `（多様性 ${100 - diversityRaw}%）` : '';
+        emotionStatus.textContent = `${activeList  } → ${  data.items.length  } 件${modeLabel}`;
         renderSearchResults(data.items, function (c) {
           return `<span class="similarity-badge">一致度: ${  (c.similarity_score * 100).toFixed(1)  }%</span>`;
         });

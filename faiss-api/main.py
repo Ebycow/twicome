@@ -318,6 +318,7 @@ class EmotionSearchRequest(BaseModel):
 
     weights: dict[str, float]
     top_k: int = 50
+    diversity: float | None = None  # None → 通常検索, 0.0〜1.0 → MMR (0.5推奨)
 
 
 class SubclusterRequest(BaseModel):
@@ -651,6 +652,10 @@ def search_emotion(login: str, req: EmotionSearchRequest):
     combined = (combined / norm).reshape(1, -1)
 
     with ui.lock:
-        results = ui.search(combined, req.top_k)
+        if req.diversity is not None:
+            diversity = max(0.0, min(1.0, req.diversity))
+            results = ui.search_mmr(combined, req.top_k, diversity=diversity)
+        else:
+            results = ui.search(combined, req.top_k)
 
     return {"results": [{"comment_id": cid, "score": score} for cid, score in results]}

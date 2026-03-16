@@ -189,18 +189,27 @@ def get_subclusters(
         raise RuntimeError(f"faiss get_subclusters failed: {e}") from e
 
 
-def emotion_search(login: str, weights: dict[str, float], top_k: int = 50) -> list[tuple[str, float]] | None:
+def emotion_search(
+    login: str,
+    weights: dict[str, float],
+    top_k: int = 50,
+    diversity: float | None = None,
+) -> list[tuple[str, float]] | None:
     """感情アンカー検索。各感情の重みを合成したベクトルで検索。
 
     weights: {"joy": 0.8, "surprise": 0.5, ...}
+    diversity: None → 通常検索, 0.0〜1.0 → MMR (0.5推奨)
     Returns: [(comment_id, score), ...] または None
     """
     if not _is_enabled():
         return None
     try:
+        payload: dict = {"weights": weights, "top_k": top_k}
+        if diversity is not None:
+            payload["diversity"] = diversity
         resp = requests.post(
             f"{FAISS_API_URL}/search/emotion/{login}",
-            json={"weights": weights, "top_k": top_k},
+            json=payload,
             timeout=_REQUEST_TIMEOUT,
         )
         if resp.status_code == 404:

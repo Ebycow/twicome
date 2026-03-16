@@ -195,6 +195,12 @@
             <div class="slider-row"><label>悲しみ</label><input type="range" data-emotion="sadness" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
             <div class="slider-row"><label>応援</label><input type="range" data-emotion="cheer" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
           </div>
+          <div class="slider-row" style="margin-top:10px;">
+            <label style="white-space:nowrap;">多様優先</label>
+            <input type="range" id="emotion-diversity-slider" min="0" max="100" value="100" step="10" />
+            <label style="white-space:nowrap;">類似優先</label>
+            <span class="slider-val" id="emotion-diversity-val">OFF</span>
+          </div>
           <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
             <label for="emotion-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
             <select id="emotion-top-k">
