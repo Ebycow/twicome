@@ -1,8 +1,8 @@
       :root {
-        --bg-color: #ffffff;
-        --text-color: #111111;
+        --bg-color: #fff;
+        --text-color: #111;
         --card-border: #ddd;
-        --card-bg: #ffffff;
+        --card-bg: #fff;
         --meta-color: #666;
         --error-bg: #fff3f3;
         --error-border: #f2b3b3;
@@ -11,6 +11,7 @@
         --btn-bg: #f0f0f0;
         --btn-hover: #e0e0e0;
       }
+
       @media (prefers-color-scheme: dark) {
         :root {
           --bg-color: #1a1a1a;
@@ -26,6 +27,7 @@
           --btn-hover: #444;
         }
       }
+
       body {
         font-family: system-ui, -apple-system, sans-serif;
         margin: 0;
@@ -43,6 +45,7 @@
         flex-direction: column;
         gap: 14px;
       }
+
       .top {
         display: flex;
         gap: 16px;
@@ -61,6 +64,7 @@
         flex-wrap: wrap;
       }
       .controls label { font-size: 0.9rem; }
+
       .n-btn {
         padding: 4px 12px;
         border: 1px solid var(--card-border);
@@ -86,6 +90,7 @@
         background: var(--card-bg);
         overflow: hidden;
       }
+
       .cluster-head {
         display: flex;
         justify-content: space-between;
@@ -96,6 +101,7 @@
       .cluster-rank { font-weight: bold; font-size: 0.9rem; color: var(--meta-color); }
       .cluster-size { font-size: 0.85rem; color: var(--meta-color); }
       .cluster-body { padding: 10px 14px; }
+
       .cluster-examples {
         margin: 0;
         padding: 0 0 0 1.2em;
@@ -119,6 +125,7 @@
       }
       .drill-btn:hover { background: var(--btn-hover); }
       .drill-btn:disabled { opacity: 0.5; cursor: default; }
+
       .view-btn {
         display: block;
         box-sizing: border-box;
@@ -144,12 +151,14 @@
         flex-direction: column;
         gap: 8px;
       }
+
       .subcluster-card {
         background: var(--sub-bg);
         border: 1px solid var(--card-border);
         border-radius: 8px;
         padding: 8px 12px;
       }
+
       .subcluster-head {
         display: flex;
         justify-content: space-between;
@@ -157,6 +166,7 @@
         color: var(--meta-color);
         margin-bottom: 6px;
       }
+
       .subcluster-examples {
         margin: 0;
         padding: 0 0 0 1.1em;
@@ -166,6 +176,7 @@
         gap: 3px;
       }
       .subcluster-examples li { word-break: break-all; }
+
       .sub-drill-btn {
         margin-top: 6px;
         padding: 3px 10px;
@@ -187,7 +198,7 @@
         background: var(--error-bg);
       }
 
-      @media (max-width: 700px) {
+      @media (width <= 700px) {
         body { padding: 14px; }
         .clusters-grid { grid-template-columns: 1fr; }
       }

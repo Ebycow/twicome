@@ -1,18 +1,19 @@
       :root {
-        --bg-color: #ffffff;
-        --text-color: #111111;
+        --bg-color: #fff;
+        --text-color: #111;
         --card-border: #ddd;
-        --card-bg: #ffffff;
+        --card-bg: #fff;
         --input-border: #ccc;
-        --input-bg: #ffffff;
+        --input-bg: #fff;
         --button-bg: #f0f0f0;
-        --button-text: #111111;
+        --button-text: #111;
         --table-header-bg: #f2f2f2;
         --table-border: #ddd;
-        --message-color: #22aa22;
-        --error-color: #dd3333;
+        --message-color: #2a2;
+        --error-color: #d33;
         --link-color: #007bff;
       }
+
       @media (prefers-color-scheme: dark) {
         :root {
           --bg-color: #1a1a1a;
@@ -25,8 +26,8 @@
           --button-text: #e0e0e0;
           --table-header-bg: #333;
           --table-border: #444;
-          --message-color: #66dd66;
-          --error-color: #ff6666;
+          --message-color: #6d6;
+          --error-color: #f66;
           --link-color: #6db3f2;
         }
       }

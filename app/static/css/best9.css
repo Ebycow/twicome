@@ -29,6 +29,7 @@
           radial-gradient(ellipse 60% 50% at 85% 70%, rgba(120,80,0,0.05) 0%, transparent 60%),
           radial-gradient(ellipse 100% 80% at 50% 0%, rgba(255,215,0,0.03) 0%, transparent 50%);
       }
+
       .bg-layer::after {
         content: '';
         position: absolute;
@@ -55,6 +56,7 @@
         margin-bottom: 48px;
         animation: fadeDown 0.9s cubic-bezier(.22,1,.36,1) both;
       }
+
       .header-eyebrow {
         font-family: system-ui, sans-serif;
         font-size: 0.75rem;
@@ -63,22 +65,25 @@
         color: rgba(255,215,0,0.5);
         margin-bottom: 14px;
       }
+
       .title {
         font-size: clamp(2.2rem, 7vw, 4.4rem);
         font-weight: 900;
         line-height: 1.15;
         background: linear-gradient(135deg, #ffe599 0%, #ffd700 30%, #c8860a 55%, #ffd700 75%, #ffe599 100%);
-        -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         filter: drop-shadow(0 0 28px rgba(255,200,0,0.25));
         letter-spacing: -0.01em;
       }
+
       .title-hash {
         font-size: 0.65em;
         opacity: 0.7;
         font-weight: 400;
       }
+
       .header-sub {
         margin-top: 14px;
         font-family: system-ui, sans-serif;
@@ -86,6 +91,7 @@
         color: var(--meta);
         letter-spacing: 0.04em;
       }
+
       .gold-rule {
         display: flex;
         align-items: center;
@@ -93,6 +99,7 @@
         margin: 20px auto;
         max-width: 360px;
       }
+
       .gold-rule::before,
       .gold-rule::after {
         content: '';
@@ -100,6 +107,7 @@
         height: 1px;
         background: linear-gradient(90deg, transparent, var(--gold), transparent);
       }
+
       .gold-rule-diamond {
         width: 6px;
         height: 6px;
@@ -124,6 +132,7 @@
         animation: fadeDown 0.9s 0.1s cubic-bezier(.22,1,.36,1) both;
         box-shadow: 0 0 30px rgba(255,215,0,0.05), inset 0 1px 0 rgba(255,215,0,0.1);
       }
+
       .share-label {
         font-family: system-ui, sans-serif;
         font-size: 0.78rem;
@@ -131,6 +140,7 @@
         letter-spacing: 0.08em;
         white-space: nowrap;
       }
+
       .share-card input {
         flex: 1;
         min-width: 160px;
@@ -143,6 +153,7 @@
         font-size: 0.82rem;
         outline: none;
       }
+
       .btn-gold {
         padding: 8px 20px;
         border-radius: 8px;
@@ -156,6 +167,7 @@
         transition: background 0.18s, color 0.18s, box-shadow 0.18s;
         letter-spacing: 0.03em;
       }
+
       .btn-gold:hover {
         background: var(--gold);
         color: #000;
@@ -168,6 +180,7 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 14px;
       }
+
       .cell {
         position: relative;
         padding: 22px 18px 18px;
@@ -215,6 +228,7 @@
         pointer-events: none;
         font-family: system-ui, sans-serif;
       }
+
       /* ナンバーバッジ */
       .cell-badge {
         display: inline-flex;
@@ -231,6 +245,7 @@
         padding: 2px 9px;
         width: fit-content;
       }
+
       .cell-body {
         font-size: 1.12rem;
         font-weight: 700;
@@ -241,6 +256,7 @@
         position: relative;
         z-index: 1;
       }
+
       .cell-meta {
         font-family: system-ui, sans-serif;
         font-size: 0.76rem;
@@ -251,15 +267,18 @@
         position: relative;
         z-index: 1;
       }
+
       a.cell {
         text-decoration: none;
         color: inherit;
       }
+
       a.cell:not(.empty):hover .cell-badge {
         background: rgba(255,215,0,0.18);
         border-color: rgba(255,215,0,0.5);
         color: var(--gold);
       }
+
       /* 空カード */
       .cell.empty {
         opacity: 0.22;
@@ -267,6 +286,7 @@
         border-color: rgba(255,255,255,0.08);
         background: transparent;
       }
+
       .cell.empty .cell-body {
         font-style: italic;
         color: #555;
@@ -281,6 +301,7 @@
         margin-top: 52px;
         animation: fadeUp 0.9s 0.6s cubic-bezier(.22,1,.36,1) both;
       }
+
       .footer a {
         font-family: system-ui, sans-serif;
         font-size: 0.88rem;
@@ -297,16 +318,18 @@
         from { opacity: 0; transform: translateY(-22px); }
         to   { opacity: 1; transform: translateY(0); }
       }
+
       @keyframes fadeUp {
         from { opacity: 0; transform: translateY(28px); }
         to   { opacity: 1; transform: translateY(0); }
       }
 
-      @media (max-width: 680px) {
+      @media (width <= 680px) {
         .container { padding: 36px 14px 80px; }
         .grid { grid-template-columns: 1fr; gap: 10px; }
         .cell-bg-num { font-size: 4rem; }
       }
-      @media (min-width: 681px) and (max-width: 880px) {
+
+      @media (width >= 681px) and (width <= 880px) {
         .grid { grid-template-columns: repeat(2, 1fr); }
       }
