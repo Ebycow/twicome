@@ -92,6 +92,9 @@ jobs:
       - name: Run JS lint
         run: npx eslint app/static/js/
 
+      - name: Run CSS lint
+        run: npx stylelint 'app/static/css/**/*.css'
+
       - name: Run HTML/Jinja lint
         run: djlint app/templates --lint
 

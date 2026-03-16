@@ -1,0 +1,11 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "indentation": 6,
+    "color-function-notation": "legacy",
+    "alpha-value-notation": "number",
+    "declaration-block-single-line-max-declarations": 3,
+    "function-comma-space-after": "always",
+    "function-comma-space-before": "never"
+  }
+}
