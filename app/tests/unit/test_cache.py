@@ -79,6 +79,26 @@ class TestComputeRenderVersion:
 
         assert cache_module._compute_render_version() == "manual-version"
 
+    def test_tracks_index_service_changes_in_render_version(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("APP_RENDER_VERSION", raising=False)
+        app_dir = tmp_path / "app"
+        (app_dir / "templates").mkdir(parents=True)
+        (app_dir / "static").mkdir(parents=True)
+        (app_dir / "core").mkdir(parents=True)
+        (app_dir / "routers").mkdir(parents=True)
+        (app_dir / "services").mkdir(parents=True)
+
+        (app_dir / "templates" / "index.html").write_text("template", encoding="utf-8")
+        (app_dir / "static" / "sw.js").write_text("sw", encoding="utf-8")
+        (app_dir / "core" / "config.py").write_text("config", encoding="utf-8")
+        (app_dir / "routers" / "comments.py").write_text("comments", encoding="utf-8")
+        target = app_dir / "services" / "index_service.py"
+        target.write_text("index-service", encoding="utf-8")
+
+        monkeypatch.setattr(cache_module, "Path", lambda *_args, **_kwargs: app_dir / "cache.py")
+
+        assert cache_module._compute_render_version() == str(target.stat().st_mtime_ns)
+
     def test_falls_back_to_startup_version_when_candidates_missing(self, monkeypatch):
         monkeypatch.delenv("APP_RENDER_VERSION", raising=False)
 

@@ -59,10 +59,12 @@ def build_index_context(db, data_version: str) -> dict:
     landing = build_landing_data(db)
     popular_comments = build_popular_comments(db)
     placeholder_login = DEFAULT_LOGIN or "sample_user"
+    placeholder_user = user_repo.find_user(db, placeholder_login, "twitch") if DEFAULT_LOGIN else None
+    placeholder_display_name = (placeholder_user or {}).get("display_name") or "表示名"
     return {
         "selected_login": DEFAULT_LOGIN or "",
         "selected_login_for_links": DEFAULT_LOGIN or "",
-        "login_search_placeholder": f"例: {placeholder_login} / サンプルユーザ",
+        "login_search_placeholder": f"例: {placeholder_login} / {placeholder_display_name}",
         "popular_comments": popular_comments,
         "quick_links": landing["quick_links"],
         "streamers": landing["streamers"],

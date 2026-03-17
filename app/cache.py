@@ -34,6 +34,7 @@ def _compute_render_version() -> str:
         app_dir / "static" / "sw.js",
         app_dir / "core" / "config.py",
         app_dir / "routers" / "comments.py",
+        app_dir / "services" / "index_service.py",
     ]
     mtimes: list[int] = []
     for candidate in candidates:

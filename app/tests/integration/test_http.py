@@ -42,14 +42,24 @@ class TestIndex:
         assert resp.status_code == 200
         assert 'data-default-login="prefetch_target"' in resp.text
 
-    def test_index_uses_default_login_in_search_placeholder(self, client, monkeypatch):
+    def test_index_uses_default_login_in_search_placeholder(self, client, db, monkeypatch):
+        import services.index_service as index_service
+
+        monkeypatch.setattr(index_service, "DEFAULT_LOGIN", "prefetch_target")
+        seed_user(db, user_id=99, login="prefetch_target", display_name="表示用ユーザ", platform="twitch")
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert 'placeholder="例: prefetch_target / 表示用ユーザ"' in resp.text
+
+    def test_index_uses_generic_display_name_when_default_login_user_is_missing(self, client, monkeypatch):
         import services.index_service as index_service
 
         monkeypatch.setattr(index_service, "DEFAULT_LOGIN", "prefetch_target")
 
         resp = client.get("/")
         assert resp.status_code == 200
-        assert 'placeholder="例: prefetch_target / サンプルユーザ"' in resp.text
+        assert 'placeholder="例: prefetch_target / 表示名"' in resp.text
 
     def test_index_embeds_service_worker_cache_name(self, client):
         resp = client.get("/")
