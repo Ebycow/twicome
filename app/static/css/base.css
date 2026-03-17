@@ -75,7 +75,7 @@
 
 /* ─── Base Reset ─── */
 * { box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; background: var(--bg-color); color: var(--text-color); }
+body { font-family: 'Noto Sans JP', system-ui, -apple-system, sans-serif; margin: 24px; background: var(--bg-color); color: var(--text-color); }
 a { color: var(--link-color); }
 a.pill { text-decoration: none; color: var(--link-color); }
 
@@ -118,6 +118,7 @@ button:active { transform: translateY(0); box-shadow: none; }
   white-space: nowrap;
   cursor: pointer;
 }
+
 .nav-link:hover {
   background: var(--accent-light);
   color: var(--accent);
