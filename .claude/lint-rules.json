@@ -1,0 +1,161 @@
+{
+  "_comment": "カスタムlintルール定義。adr フィールドはADR/Wiki URLを設定可能。",
+  "ruff": {
+    "F401": {
+      "why": "未使用インポートはコードの意図を曖昧にし、読み手が実際に使われているか追わせることになる",
+      "fix": "インポート行を削除するか、実際に使用箇所を追加する。自動修正: ruff check --fix",
+      "example": "# Bad:  import os\n# Good: (削除)"
+    },
+    "F841": {
+      "why": "代入した値を使わないまま捨てることは、ロジックのミスか不完全な実装を示唆する",
+      "fix": "変数を実際に使うか、不要なら代入ごと削除する",
+      "example": "# Bad:  result = expensive_calc()  # result を使わない\n# Good: return expensive_calc()"
+    },
+    "E711": {
+      "why": "`== None` は __eq__ をオーバーライドしたオブジェクトで誤動作する可能性がある。`is` は同一性チェックで確実",
+      "fix": "`== None` → `is None`、`!= None` → `is not None` に置換する",
+      "example": "# Bad:  if value == None:\n# Good: if value is None:"
+    },
+    "E712": {
+      "why": "Pythonでは `True`/`False` との `==` 比較はアンチパターン。`is` か直接真偽値を使うのが慣習",
+      "fix": "`== True` → `is True` または単に `if flag:`、`== False` → `is False` または `if not flag:`",
+      "example": "# Bad:  if flag == True:\n# Good: if flag:"
+    },
+    "F811": {
+      "why": "同名で再定義すると、前の定義が静かに捨てられる。意図しないシャドーイングやインポートの重複を示す",
+      "fix": "重複したインポートを削除するか、別名 (as) を使う",
+      "example": "# Bad:  from models import User\n#       from auth import User  # 前の User が消える\n# Good: from auth import User as AuthUser"
+    },
+    "E501": {
+      "why": "長い行はレビュー時の横スクロールを強制し、差分が読みにくくなる",
+      "fix": "変数に分割するか、括弧で改行を挟む",
+      "example": "# Bad:  result = some_func(very_long_argument_1, very_long_argument_2, very_long_argument_3)\n# Good: result = some_func(\n#     very_long_argument_1, very_long_argument_2, very_long_argument_3\n# )"
+    },
+    "B006": {
+      "why": "ミュータブルオブジェクトをデフォルト引数に使うと、呼び出し間で状態が共有されてバグになる",
+      "fix": "デフォルト値を `None` にして関数内で初期化する",
+      "example": "# Bad:  def fn(items=[]):\n# Good: def fn(items=None):\n#           items = items or []"
+    }
+  },
+  "eslint": {
+    "no-var": {
+      "why": "`var` は関数スコープで巻き上げが発生し、意図しない再利用バグを起こしやすい。`let`/`const` はブロックスコープで予測しやすい",
+      "fix": "`var` → 再代入しない変数は `const`、再代入する変数は `let` に変更する",
+      "example": "// Bad:  var count = 0;\n// Good: let count = 0;  // or const count = 0;"
+    },
+    "prefer-const": {
+      "why": "再代入しない変数を `const` にすることで、後から読んだ人が「この変数は変わらない」と確信できる",
+      "fix": "`let` → `const` に変更する",
+      "example": "// Bad:  let url = '/api/search';\n// Good: const url = '/api/search';"
+    },
+    "no-unused-vars": {
+      "why": "未使用変数はコードの意図を不明確にする。削除忘れや実装の途中を示す可能性がある",
+      "fix": "変数を実際に使うか、不要なら宣言ごと削除する",
+      "example": "// Bad:  const result = fetchData();\n//       showLoading();  // result を使わない\n// Good: showLoading();"
+    },
+    "eqeqeq": {
+      "why": "`==` は暗黙の型変換を行うため `0 == ''` が true になるなど意図しない比較になる。`===` は型も含めて比較する",
+      "fix": "`==` → `===`、`!=` → `!==` に変更する (null比較は許容)",
+      "example": "// Bad:  if (count == '0')\n// Good: if (count === 0)"
+    },
+    "no-implicit-coercion": {
+      "why": "`!!x` や `+x` は型変換の意図が記号だけでは伝わりにくい。`Boolean(x)` / `Number(x)` の方が明示的",
+      "fix": "`!!x` → `Boolean(x)`、`+x` → `Number(x)` に変更する",
+      "example": "// Bad:  const isActive = !!response.active;\n// Good: const isActive = Boolean(response.active);"
+    },
+    "prefer-template": {
+      "why": "文字列連結は変数の位置が見づらく、エスケープも複雑になる。テンプレートリテラルは構造が一目でわかる",
+      "fix": "`'Hello ' + name + '!'` → `` `Hello ${name}!` `` に変更する",
+      "example": "// Bad:  const msg = '/api/' + version + '/search';\n// Good: const msg = `/api/${version}/search`;"
+    },
+    "curly": {
+      "why": "ブレース省略は後でステートメントを追加したときに「if の中」と誤解する原因になる",
+      "fix": "if/for/while の本体をすべて `{}` で囲む",
+      "example": "// Bad:  if (err) return;\n// Good: if (err) { return; }"
+    },
+    "no-else-return": {
+      "why": "`return` 後の `else` は不要なネストを作る。return でフローが終わるので else は省略できる",
+      "fix": "`else` ブロックを削除してコードをフラットにする",
+      "example": "// Bad:  if (err) { return null; } else { return data; }\n// Good: if (err) { return null; }\n//       return data;"
+    },
+    "no-nested-ternary": {
+      "why": "ネストした三項演算子は解析が困難で、条件の対応関係がわかりにくい",
+      "fix": "if/else 文か早期 return パターンに書き換える",
+      "example": "// Bad:  const x = a ? b ? 1 : 2 : 3;\n// Good: let x;\n//       if (a) { x = b ? 1 : 2; } else { x = 3; }"
+    },
+    "object-shorthand": {
+      "why": "`{ fn: fn }` のような繰り返しは冗長。ショートハンドで意図が明確になる",
+      "fix": "`{ key: key }` → `{ key }` に省略する",
+      "example": "// Bad:  { onSuccess: onSuccess, data: data }\n// Good: { onSuccess, data }"
+    },
+    "dot-notation": {
+      "why": "識別子として有効なキーをブラケット記法で書くと、動的アクセスと区別がつきにくい",
+      "fix": "`obj['key']` → `obj.key` に変更する",
+      "example": "// Bad:  response['data']['items']\n// Good: response.data.items"
+    },
+    "yoda": {
+      "why": "Yoda 記法 (`0 === x`) は英語の語順と逆で読みにくい。変数を左に書く自然な順序を使う",
+      "fix": "`0 === x` → `x === 0` に逆順にする",
+      "example": "// Bad:  if (0 === count)\n// Good: if (count === 0)"
+    },
+    "no-lonely-if": {
+      "why": "`else { if (...) }` は `else if (...)` と同じ意味で、不要なネストを増やしている",
+      "fix": "`else { if (...) }` → `else if (...)` に変更する",
+      "example": "// Bad:  } else { if (b) { ... } }\n// Good: } else if (b) { ... }"
+    },
+    "jsdoc/require-jsdoc": {
+      "why": "名前付き関数にJSDocがないと、引数の型・目的・副作用をコードを読まないと把握できない",
+      "fix": "関数の直前に `/** ... */` ブロックを追加する",
+      "example": "// Bad:  function fetchComments(userId) { ... }\n// Good: /**\n//        * ユーザーのコメント一覧を取得する\n//        * @param {string} userId - ユーザーID\n//        * @returns {Promise<Comment[]>} コメント配列\n//        */\n//       function fetchComments(userId) { ... }"
+    },
+    "jsdoc/require-param": {
+      "why": "@param がないと引数の型・意味をJSDocから読み取れない",
+      "fix": "各引数に `@param {型} 引数名 - 説明` を追加する",
+      "example": "// Bad:  /**\n//        * データを取得する\n//        */\n// Good: /**\n//        * データを取得する\n//        * @param {string} endpoint - APIエンドポイント\n//        */"
+    },
+    "jsdoc/require-returns": {
+      "why": "@returns がないと戻り値の型・意味をJSDocから読み取れない",
+      "fix": "`@returns {型} 説明` を追加する。戻り値がなければ `@returns {void}` か省略",
+      "example": "// Bad:  /** コメントを取得する */\n// Good: /**\n//        * コメントを取得する\n//        * @returns {Promise<Comment[]>} コメント配列\n//        */"
+    }
+  },
+  "stylelint": {
+    "selector-class-pattern": {
+      "why": "このプロジェクトはBEM記法 (block__element--modifier) を採用している。バラバラな命名はスタイルの構造把握を難しくする",
+      "fix": "クラス名を BEM パターンに合わせる: `block`、`block__element`、`block--modifier`",
+      "example": "/* Bad:  .searchBox { } */\n/* Good: .search-box { } または .search__box { } */"
+    },
+    "color-no-invalid-hex": {
+      "why": "無効な16進数カラーはブラウザが無視するため、意図した色が適用されない",
+      "fix": "16進数カラーを正しい形式 (#RGB, #RRGGBB, #RRGGBBAA) に修正する",
+      "example": "/* Bad:  color: #zzzzzz; */\n/* Good: color: #3a7bd5; */"
+    },
+    "declaration-block-no-duplicate-properties": {
+      "why": "同一プロパティの重複は後の宣言で上書きされ、前の宣言が無意味になる",
+      "fix": "重複しているプロパティの片方を削除する",
+      "example": "/* Bad:  .btn { color: red; color: blue; } */\n/* Good: .btn { color: blue; } */"
+    },
+    "color-function-notation": {
+      "why": "このプロジェクトはレガシー記法 `rgb(255, 0, 0)` を採用 (modern記法 `rgb(255 0 0)` は除外設定済み)",
+      "fix": "モダン記法を使っている場合はカンマ区切りのレガシー記法に変更する",
+      "example": "/* Bad:  color: rgb(255 0 0); */\n/* Good: color: rgb(255, 0, 0); */"
+    }
+  },
+  "djlint": {
+    "H006": {
+      "why": "alt属性がないimgはスクリーンリーダーが内容を伝えられず、アクセシビリティ基準 (WCAG) を満たさない",
+      "fix": "意味のある画像には説明テキストを、装飾目的の画像には `alt=\"\"` を設定する",
+      "example": "{# Bad:  <img src=\"avatar.png\"> #}\n{# Good: <img src=\"avatar.png\" alt=\"ユーザーアバター\"> #}"
+    },
+    "H025": {
+      "why": "閉じタグのない孤立したタグはHTMLのネスト構造を壊し、ブラウザの補完動作が予測不能になる",
+      "fix": "対応する開きタグまたは閉じタグを追加する",
+      "example": "{# Bad:  <div class=\"card\"> ... </span> #}\n{# Good: <div class=\"card\"> ... </div> #}"
+    },
+    "W019": {
+      "why": "必須属性のないタグはHTMLの仕様違反か設定漏れを示す",
+      "fix": "エラーメッセージで指定された属性を追加する",
+      "example": "{# Bad:  <a href=\"#\">リンク</a> #}\n{# Good: <a href=\"/search\">リンク</a> #}"
+    }
+  }
+}
