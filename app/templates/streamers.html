@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}配信者一覧 - ツイコメ{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ root_path }}/static/css/streamers.css?v={{ static_version }}" />
+{% endblock %}
+
+{% block body %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <a class="page-back nav-link" href="{{ root_path }}/">&#8592; トップ</a>
+    <h1 class="page-title">&#127909; 配信者一覧</h1>
+  </div>
+</div>
+
+<div class="streamers-container">
+
+  <div class="streamers-toolbar card">
+    <div class="streamers-search-row">
+      <div class="streamers-search-wrapper">
+        <input
+          id="streamers-search"
+          class="streamers-search-input"
+          type="search"
+          placeholder="IDまたは表示名で検索"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="button" id="streamers-search-clear" class="streamers-search-clear" aria-label="クリア">&#x2715;</button>
+      </div>
+      <div id="streamers-count" class="streamers-count"></div>
+    </div>
+  </div>
+
+  <div class="streamers-grid" id="streamers-grid" role="list">
+    {% for s in streamers %}
+    <div
+      class="streamer-card"
+      role="listitem"
+      data-login="{{ s.login }}"
+      data-name="{{ (s.display_name or s.login) | lower }}"
+    >
+      <div class="streamer-card-header">
+        <div class="streamer-card-avatar">
+          {% if s.profile_image_url %}
+          <img src="{{ s.profile_image_url }}" alt="{{ s.display_name or s.login }}" loading="lazy" width="44" height="44" />
+          {% else %}
+          {{ (s.display_name or s.login)[0] | upper }}
+          {% endif %}
+        </div>
+        <div class="streamer-card-info">
+          <div class="streamer-card-name">{{ s.display_name or s.login }}</div>
+          {% if s.display_name and s.display_name != s.login %}
+          <div class="streamer-card-login">{{ s.login }}</div>
+          {% endif %}
+        </div>
+        <div class="streamer-card-stats">
+          <span class="streamer-card-badge">{{ "{:,}".format(s.vod_count) }} VODs</span>
+          <span class="streamer-card-badge streamer-card-badge-secondary">{{ "{:,}".format(s.comment_count) }} comments</span>
+        </div>
+      </div>
+      <div class="streamer-card-links">
+        <a class="streamer-card-link streamer-card-link-primary" href="{{ root_path }}/u/{{ s.login }}">&#128172; コメント検索</a>
+        <a class="streamer-card-link streamer-card-link-secondary" href="{{ root_path }}/vods?owner_login={{ s.login }}">&#127916; VOD一覧</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
+<script src="{{ root_path }}/static/js/streamers.js?v={{ static_version }}"></script>
+
+{% endblock %}
+
+{% block sw_script %}{% endblock %}

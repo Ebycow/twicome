@@ -80,6 +80,7 @@ def build_app_stats(db) -> dict:
                 "suffix": "streamers",
                 "tone": "neutral",
                 "description": "VOD収集の対象になっている配信者",
+                "link": "/streamers",
             },
         ]
     }

@@ -20,9 +20,14 @@
   var currentPages = 0;
   var currentQuery = '';
   var currentSort = 'created_at';
-  var currentStreamer = '';
+  var currentStreamer = new URLSearchParams(window.location.search).get('owner_login') || '';
   var allCards = [];
   var searchTimer = null;
+
+  // URL パラメータで配信者が指定されていれば select を初期化
+  if (currentStreamer && streamerFilter) {
+    streamerFilter.value = currentStreamer;
+  }
 
   function showStatus(msg) {
     vodsStatus.textContent = msg;
