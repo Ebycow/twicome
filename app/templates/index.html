@@ -25,6 +25,16 @@
       <aside class="hero-stats" aria-label="アプリ統計">
         <div class="hero-stats-grid">
           {% for item in app_stats["items"] %}
+          {% if item.link %}
+          <a class="hero-stat-card hero-stat-card-{{ item.tone }} hero-stat-card-link" href="{{ root_path }}{{ item.link }}">
+            <div class="hero-stat-label">{{ item.label }}</div>
+            <div class="hero-stat-value-row">
+              <span class="hero-stat-value">{{ item.value }}</span>
+              <span class="hero-stat-suffix">{{ item.suffix }}</span>
+            </div>
+            <div class="hero-stat-description">{{ item.description }}</div>
+          </a>
+          {% else %}
           <div class="hero-stat-card hero-stat-card-{{ item.tone }}">
             <div class="hero-stat-label">{{ item.label }}</div>
             <div class="hero-stat-value-row">
@@ -33,6 +43,7 @@
             </div>
             <div class="hero-stat-description">{{ item.description }}</div>
           </div>
+          {% endif %}
           {% endfor %}
         </div>
       </aside>
@@ -148,6 +159,7 @@
 
         <!-- Sub Links -->
         <div class="sub-links">
+          <a class="sub-link" href="{{ root_path }}/users">&#128100; ユーザ一覧</a>
           <a class="sub-link" href="{{ root_path }}/add_user">&#43; 配信者を追加</a>
           <a class="sub-link" href="{{ root_path }}/manual">&#128214; 使い方ガイド</a>
         </div>

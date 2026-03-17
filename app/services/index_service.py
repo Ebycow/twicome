@@ -64,6 +64,7 @@ def build_app_stats(db) -> dict:
                 "suffix": "users",
                 "tone": "warm",
                 "description": "コメントが見つかるユーザ",
+                "link": "/users",
             },
             {
                 "label": "VOD数",

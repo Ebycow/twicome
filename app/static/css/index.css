@@ -109,6 +109,19 @@
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
       }
 
+      a.hero-stat-card-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: filter 0.15s, transform 0.15s;
+      }
+
+      a.hero-stat-card-link:hover {
+        filter: brightness(1.15);
+        transform: translateY(-2px);
+      }
+
       .hero-stat-label {
         font-size: 0.7rem;
         color: var(--meta-color);
@@ -724,7 +737,7 @@
         flex-shrink: 0;
       }
 
-      @media (max-width: 560px) {
+      @media (width <= 560px) {
         .selected-user-main {
           align-items: flex-start;
           flex-direction: column;
@@ -787,15 +800,18 @@
           grid-template-columns: 1fr;
           gap: 16px;
         }
+
         .hero-stats {
           padding: 12px;
           border-radius: 18px;
         }
+
         .hero-stats-grid {
           grid-template-columns: 1fr;
         }
         .main-card { padding: 16px; }
         .ranking-card { padding: 16px; }
+
         .search-spotlight {
           margin-bottom: 18px;
           padding: 0;
@@ -804,6 +820,7 @@
           background: transparent;
           box-shadow: none;
         }
+
         .search-filter-bar {
           margin-bottom: 18px;
         }

@@ -1,0 +1,350 @@
+/* ─── users 固有の変数 ─── */
+:root {
+  --radius: 12px;
+  --radius-sm: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+}
+
+/* ─── Page Header ─── */
+.page-header {
+  border-bottom: 1px solid var(--card-border);
+  padding: 14px 24px;
+  background: var(--card-bg);
+  /* body { margin: 24px } を打ち消してフル幅にする */
+  margin: -24px -24px 0;
+}
+
+.page-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-back {
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+/* ─── Container ─── */
+.users-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+}
+
+/* ─── Toolbar ─── */
+.users-toolbar {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ─── Filter Bar (共通クラスは base.css/index.css にあるが、ここでも定義) ─── */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.filter-item > label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--label-color);
+  letter-spacing: 0.02em;
+  margin-top: 0;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-color);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  width: 100%;
+  margin-top: 0;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ─── Search Row ─── */
+.users-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.users-search-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.users-search-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.users-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px 10px 14px;
+  font-size: 0.95rem;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  appearance: none;
+  margin-top: 0;
+  width: 100%;
+}
+
+.users-search-input::-webkit-search-cancel-button {
+  appearance: none;
+  display: none;
+}
+
+.users-search-input:focus {
+  outline: none;
+}
+
+.users-search-clear {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--meta-color);
+  font-size: 1rem;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.users-search-clear:hover {
+  color: var(--text-color);
+}
+
+.users-count {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: var(--meta-color);
+  white-space: nowrap;
+  min-width: 5em;
+  text-align: right;
+}
+
+/* ─── Status ─── */
+.users-status {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--meta-color);
+  font-size: 0.88rem;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.users-status[hidden] {
+  display: none;
+}
+
+/* ─── Users Grid ─── */
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* ─── User Card ─── */
+.user-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.user-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.user-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.user-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-card-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.user-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-card-login {
+  font-size: 0.75rem;
+  color: var(--meta-color);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-card-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-light);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.user-card-meta {
+  font-size: 0.72rem;
+  color: var(--meta-color);
+}
+
+/* ─── User Card Links ─── */
+.user-card-links {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.user-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.user-card-link-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.user-card-link-primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  color: #fff;
+  opacity: 1;
+}
+
+.user-card-link-secondary {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--card-border);
+}
+
+.user-card-link-secondary:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ─── Responsive ─── */
+@media (width <= 720px) {
+  .page-header {
+    margin: -12px -12px 0;
+    padding: 12px 16px;
+  }
+}
+
+@media (width <= 600px) {
+  .page-header {
+    padding: 12px 16px;
+  }
+
+  .users-container {
+    padding: 16px 12px 60px;
+  }
+
+  .users-toolbar {
+    padding: 14px 14px;
+  }
+
+  .users-grid {
+    grid-template-columns: 1fr;
+  }
+}

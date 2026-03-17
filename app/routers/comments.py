@@ -201,6 +201,19 @@ def index(request: Request):
     return HTMLResponse(html, headers=headers)
 
 
+@router.get("/users", response_class=HTMLResponse)
+def users_page(request: Request):
+    with SessionLocal() as db:
+        landing = build_landing_data(db)
+    return templates.TemplateResponse(
+        "users.html",
+        {
+            "request": request,
+            "streamers": landing["streamers"],
+        },
+    )
+
+
 @router.get("/api/meta/data-version", response_class=JSONResponse)
 def api_data_version():
     data_version = get_data_version()
