@@ -83,11 +83,11 @@ def fetch_streamers(db) -> list[dict]:
                 u.login,
                 u.display_name,
                 u.profile_image_url,
-                COUNT(DISTINCT v.vod_id) AS vod_count,
-                COUNT(c.comment_id) AS comment_count
+                COUNT(v.vod_id) AS vod_count,
+                COALESCE(SUM(vim.comments_ingested), 0) AS comment_count
             FROM users u
             JOIN vods v ON v.owner_user_id = u.user_id
-            LEFT JOIN comments c ON c.vod_id = v.vod_id
+            LEFT JOIN vod_ingest_markers vim ON vim.vod_id = v.vod_id
             WHERE u.platform = 'twitch'
             GROUP BY u.user_id, u.login, u.display_name, u.profile_image_url
             ORDER BY u.login
