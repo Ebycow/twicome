@@ -65,6 +65,7 @@ def build_app_stats(db) -> dict:
                 "tone": "warm",
                 "description": "コメントが見つかるユーザ",
                 "link": "/users",
+                "tooltip": "コメントが記録されているユーザの一覧を表示します",
             },
             {
                 "label": "VOD数",
@@ -73,6 +74,7 @@ def build_app_stats(db) -> dict:
                 "tone": "cool",
                 "description": "横断検索できる配信",
                 "link": "/vods",
+                "tooltip": "収録済みのVOD一覧を表示します",
             },
             {
                 "label": "配信者数",
@@ -81,6 +83,7 @@ def build_app_stats(db) -> dict:
                 "tone": "neutral",
                 "description": "VOD収集の対象になっている配信者",
                 "link": "/streamers",
+                "tooltip": "VODを収集している配信者の一覧を表示します",
             },
         ]
     }
