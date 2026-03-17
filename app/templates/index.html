@@ -22,7 +22,7 @@
 
       <!-- Main Card -->
       <div class="main-card">
-        <form method="post" action="{{ root_path }}/go" data-default-login="{{ selected_login }}">
+        <form method="get" action="{{ root_path }}/go" data-default-login="{{ selected_login }}">
           <input type="hidden" name="platform" value="twitch">
 
           {% if streamers %}

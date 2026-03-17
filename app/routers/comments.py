@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import re
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -79,6 +80,18 @@ def _render_index_html(context: dict) -> str:
 
 def _render_user_comments_html(context: dict) -> str:
     return templates.env.get_template("user_comments.html").render(context)
+
+
+def _build_go_redirect_url(request: Request, login: str | None, platform: str | None) -> str:
+    # Cloudflare Access can resume an interrupted form submission as GET /go,
+    # so this endpoint needs to accept both verbs and recover gracefully.
+    normalized_login = (login or "").strip()
+    if not normalized_login:
+        return str(request.url_for("index"))
+
+    normalized_platform = (platform or DEFAULT_PLATFORM).strip() or DEFAULT_PLATFORM
+    target = request.url_for("user_comments_page", login=normalized_login)
+    return f"{target}?{urlencode({'platform': normalized_platform})}"
 
 
 def _load_user_meta(login: str, uid: int, db) -> dict | None:
@@ -212,12 +225,14 @@ def api_users_commenters(streamer: str = Query(...)):
     return {"logins": logins}
 
 
+@router.get("/go")
+def go_get(request: Request, login: str | None = Query(None), platform: str = Query(DEFAULT_PLATFORM)):
+    return RedirectResponse(url=_build_go_redirect_url(request, login, platform), status_code=303)
+
+
 @router.post("/go")
-def go(request: Request, login: str = Form(...), platform: str = Form(DEFAULT_PLATFORM)):
-    login = login.strip()
-    platform = platform.strip() or DEFAULT_PLATFORM
-    target = request.url_for("user_comments_page", login=login)
-    return RedirectResponse(url=f"{target}?platform={platform}", status_code=303)
+def go_post(request: Request, login: str | None = Form(None), platform: str = Form(DEFAULT_PLATFORM)):
+    return RedirectResponse(url=_build_go_redirect_url(request, login, platform), status_code=303)
 
 
 # ── ユーザーコメント一覧 ──────────────────────────────────────────────────────
