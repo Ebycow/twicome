@@ -267,6 +267,95 @@ def fetch_comments_in_vod(
     return [dict(row) for row in rows]
 
 
+def _build_vod_comment_where(
+    vod_id: int,
+    q: str | None,
+    exclude_terms: list[str],
+) -> tuple[str, dict]:
+    """VOD コメント一覧用 WHERE 句とパラメータを返す。"""
+    where = ["c.vod_id = :vod_id"]
+    params: dict = {"vod_id": vod_id}
+
+    if q:
+        where.append("c.body LIKE :q_like")
+        params["q_like"] = f"%{q}%"
+
+    for idx, term in enumerate(exclude_terms):
+        key = f"exclude_q_like_{idx}"
+        where.append(f"c.body NOT LIKE :{key}")
+        params[key] = f"%{term}%"
+
+    return " AND ".join(where), params
+
+
+def _build_vod_comment_order(sort: str) -> str:
+    """VOD コメント一覧用 ORDER BY 句を返す。"""
+    if sort == "offset_desc":
+        return "ORDER BY c.offset_seconds DESC, c.comment_created_at_utc DESC"
+    if sort == "likes":
+        return "ORDER BY c.twicome_likes_count DESC, c.offset_seconds ASC"
+    if sort == "dislikes":
+        return "ORDER BY c.twicome_dislikes_count DESC, c.offset_seconds ASC"
+    if sort == "random":
+        return "ORDER BY RAND()"
+    # default: offset ascending (VOD 再生順)
+    return "ORDER BY c.offset_seconds ASC, c.comment_created_at_utc ASC"
+
+
+def count_vod_comments_filtered(
+    db,
+    vod_id: int,
+    *,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
+) -> int:
+    """VOD 内のフィルタ条件に合うコメント数を返す。"""
+    where_sql, params = _build_vod_comment_where(vod_id, q, exclude_terms or [])
+    row = (
+        db.execute(
+            text(f"SELECT COUNT(*) AS cnt FROM comments c WHERE {where_sql}"),
+            params,
+        )
+        .mappings()
+        .first()
+    )
+    return int(row["cnt"])
+
+
+def fetch_vod_comments_filtered(
+    db,
+    vod_id: int,
+    *,
+    q: str | None = None,
+    exclude_terms: list[str] | None = None,
+    sort: str = "offset",
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """VOD 内のコメントをフィルタ・ソート・ページネーションして取得する。"""
+    where_sql, params = _build_vod_comment_where(vod_id, q, exclude_terms or [])
+    order_sql = _build_vod_comment_order(sort)
+    params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
+    rows = (
+        db.execute(
+            text(f"""
+            SELECT {_COL_LIST}
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            JOIN users u ON u.user_id = v.owner_user_id
+            LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+            WHERE {where_sql}
+            {order_sql}
+            LIMIT :limit OFFSET :offset
+        """),
+            params,
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
 def find_comment_by_id(db, comment_id: str) -> dict | None:
     """コメント ID でコメントを1件取得。カーソル解決用。"""
     row = (

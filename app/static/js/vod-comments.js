@@ -1,0 +1,70 @@
+(function () {
+  var rootPathEl = document.getElementById('root-path-data');
+  if (!rootPathEl) { return; }
+
+  var rawRootPath = JSON.parse(rootPathEl.textContent);
+  var rootPath = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
+
+  // ── 投票機能 ──────────────────────────────────────────────────────────────
+
+  window.vote = function (btn, commentId, type) {
+    var url = rootPath + '/' + (type === 'like' ? 'like' : 'dislike') + '/' + encodeURIComponent(commentId);
+    fetch(url, { method: 'POST' })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.error) { return; }
+        var count = parseInt(btn.getAttribute('data-count') || '0', 10) + 1;
+        btn.setAttribute('data-count', count);
+        var emoji = type === 'like' ? '😂' : '❓';
+        btn.textContent = emoji + ' ' + count;
+      })
+      .catch(function () {});
+  };
+
+  // ── 投票数の遅延ロード ────────────────────────────────────────────────────
+
+  function loadVoteCounts() {
+    var controls = document.querySelectorAll('[data-vote-controls="deferred"]');
+    if (controls.length === 0) { return; }
+
+    var ids = [];
+    controls.forEach(function (el) {
+      var id = el.getAttribute('data-comment-id');
+      if (id) { ids.push(id); }
+    });
+
+    if (ids.length === 0) { return; }
+
+    fetch(rootPath + '/api/comments/votes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment_ids: ids }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var items = data.items || {};
+        controls.forEach(function (el) {
+          var id = el.getAttribute('data-comment-id');
+          var counts = items[id];
+          if (!counts) { return; }
+
+          var btns = el.querySelectorAll('.vote-btn');
+          if (btns[0]) {
+            btns[0].setAttribute('data-count', counts.twicome_likes_count || 0);
+            btns[0].textContent = '😂 ' + (counts.twicome_likes_count || 0);
+          }
+          if (btns[1]) {
+            btns[1].setAttribute('data-count', counts.twicome_dislikes_count || 0);
+            btns[1].textContent = '❓ ' + (counts.twicome_dislikes_count || 0);
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadVoteCounts);
+  } else {
+    loadVoteCounts();
+  }
+}());

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}VOD 一覧 - ツイコメ{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ root_path }}/static/css/vods.css?v={{ static_version }}" />
+{% endblock %}
+
+{% block body %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <a class="page-back nav-link" href="{{ root_path }}/">&#8592; トップ</a>
+    <h1 class="page-title">&#127916; VOD 一覧</h1>
+  </div>
+</div>
+
+<div class="vods-container">
+
+  <div class="vods-toolbar card">
+
+    {% if streamers %}
+    <div class="filter-bar">
+      <div class="filter-item">
+        <label for="streamer-filter">配信者で絞り込み</label>
+        <select id="streamer-filter" class="filter-select">
+          <option value="">すべての配信者</option>
+          {% for s in streamers %}
+          <option value="{{ s.login }}">{{ s.display_name or s.login }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="sort-select">並び順</label>
+        <select id="sort-select" class="filter-select">
+          <option value="created_at">配信日時が新しい順</option>
+          <option value="comment_count">コメント数が多い順</option>
+        </select>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="vods-search-row">
+      <div class="vods-search-wrapper">
+        <input
+          id="vods-search"
+          class="vods-search-input"
+          type="search"
+          placeholder="VOD タイトルで検索"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="button" id="vods-search-clear" class="vods-search-clear" aria-label="クリア">&#x2715;</button>
+      </div>
+      <div id="vods-count" class="vods-count"></div>
+    </div>
+
+  </div>
+
+  <div id="vods-status" class="vods-status" hidden></div>
+
+  <div id="vods-grid" class="vods-grid" role="list"></div>
+
+  <div id="vods-pagination" class="vods-pagination" hidden>
+    <button type="button" id="vods-load-more" class="vods-load-more">さらに読み込む</button>
+  </div>
+
+</div>
+
+<script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
+<script src="{{ root_path }}/static/js/vods.js?v={{ static_version }}"></script>
+
+{% endblock %}
+
+{% block sw_script %}{% endblock %}

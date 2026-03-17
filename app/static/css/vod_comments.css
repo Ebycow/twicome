@@ -1,0 +1,278 @@
+/* ─── vod_comments 固有スタイル ─── */
+:root {
+  --radius: 12px;
+  --radius-sm: 10px;
+}
+
+/* ─── Page Header ─── */
+.page-header {
+  border-bottom: 1px solid var(--card-border);
+  padding: 14px 24px;
+  background: var(--card-bg);
+  margin: -24px -24px 0;
+}
+
+.page-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-back {
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+/* ─── Container ─── */
+.vod-comments-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── VOD Info ─── */
+.vod-info-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vod-info-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.vod-info-meta {
+  font-size: 0.85rem;
+  color: var(--meta-color);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+}
+
+.vod-owner-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.vod-owner-link:hover {
+  text-decoration: underline;
+}
+
+.vod-info-links {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── Filter Form ─── */
+.filter-form {
+  padding: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filters > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.filters > div.wide {
+  flex: 2;
+  min-width: 200px;
+}
+
+.filters > div.action {
+  min-width: 0;
+}
+
+.filters label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--label-color);
+  margin: 0;
+}
+
+.filters input,
+.filters select {
+  margin-top: 0;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+}
+
+.filters button[type="submit"] {
+  padding: 9px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.filters button[type="submit"]:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+/* ─── Pagination ─── */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-btn {
+  display: inline-block;
+  padding: 7px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.page-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+  opacity: 1;
+}
+
+.page-info {
+  font-size: 0.85rem;
+  color: var(--meta-color);
+}
+
+/* ─── Comment List ─── */
+.commenter-name {
+  font-weight: 700;
+}
+
+.commenter-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.commenter-link:hover {
+  text-decoration: underline;
+}
+
+.comment {
+  padding: 12px;
+  border: 1px solid var(--comment-border);
+  border-radius: 12px;
+  background: var(--comment-bg);
+}
+
+.comment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.body {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* ─── Vote Controls ─── */
+.vote-controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.vote-btn {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--vote-btn-border);
+  background: var(--vote-btn-bg);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.vote-btn:hover {
+  background: var(--vote-btn-hover);
+}
+
+/* ─── Community Note ─── */
+.community-note {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--cn-bg);
+  border-left: 3px solid var(--cn-border);
+  border-radius: 0 8px 8px 0;
+  color: var(--cn-text);
+  font-size: 0.85rem;
+}
+
+.cn-danger-badge,
+.cn-status-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 4px;
+}
+
+.cn-status-badge {
+  background: rgba(33, 150, 243, 0.15);
+  color: #1565c0;
+  border: 1px solid #2196f3;
+}
+
+/* ─── Responsive ─── */
+@media (width <= 720px) {
+  .page-header {
+    margin: -12px -12px 0;
+    padding: 12px 16px;
+  }
+}
+
+@media (width <= 600px) {
+  .vod-comments-container {
+    padding: 16px 12px 60px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filters > div,
+  .filters > div.wide {
+    min-width: 0;
+    width: 100%;
+  }
+}

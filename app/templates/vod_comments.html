@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}{% if vod %}{{ vod.title }} - VOD コメント - ツイコメ{% else %}VOD コメント - ツイコメ{% endif %}{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ root_path }}/static/css/vod_comments.css?v={{ static_version }}" />
+{% endblock %}
+
+{% block body %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <a class="page-back nav-link" href="{{ root_path }}/vods">&#8592; VOD 一覧</a>
+    <h1 class="page-title">&#127916; VOD コメント</h1>
+  </div>
+</div>
+
+<div class="vod-comments-container">
+
+  {% if error %}
+    <div class="card error" style="margin-bottom:16px;">{{ error }}</div>
+  {% endif %}
+
+  {% if vod %}
+  <div class="vod-info card">
+    <div class="vod-info-header">
+      <div class="vod-info-title">{{ vod.title }}</div>
+      <div class="vod-info-meta">
+        <span class="meta">配信者:
+          <a href="{{ root_path }}/u/{{ vod.owner_login }}?platform=twitch" class="vod-owner-link">
+            {{ vod.owner_display_name or vod.owner_login }}
+            {% if vod.owner_display_name and vod.owner_display_name != vod.owner_login %}
+              <span class="meta">({{ vod.owner_login }})</span>
+            {% endif %}
+          </a>
+        </span>
+        {% if vod.created_at_jst %}
+          <span class="meta">· 配信日時: {{ vod.created_at_jst }} JST</span>
+        {% endif %}
+        {% if vod.length_hms %}
+          <span class="meta">· 長さ: {{ vod.length_hms }}</span>
+        {% endif %}
+        {% if vod.game_name %}
+          <span class="meta">· {{ vod.game_name }}</span>
+        {% endif %}
+        {% if vod.view_count %}
+          <span class="meta">· 視聴数: {{ vod.view_count | int }}</span>
+        {% endif %}
+        <span class="meta">· コメント: {{ total }}</span>
+      </div>
+      {% if vod.url %}
+      <div class="vod-info-links">
+        <a href="{{ vod.url }}" target="_blank" rel="noopener" class="pill">Twitch で開く</a>
+        {% if vod.youtube_url %}
+          <a href="{{ vod.youtube_url }}" target="_blank" rel="noopener" class="pill">YouTube で開く</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <form class="card filter-form" method="get" action="{{ root_path }}/vods/{{ vod.vod_id }}">
+    <div class="section-title">フィルター</div>
+    <div class="filters">
+      <div>
+        <label for="filter-q">本文検索</label>
+        <input id="filter-q" name="q" value="{{ filters.q or '' }}" placeholder="keyword" />
+      </div>
+      <div class="wide">
+        <label for="filter-exclude-q">除外ワード</label>
+        <input id="filter-exclude-q" name="exclude_q" value="{{ filters.exclude_q or '' }}" placeholder="含まれると除外（空白/カンマ区切り）" />
+      </div>
+      <div>
+        <label for="filter-sort">並び</label>
+        <select id="filter-sort" name="sort">
+          <option value="offset" {% if not filters.sort or filters.sort == 'offset' %}selected{% endif %}>VOD 内時刻順（昇順）</option>
+          <option value="offset_desc" {% if filters.sort == 'offset_desc' %}selected{% endif %}>VOD 内時刻順（降順）</option>
+          <option value="likes" {% if filters.sort == 'likes' %}selected{% endif %}>いいね順</option>
+          <option value="dislikes" {% if filters.sort == 'dislikes' %}selected{% endif %}>わるいね順</option>
+          <option value="random" {% if filters.sort == 'random' %}selected{% endif %}>ランダム</option>
+        </select>
+      </div>
+      <div>
+        <label for="filter-page-size">1ページ</label>
+        <select id="filter-page-size" name="page_size">
+          {% for s in [20, 50, 100, 200] %}
+            <option value="{{ s }}" {% if filters.page_size == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="action">
+        <button type="submit">適用</button>
+      </div>
+    </div>
+  </form>
+
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn">&#8592; 前</a>
+    {% endif %}
+    <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
+    {% if page < pages %}
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 &#8594;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="list">
+    {% for c in comments %}
+      <div class="comment" id="{{ c.comment_id }}">
+        <div class="comment-head">
+          <div>
+            {% if c.vod_jump_link %}
+              <a href="{{ c.vod_jump_link }}" target="_blank" class="pill">{{ c.offset_hms }}</a>
+            {% else %}
+              <span class="pill">{{ c.offset_hms }}</span>
+            {% endif %}
+            {% if c.youtube_jump_link %}
+              <a href="{{ c.youtube_jump_link }}" target="_blank" class="pill">YouTube</a>
+            {% endif %}
+            <span class="commenter-name" {% if c.user_color %}style="color:{{ c.user_color }}"{% endif %}>
+              <a href="{{ root_path }}/u/{{ c.commenter_login_snapshot }}?platform=twitch" class="commenter-link">{{ c.commenter_display_name_snapshot or c.commenter_login_snapshot }}</a>
+            </span>
+            {% if c.commenter_display_name_snapshot and c.commenter_display_name_snapshot != c.commenter_login_snapshot %}
+              <span class="meta">({{ c.commenter_login_snapshot }})</span>
+            {% endif %}
+            {% if c.comment_created_at_jst %}
+              <span class="meta">· {{ c.comment_created_at_jst }} JST</span>
+            {% endif %}
+            {% if c.bits_spent %}
+              <span class="pill">bits {{ c.bits_spent }}</span>
+            {% endif %}
+          </div>
+          <div class="meta">
+            <span
+              class="vote-controls"
+              data-vote-controls="deferred"
+              data-comment-id="{{ c.comment_id }}"
+            >
+              <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0">😂 0</button>
+              <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0">❓ 0</button>
+            </span>
+          </div>
+        </div>
+        <div class="body">{{ c.body_html | safe }}</div>
+        {% if c.community_note_body %}
+          <div class="community-note">
+            <div>
+              {% if c.cn_harm_risk is not none %}
+                {% set danger = ((c.cn_harm_risk + c.cn_exaggeration + c.cn_evidence_gap + c.cn_subjectivity) / 4)|round|int %}
+                <span class="cn-danger-badge" style="background:{{ 'rgba(244,67,54,0.2);color:#d32f2f;border:1px solid #d32f2f' if danger >= 60 else ('rgba(255,152,0,0.2);color:#e65100;border:1px solid #e65100' if danger >= 30 else 'rgba(76,175,80,0.2);color:#2e7d32;border:1px solid #2e7d32') }}">
+                  危険度 {{ danger }}
+                </span>
+              {% endif %}
+              {% if c.cn_status %}
+                <span class="cn-status-badge">{{ {"supported": "裏付けあり", "insufficient": "情報不足", "inconsistent": "矛盾あり", "not_applicable": "該当なし"}[c.cn_status] or c.cn_status }}</span>
+              {% endif %}
+              &#x1f4dd; {{ c.community_note_body }}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="meta" style="text-align:center; padding:24px;">コメントが見つかりませんでした。</div>
+    {% endfor %}
+  </div>
+
+  {% if pages > 1 %}
+  <div class="pagination" style="margin-top:16px;">
+    {% if page > 1 %}
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn">&#8592; 前</a>
+    {% endif %}
+    <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
+    {% if page < pages %}
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 &#8594;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+
+<script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
+<script src="{{ root_path }}/static/js/vod-comments.js?v={{ static_version }}"></script>
+
+{% endblock %}
+
+{% block sw_script %}{% endblock %}

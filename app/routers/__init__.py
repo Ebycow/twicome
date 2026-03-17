@@ -1,7 +1,8 @@
-from . import best9, clusters, comments, misc, quiz, search, stats
+from . import best9, clusters, comments, misc, quiz, search, stats, vods
 
 ALL_ROUTERS = [
     comments.router,
+    vods.router,
     best9.router,
     search.router,
     stats.router,

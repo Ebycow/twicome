@@ -72,6 +72,7 @@ def build_app_stats(db) -> dict:
                 "suffix": "VODs",
                 "tone": "cool",
                 "description": "横断検索できる配信",
+                "link": "/vods",
             },
             {
                 "label": "配信者数",
