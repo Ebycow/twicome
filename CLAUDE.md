@@ -2,6 +2,11 @@
 
 ブラウザ閲覧してレビューしたい場合は、http://localhost:8011/ が利用可能
 
+CSS・テンプレート等の静的ファイルを変更した後、サーバーが変更を反映していない場合は再ビルドが必要:
+```
+docker compose -f docker-compose.dev.yml --profile faiss up --build
+```
+
 ## Lint
 
 ファイルを書き込み・編集すると PostToolUse フック（`.claude/hooks/post_tool_lint.sh`）が自動で lint を実行する:
