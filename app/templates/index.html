@@ -17,8 +17,26 @@
 
     <!-- Hero -->
     <div class="hero">
-      <h1 class="hero-title">ツイコメ <small>Twicome</small></h1>
-      <p class="hero-sub">Twitch VOD コメント検索・分析ツール</p>
+      <div class="hero-copy">
+        <h1 class="hero-title">ツイコメ <small>Twicome</small></h1>
+        <p class="hero-sub">Twitch VOD コメント検索・分析ツール</p>
+      </div>
+      {% if app_stats %}
+      <aside class="hero-stats" aria-label="アプリ統計">
+        <div class="hero-stats-grid">
+          {% for item in app_stats["items"] %}
+          <div class="hero-stat-card hero-stat-card-{{ item.tone }}">
+            <div class="hero-stat-label">{{ item.label }}</div>
+            <div class="hero-stat-value-row">
+              <span class="hero-stat-value">{{ item.value }}</span>
+              <span class="hero-stat-suffix">{{ item.suffix }}</span>
+            </div>
+            <div class="hero-stat-description">{{ item.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </aside>
+      {% endif %}
     </div>
 
     <div class="container">
@@ -134,7 +152,7 @@
           <a class="sub-link" href="{{ root_path }}/manual">&#128214; 使い方ガイド</a>
         </div>
 
-        <p class="hint">例: /u/someone?platform=twitch でも直接アクセスできます。</p>
+        <!-- <p class="hint">例: /u/someone?platform=twitch でも直接アクセスできます。</p> -->
       </div>
 
       <!-- PWA Banner (mobile only) -->

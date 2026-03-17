@@ -93,6 +93,43 @@ def fetch_streamers(db) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def fetch_app_stats(db) -> dict:
+    """トップページ向けのアプリ全体統計を返す。"""
+    row = (
+        db.execute(
+            text("""
+            SELECT
+                (SELECT COUNT(*) FROM users WHERE platform = 'twitch') AS total_users,
+                (
+                    SELECT COUNT(*)
+                    FROM users u
+                    WHERE u.platform = 'twitch'
+                      AND EXISTS (
+                          SELECT 1
+                          FROM comments c
+                          WHERE c.commenter_login_snapshot = u.login
+                      )
+                ) AS active_commenters,
+                (SELECT COUNT(*) FROM vods) AS total_vods,
+                (SELECT COUNT(*) FROM comments) AS total_comments,
+                (
+                    SELECT COUNT(DISTINCT v.owner_user_id)
+                    FROM vods v
+                ) AS tracked_streamers
+        """)
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else {
+        "total_users": 0,
+        "active_commenters": 0,
+        "total_vods": 0,
+        "total_comments": 0,
+        "tracked_streamers": 0,
+    }
+
+
 def fetch_commenters_for_streamer(db, streamer_login: str) -> list[str]:
     """指定した配信者の VOD にコメントしたユーザーの login リスト。"""
     rows = db.execute(

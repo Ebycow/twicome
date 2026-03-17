@@ -76,6 +76,38 @@ class TestPageLoad:
         page.goto("/")
         expect(page.locator("#sort-select")).to_be_visible()
 
+    def test_hero_stats_panel_displays_app_statistics(self, page: Page, db):
+        """
+        【確認内容】ヒーロー右側にアプリ全体の統計が表示される
+
+        トップページに追加した統計パネルが、DB の件数をもとに描画されることを確認する。
+        """
+        from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
+        seed_user(db, user_id=1, login="streamer_a", display_name="配信者A", platform="twitch")
+        seed_user(db, user_id=2, login="streamer_b", display_name="配信者B", platform="twitch")
+        seed_user(db, user_id=3, login="viewer_a", display_name="視聴者A", platform="twitch")
+        seed_user(db, user_id=4, login="viewer_b", display_name="視聴者B", platform="twitch")
+
+        seed_vod(db, vod_id=100, owner_user_id=1, title="朝配信")
+        seed_vod(db, vod_id=200, owner_user_id=2, title="夜配信")
+
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=3, commenter_login_snapshot="viewer_a")
+        seed_comment(db, comment_id="c2", vod_id=200, commenter_user_id=4, commenter_login_snapshot="viewer_b")
+        seed_comment(db, comment_id="c3", vod_id=200, commenter_user_id=4, commenter_login_snapshot="viewer_b")
+
+        page.goto("/")
+
+        stats_panel = page.locator(".hero-stats")
+        expect(stats_panel).to_be_visible()
+        expect(stats_panel).to_contain_text("コメント数")
+        expect(stats_panel).to_contain_text("3")
+        expect(stats_panel).to_contain_text("コメント勢")
+        expect(stats_panel).to_contain_text("2")
+        expect(stats_panel).to_contain_text("配信ストック")
+        expect(stats_panel).to_contain_text("配信者数")
+        expect(stats_panel).to_contain_text("2")
+
 
 class TestSearchInput:
     """検索フォームのインタラクティブな動作を確認するテスト群。"""

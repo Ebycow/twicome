@@ -41,6 +41,48 @@ def build_landing_data(db) -> dict:
     }
 
 
+def build_app_stats(db) -> dict:
+    """トップページヒーロー用のアプリ統計を返す。"""
+    raw = user_repo.fetch_app_stats(db)
+    active_commenters = int(raw.get("active_commenters") or 0)
+    total_vods = int(raw.get("total_vods") or 0)
+    total_comments = int(raw.get("total_comments") or 0)
+    tracked_streamers = int(raw.get("tracked_streamers") or 0)
+
+    return {
+        "items": [
+            {
+                "label": "コメント数",
+                "value": f"{total_comments:,}",
+                "suffix": "comments",
+                "tone": "primary",
+                "description": "収録している総コメント数",
+            },
+            {
+                "label": "コメント勢",
+                "value": f"{active_commenters:,}",
+                "suffix": "users",
+                "tone": "warm",
+                "description": "コメントが見つかるユーザ",
+            },
+            {
+                "label": "配信ストック",
+                "value": f"{total_vods:,}",
+                "suffix": "VODs",
+                "tone": "cool",
+                "description": "横断検索できる配信",
+            },
+            {
+                "label": "配信者数",
+                "value": f"{tracked_streamers:,}",
+                "suffix": "streamers",
+                "tone": "neutral",
+                "description": "VOD収集の対象になっている配信者",
+            },
+        ]
+    }
+
+
 def build_popular_comments(db) -> list[dict]:
     """人気コメントランキング（HTML キャッシュに含める）。"""
     rows = comment_repo.fetch_popular_comments(db, limit=20)
@@ -58,6 +100,7 @@ def build_index_context(db, data_version: str) -> dict:
     """トップページテンプレートに渡すコンテキスト全体。"""
     landing = build_landing_data(db)
     popular_comments = build_popular_comments(db)
+    app_stats = build_app_stats(db)
     placeholder_login = DEFAULT_LOGIN or "sample_user"
     placeholder_user = user_repo.find_user(db, placeholder_login, "twitch") if DEFAULT_LOGIN else None
     placeholder_display_name = (placeholder_user or {}).get("display_name") or "表示名"
@@ -68,6 +111,7 @@ def build_index_context(db, data_version: str) -> dict:
         "popular_comments": popular_comments,
         "quick_links": landing["quick_links"],
         "streamers": landing["streamers"],
+        "app_stats": app_stats,
         "data_version": data_version,
         "service_worker_cache_name": SERVICE_WORKER_CACHE_NAME,
     }

@@ -25,10 +25,18 @@
 
       /* ─── Hero ─── */
       .hero {
-        max-width: 720px;
+        max-width: 1200px;
         margin: 0 auto 24px;
         padding: 20px 0;
         border-bottom: 1px solid var(--card-border);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 24px;
+        align-items: center;
+      }
+
+      .hero-copy {
+        min-width: 0;
       }
 
       .hero-title {
@@ -54,6 +62,85 @@
         color: var(--meta-color);
         font-size: 0.9rem;
         margin: 0;
+      }
+
+      .hero-stats {
+        position: relative;
+        overflow: hidden;
+        padding: 12px;
+        border-radius: 18px;
+        width: 100%;
+        justify-self: end;
+      }
+
+      .hero-stats-grid {
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .hero-stat-card {
+        min-width: 0;
+        padding: 10px 10px 9px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(6px);
+      }
+
+      .hero-stat-card-primary {
+        background: linear-gradient(180deg, rgba(145, 71, 255, 0.18), rgba(145, 71, 255, 0.06));
+      }
+
+      .hero-stat-card-warm {
+        background: linear-gradient(180deg, rgba(245, 166, 35, 0.18), rgba(245, 166, 35, 0.05));
+      }
+
+      .hero-stat-card-cool {
+        background: linear-gradient(180deg, rgba(82, 197, 255, 0.16), rgba(82, 197, 255, 0.05));
+      }
+
+      .hero-stat-card-neutral {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
+      }
+
+      .hero-stat-label {
+        font-size: 0.7rem;
+        color: var(--meta-color);
+      }
+
+      .hero-stat-value-row {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        margin-top: 6px;
+      }
+
+      .hero-stat-value {
+        font-size: clamp(1rem, 1.6vw, 1.28rem);
+        font-weight: 800;
+        line-height: 1;
+        color: var(--text-color);
+      }
+
+      .hero-stat-suffix {
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--meta-color);
+      }
+
+      .hero-stat-description {
+        margin-top: 6px;
+        font-size: 0.62rem;
+        line-height: 1.5;
+        color: var(--meta-color);
       }
 
       /* ─── Container ─── */
@@ -696,6 +783,17 @@
 
       /* ─── Responsive ─── */
       @media (width <= 600px) {
+        .hero {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        .hero-stats {
+          padding: 12px;
+          border-radius: 18px;
+        }
+        .hero-stats-grid {
+          grid-template-columns: 1fr;
+        }
         .main-card { padding: 16px; }
         .ranking-card { padding: 16px; }
         .search-spotlight {
