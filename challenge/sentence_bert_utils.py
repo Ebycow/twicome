@@ -181,10 +181,7 @@ def _is_symbolic_text(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return False
-    return all(
-        char.isspace() or unicodedata.category(char).startswith(("S", "P"))
-        for char in stripped
-    )
+    return all(char.isspace() or unicodedata.category(char).startswith(("S", "P")) for char in stripped)
 
 
 def bucketize_short_text(text: str) -> str:
@@ -210,10 +207,7 @@ def build_bucket_embeddings(texts: list[str], embeddings: np.ndarray) -> dict[st
     grouped = defaultdict(list)
     for idx, text in enumerate(texts):
         grouped[bucketize_short_text(text)].append(idx)
-    return {
-        bucket: embeddings[np.asarray(indices, dtype=np.int32)]
-        for bucket, indices in grouped.items()
-    }
+    return {bucket: embeddings[np.asarray(indices, dtype=np.int32)] for bucket, indices in grouped.items()}
 
 
 def build_bucket_centroids(texts: list[str], embeddings: np.ndarray) -> dict[str, np.ndarray]:
