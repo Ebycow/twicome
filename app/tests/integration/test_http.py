@@ -42,6 +42,15 @@ class TestIndex:
         assert resp.status_code == 200
         assert 'data-default-login="prefetch_target"' in resp.text
 
+    def test_index_uses_default_login_in_search_placeholder(self, client, monkeypatch):
+        import services.index_service as index_service
+
+        monkeypatch.setattr(index_service, "DEFAULT_LOGIN", "prefetch_target")
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert 'placeholder="例: prefetch_target / サンプルユーザ"' in resp.text
+
     def test_index_embeds_service_worker_cache_name(self, client):
         resp = client.get("/")
         assert resp.status_code == 200
@@ -51,6 +60,25 @@ class TestIndex:
         resp = client.get("/")
         assert resp.status_code == 200
         assert 'method="get" action="/go"' in resp.text
+
+    def test_index_renders_selected_user_panel(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert 'id="selected-user-panel"' in resp.text
+        assert 'id="selected-user-name"' in resp.text
+        assert "まだ選択されていません" in resp.text
+
+    def test_index_renders_recommended_users_heading_when_quick_links_exist(self, client, db, monkeypatch):
+        import services.index_service as index_service
+
+        seed_user(db, user_id=10, login="viewer", display_name="おすすめ太郎", platform="twitch")
+        monkeypatch.setattr(index_service, "QUICK_LINK_LOGINS", ["viewer"])
+
+        resp = client.get("/")
+
+        assert resp.status_code == 200
+        assert '<h2 class="quick-links-title">おすすめユーザ</h2>' in resp.text
+        assert "おすすめ太郎をみるならここ" in resp.text
 
     def test_service_worker_script_embeds_cache_name(self, client):
         resp = client.get("/sw.js")

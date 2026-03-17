@@ -80,6 +80,32 @@ class TestPageLoad:
 class TestSearchInput:
     """検索フォームのインタラクティブな動作を確認するテスト群。"""
 
+    def test_selected_user_panel_updates_after_resolving_user(self, page: Page, db):
+        """
+        【確認内容】入力したユーザーが解決できたら、確認用パネルに選択内容が表示される
+
+        候補ドロップダウンとは別に、フォーム内で現在どのユーザーを開こうとしているかが
+        常時確認できることを検証する。
+        """
+        from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", display_name="ビューワー", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer")
+
+        with page.expect_response(re.compile(r"/api/users/index")):
+            page.goto("/")
+
+        selected_panel = page.locator("#selected-user-panel")
+        expect(selected_panel).to_contain_text("まだ選択されていません")
+
+        page.locator("#login-search").fill("viewer")
+
+        expect(selected_panel).to_contain_text("ビューワー")
+        expect(selected_panel).to_contain_text("@viewer")
+        expect(page.locator("#selected-user-count")).to_contain_text("1件")
+
     def test_clear_button_hidden_initially(self, page: Page):
         """
         【確認内容】入力前はクリアボタンが非表示になっている

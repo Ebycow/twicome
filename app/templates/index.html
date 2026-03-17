@@ -28,58 +28,81 @@
         <form method="get" action="{{ root_path }}/go" data-default-login="{{ selected_login }}">
           <input type="hidden" name="platform" value="twitch">
 
-          {% if streamers %}
-          <div class="filter-bar">
-            <div class="filter-item">
-              <label for="streamer-filter">配信者で絞り込み</label>
-              <select id="streamer-filter" class="filter-select">
-                <option value="">すべての配信者</option>
-                {% for s in streamers %}
-                <option value="{{ s.login }}">{{ s.display_name or s.login }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="filter-item">
-              <label for="sort-select">並び順</label>
-              <select id="sort-select" class="filter-select">
-                <option value="login">アルファベット順</option>
-                <option value="count_desc">コメント数が多い順</option>
-                <option value="count_asc">コメント数が少ない順</option>
-                <option value="recent">最近活動した順</option>
-              </select>
-            </div>
-          </div>
-          {% endif %}
+          <section class="search-spotlight" aria-label="Twitch ユーザ検索">
 
-          <label class="form-label" for="login-search">Twitch ユーザを検索（login / display_name）</label>
-          <div class="search-wrapper" id="login-search-wrapper">
-            <div class="search-input-row">
-              <input
-                id="login-search"
-                class="search-input"
-                type="search"
-                name="login"
-                value="{{ selected_login }}"
-                placeholder="login または display_name を入力して候補から選択"
-                autocomplete="off"
-                spellcheck="false"
-                required
-              />
-              <button type="button" id="login-search-clear" class="search-clear-btn" aria-label="検索をクリア">&#x2715;</button>
+            {% if streamers %}
+            <div class="filter-bar search-filter-bar">
+              <div class="filter-item">
+                <label for="streamer-filter">配信者で絞り込み</label>
+                <select id="streamer-filter" class="filter-select">
+                  <option value="">すべての配信者</option>
+                  {% for s in streamers %}
+                  <option value="{{ s.login }}">{{ s.display_name or s.login }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="filter-item">
+                <label for="sort-select">並び順</label>
+                <select id="sort-select" class="filter-select">
+                  <option value="login">アルファベット順</option>
+                  <option value="count_desc">コメント数が多い順</option>
+                  <option value="count_asc">コメント数が少ない順</option>
+                  <option value="recent">最近活動した順</option>
+                </select>
+              </div>
             </div>
-            <div id="login-search-results" class="search-results" role="listbox" hidden></div>
-          </div>
-          <div id="offline-status" class="offline-status" hidden></div>
+            {% endif %}
 
-          <div class="actions">
-            <button id="go-btn" class="btn btn-primary" type="submit">&#9654; コメント一覧を表示</button>
-            <a id="stats-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/stats?platform=twitch">&#128202; 統計ページ</a>
-            <a id="quiz-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/quiz?platform=twitch">&#127922; コメント当てクイズで遊ぶ</a>
-          </div>
+            <label class="form-label search-form-label" for="login-search">Twitch ユーザを検索（IDかユーザ名）</label>
+            <div class="search-wrapper" id="login-search-wrapper">
+              <div class="search-input-row">
+                <input
+                  id="login-search"
+                  class="search-input"
+                  type="search"
+                  name="login"
+                  value="{{ selected_login }}"
+                  placeholder="{{ login_search_placeholder }}"
+                  autocomplete="off"
+                  spellcheck="false"
+                  required
+                />
+                <button type="button" id="login-search-clear" class="search-clear-btn" aria-label="検索をクリア">&#x2715;</button>
+              </div>
+              <div id="login-search-results" class="search-results" role="listbox" hidden></div>
+            </div>
+            <div id="offline-status" class="offline-status" hidden></div>
+
+            <section id="selected-user-panel" class="selected-user-panel" aria-live="polite" aria-label="選択中のユーザ">
+              <div class="selected-user-heading">
+                <h3 class="selected-user-title">選択中のユーザ</h3>
+              </div>
+              <div id="selected-user-card" class="selected-user-card selected-user-card-empty">
+                <span id="selected-user-avatar" class="search-item-avatar selected-user-avatar">?</span>
+                <div class="search-item-body">
+                  <div class="selected-user-main">
+                    <div id="selected-user-name" class="search-item-name">まだ選択されていません</div>
+                    <span id="selected-user-count" class="search-item-count selected-user-count" hidden></span>
+                  </div>
+                  <div id="selected-user-login" class="selected-user-login" hidden></div>
+                  <div id="selected-user-meta" class="search-item-meta selected-user-meta">
+                    ユーザ名を入力して候補から選ぶと、ここで確認できます。
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="actions">
+              <button id="go-btn" class="btn btn-primary" type="submit">&#9654; コメント一覧を表示</button>
+              <a id="stats-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/stats?platform=twitch">&#128202; 統計ページ</a>
+              <a id="quiz-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/quiz?platform=twitch">&#127922; コメント当てクイズで遊ぶ</a>
+            </div>
+          </section>
         </form>
 
         {% if quick_links %}
         <!-- Quick Links -->
+        <h2 class="quick-links-title">おすすめユーザ</h2>
         <div class="quick-links">
           {% for quick_link in quick_links %}
           <a

@@ -58,9 +58,11 @@ def build_index_context(db, data_version: str) -> dict:
     """トップページテンプレートに渡すコンテキスト全体。"""
     landing = build_landing_data(db)
     popular_comments = build_popular_comments(db)
+    placeholder_login = DEFAULT_LOGIN or "sample_user"
     return {
         "selected_login": DEFAULT_LOGIN or "",
         "selected_login_for_links": DEFAULT_LOGIN or "",
+        "login_search_placeholder": f"例: {placeholder_login} / サンプルユーザ",
         "popular_comments": popular_comments,
         "quick_links": landing["quick_links"],
         "streamers": landing["streamers"],

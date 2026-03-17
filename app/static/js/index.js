@@ -4,6 +4,12 @@
   const loginSearchResults = document.getElementById('login-search-results');
   const loginSearchClear = document.getElementById('login-search-clear');
   const offlineStatus = document.getElementById('offline-status');
+  const selectedUserCard = document.getElementById('selected-user-card');
+  const selectedUserAvatar = document.getElementById('selected-user-avatar');
+  const selectedUserName = document.getElementById('selected-user-name');
+  const selectedUserLogin = document.getElementById('selected-user-login');
+  const selectedUserMeta = document.getElementById('selected-user-meta');
+  const selectedUserCount = document.getElementById('selected-user-count');
 
   if (!loginInput) {return;}
 
@@ -43,6 +49,7 @@
   let indexedUsers = [];
   let loginMap = new Map();
   let displayMap = new Map();
+  let userMap = new Map();
   let usersLoaded = false;
   let usersLoadPromise = null;
   let currentSort = 'login';
@@ -327,6 +334,87 @@
   }
 
   /**
+   * 選択中ユーザカードのアバター領域をプロフィール画像または頭文字で更新する。
+   * @param user - 表示対象ユーザ。null の場合はプレースホルダ表示
+   * @param fallbackText - ユーザ不在時に表示する1文字
+   */
+  function renderSelectedUserAvatar(user, fallbackText) {
+    if (!selectedUserAvatar) {return;}
+    selectedUserAvatar.textContent = '';
+    selectedUserAvatar.innerHTML = '';
+    if (user && user.profileImageUrl) {
+      const img = document.createElement('img');
+      img.src = user.profileImageUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      selectedUserAvatar.appendChild(img);
+      return;
+    }
+    selectedUserAvatar.textContent = String(fallbackText || '?').slice(0, 1).toUpperCase();
+  }
+
+  /**
+   * 入力欄の状態に合わせて「選択中のユーザ」カードの表示内容を更新する。
+   */
+  function updateSelectedUserPreview() {
+    if (!selectedUserCard || !selectedUserName || !selectedUserLogin || !selectedUserMeta || !selectedUserCount) {return;}
+
+    const currentValue = loginInput.value.trim();
+    const setEmpty = function (name, meta, fallbackText) {
+      selectedUserCard.classList.add('selected-user-card-empty');
+      selectedUserName.textContent = name;
+      selectedUserMeta.textContent = meta;
+      selectedUserLogin.hidden = true;
+      selectedUserLogin.textContent = '';
+      selectedUserCount.hidden = true;
+      selectedUserCount.textContent = '';
+      renderSelectedUserAvatar(null, fallbackText || '?');
+    };
+
+    if (!currentValue) {
+      setEmpty('まだ選択されていません', 'ユーザ名を入力して候補から選ぶと、ここで確認できます。', '?');
+      return;
+    }
+
+    if (!usersLoaded) {
+      setEmpty(currentValue, 'ユーザ情報を読み込み中です...', currentValue);
+      return;
+    }
+
+    const resolved = resolveLogin(currentValue);
+    if (!resolved) {
+      setEmpty(
+        currentValue,
+        offlineMode ? 'オフライン中は閲覧済みユーザから選択してください。' : '候補から一致するユーザを選択してください。',
+        currentValue
+      );
+      return;
+    }
+
+    const user = userMap.get(resolved.toLowerCase());
+    if (!user) {
+      setEmpty(resolved, 'ユーザ情報を表示できません。', resolved);
+      return;
+    }
+
+    selectedUserCard.classList.remove('selected-user-card-empty');
+    selectedUserName.textContent = user.displayName || user.login;
+    selectedUserLogin.hidden = false;
+    selectedUserLogin.textContent = `@${user.login}`;
+    const rel = formatRelativeTime(user.lastCommentAt);
+    if (user.commentCount > 0) {
+      selectedUserCount.hidden = false;
+      selectedUserCount.textContent = `${user.commentCount.toLocaleString()}件`;
+      selectedUserMeta.textContent = rel ? `最終活動: ${rel}` : 'コメント一覧を開く準備ができています。';
+    } else {
+      selectedUserCount.hidden = true;
+      selectedUserCount.textContent = '';
+      selectedUserMeta.textContent = 'コメント数はまだ集計されていません。';
+    }
+    renderSelectedUserAvatar(user, user.displayName || user.login);
+  }
+
+  /**
    * 候補リストの代わりにメッセージを表示する。
    * @param message - 候補リストに表示するメッセージ文字列
    */
@@ -388,6 +476,7 @@
     opts = opts || {};
     refreshOfflineAccessibleRoutes();
     updateOfflineStatus();
+    updateSelectedUserPreview();
     syncActionLinksFromInput();
     if (opts.rerender && !loginSearchResults.hidden) {
       void renderCandidates(loginInput.value);
@@ -417,6 +506,7 @@
     });
 
     loginMap = new Map(indexedUsers.map(function (user) { return [user.loginLower, user.login]; }));
+    userMap = new Map(indexedUsers.map(function (user) { return [user.loginLower, user]; }));
     displayMap = new Map();
     for (let i = 0; i < indexedUsers.length; i++) {
       const user = indexedUsers[i];
@@ -440,6 +530,7 @@
         hydrateUsers(data.users || []);
         usersLoaded = true;
         updateOfflineStatus();
+        updateSelectedUserPreview();
         syncActionLinksFromInput();
         scheduleResolvedInputPrefetch();
         return indexedUsers;
@@ -642,6 +733,7 @@
     loginInput.value = login;
     loginInput.setCustomValidity('');
     setActionLinks(login);
+    updateSelectedUserPreview();
     syncActionLinksFromInput();
     queueCommentPrefetch(login);
     hideCandidates();
@@ -685,6 +777,7 @@
    * 入力欄の現在値を解決して統計・クイズリンクのhrefと有効/無効状態を同期する。
    */
   function syncActionLinksFromInput() {
+    updateSelectedUserPreview();
     const currentValue = loginInput.value.trim();
     if (!usersLoaded) {
       if (currentValue) { setActionLinks(currentValue); setActionLinkState(!offlineMode); }
@@ -831,6 +924,7 @@
   });
 
   updateOfflineStatus();
+  updateSelectedUserPreview();
   syncActionLinksFromInput();
   primeInitialCommentPrefetches();
   void ensureUsersLoaded().catch(function () {});
