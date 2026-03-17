@@ -20,6 +20,8 @@
   --link-color: #0056b3;
   --error-bg: #fff3f3;
   --error-border: #f2b3b3;
+  --accent: #9147ff;
+  --accent-light: rgba(145, 71, 255, 0.1);
   --vote-btn-bg: #f9f9f9;
   --vote-btn-hover: #e9e9e9;
   --vote-btn-border: #ccc;
@@ -53,6 +55,8 @@
     --link-color: #6db3f2;
     --error-bg: #3a2020;
     --error-border: #6b3a3a;
+    --accent: #a970ff;
+    --accent-light: rgba(169, 112, 255, 0.12);
     --vote-btn-bg: #3a3a3a;
     --vote-btn-hover: #4a4a4a;
     --vote-btn-border: #555;
@@ -77,9 +81,11 @@ a.pill { text-decoration: none; color: var(--link-color); }
 
 /* ─── Form Elements ─── */
 label { display: block; font-size: 0.9rem; color: var(--label-color); }
-input, select { width: 100%; padding: 10px; margin-top: 6px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); }
-button { padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; background: var(--button-bg); color: var(--button-text); }
-button:hover { opacity: 0.8; }
+input, select { width: 100%; padding: 10px; margin-top: 6px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); transition: border-color 0.2s; }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+button { padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; background: var(--button-bg); color: var(--button-text); transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s; }
+button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); opacity: 1; }
+button:active { transform: translateY(0); box-shadow: none; }
 
 /* ─── Common Components ─── */
 .card { padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card-bg); }
@@ -96,6 +102,30 @@ button:hover { opacity: 0.8; }
 .body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: bold; }
 .emote { height: 1.35em; vertical-align: -0.2em; }
 .recent { color: #c00000; }
+
+/* ─── Nav Links ─── */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--label-color);
+  background: var(--button-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nav-link:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  opacity: 1;
+}
+.nav-link:active { transform: translateY(0); box-shadow: none; }
 
 /* ─── Vote Buttons ─── */
 .vote-btn { margin-right: 8px; padding: 4px 8px; border: 1px solid var(--vote-btn-border); border-radius: 4px; background: var(--vote-btn-bg); cursor: pointer; color: var(--text-color); touch-action: manipulation; }

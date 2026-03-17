@@ -30,13 +30,15 @@
             </div>
           {% endif %}
         </div>
-        <div style="display:flex; gap:16px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           {% if user %}
-            <button type="button" id="best9-toggle-btn" style="border:1px solid var(--pill-border); background:var(--button-bg); color:var(--button-text);">Best9モード</button>
+            <button type="button" id="best9-toggle-btn" class="nav-link">Best9モード</button>
           {% endif %}
-          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}">クイズで遊ぶ</a>
-          <a href="{{ root_path }}/manual">使い方ガイド</a>
-          <a href="{{ root_path }}/">← 検索に戻る</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link">統計</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link">クラスタ探索</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link">クイズで遊ぶ</a>
+          <a href="{{ root_path }}/manual" class="nav-link">使い方ガイド</a>
+          <a href="{{ root_path }}/" class="nav-link">← 検索に戻る</a>
         </div>
       </div>
     <div style="margin:2rem 2rem 0;">
