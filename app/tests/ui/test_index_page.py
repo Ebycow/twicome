@@ -102,9 +102,10 @@ class TestPageLoad:
         expect(stats_panel).to_be_visible()
         expect(stats_panel).to_contain_text("コメント数")
         expect(stats_panel).to_contain_text("3")
-        expect(stats_panel).to_contain_text("コメント勢")
+        expect(stats_panel).to_contain_text("ユーザ数")
         expect(stats_panel).to_contain_text("2")
-        expect(stats_panel).to_contain_text("配信ストック")
+        expect(stats_panel).to_contain_text("VOD数")
+        expect(stats_panel).to_contain_text("2")
         expect(stats_panel).to_contain_text("配信者数")
         expect(stats_panel).to_contain_text("2")
 

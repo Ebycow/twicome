@@ -59,14 +59,14 @@ def build_app_stats(db) -> dict:
                 "description": "収録している総コメント数",
             },
             {
-                "label": "コメント勢",
+                "label": "ユーザ数",
                 "value": f"{active_commenters:,}",
                 "suffix": "users",
                 "tone": "warm",
                 "description": "コメントが見つかるユーザ",
             },
             {
-                "label": "配信ストック",
+                "label": "VOD数",
                 "value": f"{total_vods:,}",
                 "suffix": "VODs",
                 "tone": "cool",
