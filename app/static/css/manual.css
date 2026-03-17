@@ -1,11 +1,10 @@
+      /* base.css から継承: :root 共通変数（--bg-color, --text-color, --meta-color,
+         --card-border, --card-bg, --link-color 等）, body 基本, a
+         このページは max-width コンテナレイアウトのため body margin を 0 にオーバーライド */
+
       :root {
-        --bg: #fff;
-        --text: #111;
-        --muted: #666;
-        --border: #ddd;
-        --card: #fff;
+        /* manual 固有のローカル変数 */
         --card-soft: #f7f7f9;
-        --link: #007bff;
         --accent: #0d6efd;
         --accent-soft: #e9f2ff;
         --warn-bg: #fff8e1;
@@ -22,13 +21,7 @@
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #17181b;
-          --text: #e5e7eb;
-          --muted: #9ca3af;
-          --border: #3f4652;
-          --card: #22252b;
           --card-soft: #1d2026;
-          --link: #7ab7ff;
           --accent: #60a5fa;
           --accent-soft: #1f2937;
           --warn-bg: #3b3116;
@@ -44,17 +37,11 @@
         }
       }
 
-      * { box-sizing: border-box; }
-
       body {
         margin: 0;
         padding: 24px;
-        background: var(--bg);
-        color: var(--text);
-        font-family: system-ui, -apple-system, sans-serif;
         line-height: 1.75;
       }
-      a { color: var(--link); }
 
       code {
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -84,7 +71,7 @@
       }
 
       .meta {
-        color: var(--muted);
+        color: var(--meta-color);
         font-size: 0.92rem;
       }
 
@@ -98,17 +85,17 @@
       .chip {
         display: inline-flex;
         align-items: center;
-        border: 1px solid var(--border);
+        border: 1px solid var(--card-border);
         background: var(--card-soft);
         border-radius: 999px;
         padding: 4px 10px;
         font-size: 0.82rem;
-        color: var(--muted);
+        color: var(--meta-color);
       }
 
       .toc {
-        border: 1px solid var(--border);
-        background: var(--card);
+        border: 1px solid var(--card-border);
+        background: var(--card-bg);
         border-radius: 14px;
         padding: 18px 22px;
         margin: 20px 0 30px;
@@ -131,7 +118,7 @@
       }
 
       .section {
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--card-border);
         padding-top: 24px;
         margin-top: 24px;
       }
@@ -147,8 +134,8 @@
       }
 
       .card {
-        border: 1px solid var(--border);
-        background: var(--card);
+        border: 1px solid var(--card-border);
+        background: var(--card-bg);
         border-radius: 12px;
         padding: 14px 16px;
         margin: 10px 0;
@@ -178,7 +165,7 @@
       }
 
       .url {
-        border: 1px solid var(--border);
+        border: 1px solid var(--card-border);
         background: var(--code-bg);
         border-radius: 10px;
         padding: 9px 12px;
@@ -194,7 +181,7 @@
       }
 
       .feature {
-        border: 1px solid var(--border);
+        border: 1px solid var(--card-border);
         background: var(--card-soft);
         border-radius: 10px;
         padding: 12px;
@@ -215,9 +202,9 @@
         text-align: left;
         vertical-align: top;
         padding: 8px 10px;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--card-border);
       }
-      th { color: var(--muted); }
+      th { color: var(--meta-color); }
       tr:last-child td { border-bottom: 0; }
 
       .badge-row {
@@ -256,8 +243,8 @@
       .footer {
         margin-top: 30px;
         padding-top: 16px;
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--card-border);
         text-align: center;
-        color: var(--muted);
+        color: var(--meta-color);
         font-size: 0.9rem;
       }

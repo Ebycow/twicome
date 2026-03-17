@@ -1,12 +1,8 @@
+      /* base.css から継承: :root 共通変数, body 基本, a, button, label, input
+         このページはフルスクリーンゲームレイアウトのため body margin を 0 にオーバーライド */
+
       :root {
-        --bg-color: #fff;
-        --text-color: #111;
-        --card-border: #ddd;
-        --card-bg: #fff;
-        --meta-color: #666;
-        --link-color: #007bff;
-        --button-bg: #f0f0f0;
-        --button-text: #111;
+        /* quiz 固有のローカル変数 */
         --correct-color: #4caf50;
         --wrong-color: #f44336;
         --heart-color: #e74c3c;
@@ -21,14 +17,6 @@
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg-color: #1a1a1a;
-          --text-color: #e0e0e0;
-          --card-border: #444;
-          --card-bg: #2a2a2a;
-          --meta-color: #999;
-          --link-color: #6db3f2;
-          --button-bg: #3a3a3a;
-          --button-text: #e0e0e0;
           --correct-color: #66bb6a;
           --wrong-color: #ef5350;
           --heart-color: #ef5350;
@@ -42,12 +30,8 @@
         }
       }
 
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-
       body {
-        font-family: system-ui, -apple-system, sans-serif;
-        background: var(--bg-color);
-        color: var(--text-color);
+        margin: 0;
         min-height: 100vh;
         overflow-x: hidden;
       }
@@ -67,7 +51,7 @@
         text-decoration: none;
         font-size: 0.9rem;
       }
-      .nav a:hover { text-decoration: underline; }
+      .nav a:hover { text-decoration: underline; opacity: 1; }
       .nav-links { display: flex; gap: 16px; }
 
       /* --- Start Screen --- */
@@ -117,11 +101,6 @@
         font-weight: bold;
       }
 
-      .meta {
-        color: var(--meta-color);
-        font-size: 0.85rem;
-      }
-
       .quiz-desc {
         color: var(--meta-color);
         line-height: 1.6;
@@ -168,6 +147,7 @@
       .quiz-btn:hover:not(:disabled) {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        opacity: 1;
       }
 
       .quiz-btn:active:not(:disabled) {
@@ -314,7 +294,7 @@
         padding: 18px 12px;
         font-size: 1rem;
       }
-      .target-btn:hover:not(:disabled) { background: var(--btn-target-hover); }
+      .target-btn:hover:not(:disabled) { background: var(--btn-target-hover); opacity: 1; }
 
       .other-btn {
         background: var(--btn-other-bg);
@@ -322,7 +302,7 @@
         padding: 18px 12px;
         font-size: 1rem;
       }
-      .other-btn:hover:not(:disabled) { background: var(--btn-other-hover); }
+      .other-btn:hover:not(:disabled) { background: var(--btn-other-hover); opacity: 1; }
 
       /* --- Result Overlay --- */
       .result-overlay {
@@ -432,14 +412,8 @@
         flex-wrap: wrap;
       }
 
-      /* --- Confetti --- */
-      .confetti {
-        position: fixed;
-        width: 10px;
-        height: 10px;
-        pointer-events: none;
-        z-index: 9999;
-      }
+      /* --- confetti: quiz は JS アニメーションを使うため CSS animation を無効化 --- */
+      .confetti { width: 10px; height: 10px; animation: none; }
       .confetti.circle { border-radius: 50%; }
       .confetti.square { border-radius: 2px; }
       .confetti.strip { width: 4px; height: 14px; border-radius: 2px; }

@@ -1,19 +1,25 @@
+      /* base.css から継承: :root 共通変数, *, body 基本, a, button, input, select
+         このページは独自のレイアウト（Hero + Container）のため body margin を 0 にオーバーライド */
+
+      /* ─── index 固有の変数（gold standard からの上書き + 追加） ─── */
       :root {
-        --bg-primary: #f5f5f7;
-        --bg-secondary: #fff;
-        --bg-tertiary: #f0f0f2;
-        --text-primary: #1a1a2e;
-        --text-secondary: #555;
-        --text-muted: #888;
+        /* gold standard からの上書き（Twitch ブランド・デザイン） */
+        --bg-color: #f5f5f7;
+        --text-color: #1a1a2e;
+        --label-color: #555;
+        --meta-color: #888;
+        --card-border: #e0e0e0;
+
+        /* index 固有 */
         --accent: #9147ff;
         --accent-hover: #772ce8;
         --accent-light: rgba(145, 71, 255, 0.1);
-        --border: #e0e0e0;
+        --gradient: linear-gradient(135deg, #9147ff 0%, #5c16c5 100%);
         --shadow: 0 2px 12px rgba(0,0,0,0.06);
         --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
         --radius: 16px;
         --radius-sm: 10px;
-        --gradient: linear-gradient(135deg, #9147ff 0%, #5c16c5 100%);
+        --bg-tertiary: #f0f0f2;
         --gold: #f5a623;
         --silver: #b0b0b0;
         --bronze: #cd7f32;
@@ -21,26 +27,26 @@
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg-primary: #0e0e10;
-          --bg-secondary: #18181b;
+          --bg-color: #0e0e10;
+          --card-bg: #18181b;
           --bg-tertiary: #1f1f23;
-          --text-primary: #efeff1;
-          --text-secondary: #adadb8;
-          --text-muted: #777;
-          --border: #2f2f35;
+          --text-color: #efeff1;
+          --label-color: #adadb8;
+          --meta-color: #777;
+          --card-border: #2f2f35;
           --shadow: 0 2px 12px rgba(0,0,0,0.3);
           --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
           --accent-light: rgba(145, 71, 255, 0.15);
         }
       }
 
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      * { margin: 0; padding: 0; }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-        background: var(--bg-primary);
-        color: var(--text-primary);
+        background: var(--bg-color);
+        color: var(--text-color);
         min-height: 100vh;
+        margin: 0;
       }
 
       /* ─── Hero ─── */
@@ -86,7 +92,7 @@
 
       /* ─── Main Card ─── */
       .main-card {
-        background: var(--bg-secondary);
+        background: var(--card-bg);
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
         padding: 32px;
@@ -99,7 +105,7 @@
         display: block;
         font-size: 0.85rem;
         font-weight: 600;
-        color: var(--text-secondary);
+        color: var(--label-color);
         margin-bottom: 8px;
         letter-spacing: 0.02em;
       }
@@ -111,7 +117,7 @@
       .search-input-row {
         display: flex;
         align-items: center;
-        border: 2px solid var(--border);
+        border: 2px solid var(--card-border);
         border-radius: var(--radius-sm);
         background: var(--bg-tertiary);
         transition: border-color 0.2s;
@@ -128,13 +134,12 @@
         font-size: 1rem;
         border: none;
         background: transparent;
-        color: var(--text-primary);
+        color: var(--text-color);
         appearance: none;
-        appearance: none;
+        margin-top: 0;
       }
 
       .search-input::-webkit-search-cancel-button {
-        appearance: none;
         appearance: none;
         display: none;
       }
@@ -148,7 +153,7 @@
         background: none;
         border: none;
         cursor: pointer;
-        color: var(--text-muted);
+        color: var(--meta-color);
         font-size: 1rem;
         padding: 0;
         width: 36px;
@@ -157,11 +162,13 @@
         align-items: center;
         justify-content: center;
         -webkit-tap-highlight-color: transparent;
+        opacity: 1;
       }
 
       .search-clear-btn:hover,
       .search-clear-btn:active {
-        color: var(--text-primary);
+        color: var(--text-color);
+        opacity: 1;
       }
 
       .search-results {
@@ -169,8 +176,8 @@
         top: calc(100% + 6px);
         left: 0;
         right: 0;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
         border-radius: var(--radius-sm);
         box-shadow: var(--shadow);
         max-height: 260px;
@@ -183,11 +190,13 @@
       }
 
       .search-item {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         width: 100%;
         border: none;
         background: transparent;
-        color: var(--text-primary);
+        color: var(--text-color);
         text-align: left;
         padding: 10px 14px;
         font-size: 0.92rem;
@@ -198,12 +207,13 @@
       .search-item:focus {
         background: var(--accent-light);
         outline: none;
+        opacity: 1;
       }
 
       .search-empty {
         padding: 10px 14px;
         font-size: 0.82rem;
-        color: var(--text-muted);
+        color: var(--meta-color);
       }
 
       .offline-status {
@@ -212,7 +222,7 @@
         border: 1px solid rgba(245, 166, 35, 0.28);
         border-radius: var(--radius-sm);
         background: rgba(245, 166, 35, 0.12);
-        color: var(--text-secondary);
+        color: var(--label-color);
         font-size: 0.82rem;
         line-height: 1.5;
       }
@@ -247,6 +257,7 @@
       .btn:hover {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        opacity: 1;
       }
       .btn:active { transform: translateY(0); }
 
@@ -263,11 +274,11 @@
 
       .btn-secondary {
         background: var(--bg-tertiary);
-        color: var(--text-primary);
-        border: 1px solid var(--border);
+        color: var(--text-color);
+        border: 1px solid var(--card-border);
       }
 
-      /* ─── Quick Links (specific users) ─── */
+      /* ─── Quick Links ─── */
       .quick-links {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -327,9 +338,9 @@
         gap: 6px;
         padding: 10px 16px;
         font-size: 0.85rem;
-        color: var(--text-secondary);
+        color: var(--label-color);
         background: var(--bg-tertiary);
-        border: 1px solid var(--border);
+        border: 1px solid var(--card-border);
         border-radius: var(--radius-sm);
         text-decoration: none;
         transition: background 0.2s, color 0.2s;
@@ -343,13 +354,13 @@
       .hint {
         margin-top: 16px;
         font-size: 0.8rem;
-        color: var(--text-muted);
+        color: var(--meta-color);
       }
 
       /* ─── Divider ─── */
       .divider {
         border: none;
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--card-border);
         margin: 28px 0;
       }
 
@@ -364,7 +375,7 @@
       }
 
       .ranking-card {
-        background: var(--bg-secondary);
+        background: var(--card-bg);
         border-radius: var(--radius);
         box-shadow: var(--shadow);
         padding: 28px 32px;
@@ -376,6 +387,8 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+        margin: 0;
+        padding: 0;
       }
 
       .ranking-item {
@@ -392,6 +405,7 @@
 
       .ranking-item:hover {
         background: var(--accent-light);
+        opacity: 1;
       }
 
       .rank-badge {
@@ -404,7 +418,7 @@
         font-weight: 700;
         color: #fff;
         flex-shrink: 0;
-        background: var(--text-muted);
+        background: var(--meta-color);
       }
       .rank-1 { background: var(--gold); }
       .rank-2 { background: var(--silver); }
@@ -433,7 +447,7 @@
         gap: 8px 16px;
         margin-top: 6px;
         font-size: 0.78rem;
-        color: var(--text-muted);
+        color: var(--meta-color);
       }
 
       .ranking-score {
@@ -465,19 +479,22 @@
       .filter-item > label {
         font-size: 0.78rem;
         font-weight: 600;
-        color: var(--text-secondary);
+        color: var(--label-color);
         letter-spacing: 0.02em;
+        margin-top: 0;
       }
 
       .filter-select {
         padding: 8px 12px;
         border-radius: var(--radius-sm);
-        border: 2px solid var(--border);
+        border: 2px solid var(--card-border);
         background: var(--bg-tertiary);
-        color: var(--text-primary);
+        color: var(--text-color);
         font-size: 0.88rem;
         cursor: pointer;
         transition: border-color 0.2s;
+        width: 100%;
+        margin-top: 0;
       }
 
       .filter-select:focus {
@@ -486,12 +503,6 @@
       }
 
       /* ─── Search Item (avatar + meta) ─── */
-      .search-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
       .search-item-avatar {
         width: 32px;
         height: 32px;
@@ -529,7 +540,7 @@
 
       .search-item-meta {
         font-size: 0.72rem;
-        color: var(--text-muted);
+        color: var(--meta-color);
         margin-top: 1px;
       }
 
@@ -570,12 +581,12 @@
       .pwa-banner-title {
         font-size: 0.9rem;
         font-weight: 700;
-        color: var(--text-primary);
+        color: var(--text-color);
       }
 
       .pwa-banner-sub {
         font-size: 0.78rem;
-        color: var(--text-muted);
+        color: var(--meta-color);
         margin-top: 3px;
         line-height: 1.5;
       }
@@ -591,7 +602,7 @@
       }
 
       .pwa-banner--installed .pwa-banner-title {
-        color: var(--text-muted);
+        color: var(--meta-color);
       }
 
       /* ─── Responsive ─── */
@@ -609,7 +620,7 @@
           display: flex;
           align-items: center;
           gap: 14px;
-          background: var(--bg-secondary);
+          background: var(--card-bg);
           border-radius: var(--radius);
           box-shadow: var(--shadow);
           padding: 16px 18px;

@@ -1,76 +1,9 @@
-      :root {
-        --bg-color: #fff;
-        --text-color: #111;
-        --card-border: #ddd;
-        --card-bg: #fff;
-        --input-border: #ccc;
-        --input-bg: #fff;
-        --button-bg: #f0f0f0;
-        --button-text: #111;
-        --meta-color: #666;
-        --label-color: #444;
-        --comment-border: #eee;
-        --comment-bg: #fff;
-        --pill-border: #ddd;
-        --link-color: #0056b3;
-        --error-bg: #fff3f3;
-        --error-border: #f2b3b3;
-        --vote-btn-bg: #f9f9f9;
-        --vote-btn-hover: #e9e9e9;
-        --vote-btn-border: #ccc;
-        --cn-bg: #e3f2fd;
-        --cn-border: #2196f3;
-        --cn-text: #1565c0;
-        --update-banner-bg: #fff6db;
-        --update-banner-border: #e0b14a;
-        --update-banner-text: #6d4700;
-        --highlighted-bg: #fff3cd;
-        --highlighted-border: #ffc107;
-        --grayed-bg: #f5f5f5;
-        --grayed-border: #ddd;
-      }
+      /* base.css から継承: :root 変数, body, a, label, input, select, button,
+         .card, .error, .meta, .section-title, .pill, .top, .list, .comment,
+         .comment-head, .body, .emote, .recent, .vote-btn, .vote-controls,
+         .confetti, @keyframes confetti-pop, mobile body margin */
 
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg-color: #1a1a1a;
-          --text-color: #e0e0e0;
-          --card-border: #444;
-          --card-bg: #2a2a2a;
-          --input-border: #555;
-          --input-bg: #2a2a2a;
-          --button-bg: #3a3a3a;
-          --button-text: #e0e0e0;
-          --meta-color: #999;
-          --label-color: #bbb;
-          --comment-border: #444;
-          --comment-bg: #252525;
-          --pill-border: #555;
-          --link-color: #6db3f2;
-          --error-bg: #3a2020;
-          --error-border: #6b3a3a;
-          --vote-btn-bg: #3a3a3a;
-          --vote-btn-hover: #4a4a4a;
-          --vote-btn-border: #555;
-          --cn-bg: #1a2a3a;
-          --cn-border: #2196f3;
-          --cn-text: #64b5f6;
-          --update-banner-bg: #3a2b12;
-          --update-banner-border: #c28a2d;
-          --update-banner-text: #ffd48f;
-          --highlighted-bg: #4a4020;
-          --highlighted-border: #8a7020;
-          --grayed-bg: #333;
-          --grayed-border: #555;
-        }
-      }
-      * { box-sizing: border-box; }
-      body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; background: var(--bg-color); color: var(--text-color); }
-      a { color: var(--link-color); }
-      a.pill { text-decoration: none; color: var(--link-color); }
-      .top { display:flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-      .card { padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card-bg); }
-      .error { background: var(--error-bg); border-color: var(--error-border); }
-      .section-title { margin-bottom: 10px; font-weight: 600; }
+      .list { margin-top: 16px; }
 
       .filters {
         display: grid;
@@ -82,22 +15,7 @@
       .filters > .wide { grid-column: span 2; }
       .filters > .action { display: flex; align-items: end; }
       .filters > .action button { width: 100%; min-height: 42px; }
-      label { display:block; font-size: 0.9rem; color: var(--label-color); }
-      input, select { width: 100%; padding: 10px; margin-top: 6px; border-radius: 10px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); }
-      button { padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; background: var(--button-bg); color: var(--button-text); }
-      button:hover { opacity: 0.8; }
-      .meta { color: var(--meta-color); font-size: 0.9rem; }
-      .list { margin-top: 16px; display:flex; flex-direction: column; gap: 10px; }
-      .comment { padding: 12px; border: 1px solid var(--comment-border); border-radius: 12px; background: var(--comment-bg); }
-      .comment-head { display:flex; gap: 10px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; font-size: 0.9rem; }
-      .body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: bold; }
-      .emote { height: 1.35em; vertical-align: -0.2em; }
       .pager { display:flex; gap: 10px; align-items:center; justify-content: center; margin-top: 14px; }
-      .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--pill-border); font-size: 0.85rem; }
-      .recent { color: #c00000; }
-      .vote-btn { margin-right: 8px; padding: 4px 8px; border: 1px solid var(--vote-btn-border); border-radius: 4px; background: var(--vote-btn-bg); cursor: pointer; color: var(--text-color); touch-action: manipulation; }
-      .vote-btn:hover { background: var(--vote-btn-hover); }
-      .vote-controls { display:inline-flex; align-items:center; gap:8px; min-height:30px; }
       .highlighted { background-color: var(--highlighted-bg); border-color: var(--highlighted-border); }
       .grayed { background-color: var(--grayed-bg); border-color: var(--grayed-border); }
 
@@ -162,27 +80,11 @@
       .card details summary::-webkit-details-marker { margin-right:6px; }
       .card details > :not(summary) { margin-top:10px; }
 
-      .confetti {
-        position: fixed;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 9999;
-        animation: confetti-pop 0.8s ease-out forwards;
-      }
-
-      @keyframes confetti-pop {
-        0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
-        100% { opacity: 0; transform: translate(var(--cx), var(--cy)) rotate(var(--cr)) scale(0.3); }
-      }
-
       @media (width <= 980px) {
         .filters > .wide { grid-column: span 1; }
       }
 
       @media (width <= 720px) {
-        body { margin: 12px; }
         .usage-toggle-btn { display: inline-block; }
         #usage-content { display: none; }
         #usage-content.open { display: block; }

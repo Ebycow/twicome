@@ -1,35 +1,10 @@
-      :root {
-        --bg-color: #fff;
-        --text-color: #111;
-        --card-border: #ddd;
-        --card-bg: #fff;
-        --meta-color: #666;
-        --error-bg: #fff3f3;
-        --error-border: #f2b3b3;
-        --link-color: #007bff;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg-color: #1a1a1a;
-          --text-color: #e0e0e0;
-          --card-border: #444;
-          --card-bg: #2a2a2a;
-          --meta-color: #999;
-          --error-bg: #3a2020;
-          --error-border: #6b3a3a;
-          --link-color: #6db3f2;
-        }
-      }
+      /* base.css から継承: :root 変数, body, a, .card, .error, .meta
+         このページは max-width コンテナレイアウトのため body margin を 0 にオーバーライド */
 
       body {
-        font-family: system-ui, -apple-system, sans-serif;
         margin: 0;
         padding: 24px;
-        background: var(--bg-color);
-        color: var(--text-color);
       }
-      a { color: var(--link-color); }
       h1 { margin: 0; }
       h2 { margin: 0; }
       p { margin: 0; }
@@ -64,7 +39,7 @@
       }
 
       .card {
-        padding: 18px;
+        padding: 16px;
         border: 1px solid var(--card-border);
         border-radius: 12px;
         background: var(--card-bg);
@@ -72,20 +47,6 @@
 
       .card > h2 {
         margin-bottom: 10px;
-      }
-
-      .error {
-        background: var(--error-bg);
-        border-color: var(--error-border);
-      }
-
-      .meta {
-        color: var(--meta-color);
-        font-size: 0.9rem;
-      }
-
-      .card .meta + .meta {
-        margin-top: 6px;
       }
 
       .cn-layout {
