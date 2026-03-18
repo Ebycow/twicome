@@ -1,87 +1,114 @@
 (function () {
-  var searchInput = document.getElementById('users-search');
-  var searchClear = document.getElementById('users-search-clear');
-  var streamerFilter = document.getElementById('streamer-filter');
-  var sortSelect = document.getElementById('sort-select');
-  var usersGrid = document.getElementById('users-grid');
-  var usersCount = document.getElementById('users-count');
-  var usersStatus = document.getElementById('users-status');
+  const searchInput = document.getElementById('users-search');
+  const searchClear = document.getElementById('users-search-clear');
+  const streamerFilter = document.getElementById('streamer-filter');
+  const sortSelect = document.getElementById('sort-select');
+  const usersGrid = document.getElementById('users-grid');
+  const usersCount = document.getElementById('users-count');
+  const usersStatus = document.getElementById('users-status');
 
   if (!usersGrid) { return; }
 
-  var rawRootPath = JSON.parse(document.getElementById('root-path-data').textContent);
-  var rootPath = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
+  const rawRootPath = JSON.parse(document.getElementById('root-path-data').textContent);
+  const rootPath = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
 
-  var allUsers = [];
-  var activeLogins = null; // null = no streamer filter, Set = filtered logins
-  var currentQuery = '';
-  var currentSort = 'login';
+  let allUsers = [];
+  let activeLogins = null; // null = no streamer filter, Set = filtered logins
+  let currentQuery = '';
+  let currentSort = 'login';
 
+  /**
+   * ステータス表示領域にメッセージを表示する。
+   * @param msg - 表示するメッセージ文字列
+   */
   function showStatus(msg) {
     usersStatus.textContent = msg;
     usersStatus.hidden = false;
   }
 
+  /**
+   * ステータス表示領域を非表示にする。
+   */
   function hideStatus() {
     usersStatus.hidden = true;
   }
 
+  /**
+   * コメント数を日本語ロケールでフォーマットした文字列を返す。
+   * @param n - フォーマットするコメント数
+   * @returns フォーマットされたコメント数文字列
+   */
   function formatCount(n) {
     if (!n) { return '0 comments'; }
-    return n.toLocaleString('ja-JP') + ' comments';
+    return `${n.toLocaleString('ja-JP')} comments`;
   }
 
+  /**
+   * ISO日時文字列を日本語の短い日付文字列に変換する。
+   * @param iso - ISO形式の日時文字列
+   * @returns フォーマットされた日付文字列。変換に失敗した場合はnull
+   */
   function formatDate(iso) {
     if (!iso) { return null; }
     try {
-      var d = new Date(iso);
+      const d = new Date(iso);
       return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch (e) {
       return null;
     }
   }
 
+  /**
+   * ユーザのアバター要素を生成して返す。
+   * @param user - アバターを生成するユーザオブジェクト
+   * @returns アバターを含むspan要素
+   */
   function buildAvatar(user) {
     if (user.profile_image_url) {
-      var img = document.createElement('img');
+      const img = document.createElement('img');
       img.src = user.profile_image_url;
       img.alt = user.display_name || user.login;
       img.width = 40;
       img.height = 40;
-      var wrap = document.createElement('span');
+      const wrap = document.createElement('span');
       wrap.className = 'user-card-avatar';
       wrap.appendChild(img);
       return wrap;
     }
-    var fallback = document.createElement('span');
+    const fallback = document.createElement('span');
     fallback.className = 'user-card-avatar';
-    var label = (user.display_name || user.login || '?').charAt(0).toUpperCase();
+    const label = (user.display_name || user.login || '?').charAt(0).toUpperCase();
     fallback.textContent = label;
     return fallback;
   }
 
+  /**
+   * ユーザ情報からユーザカードDOM要素を生成して返す。
+   * @param user - カードを生成するユーザオブジェクト
+   * @returns 生成したユーザカードdiv要素
+   */
   function buildCard(user) {
-    var card = document.createElement('div');
+    const card = document.createElement('div');
     card.className = 'user-card';
     card.setAttribute('role', 'listitem');
 
     // Header
-    var header = document.createElement('div');
+    const header = document.createElement('div');
     header.className = 'user-card-header';
 
-    var avatar = buildAvatar(user);
+    const avatar = buildAvatar(user);
     header.appendChild(avatar);
 
-    var info = document.createElement('div');
+    const info = document.createElement('div');
     info.className = 'user-card-info';
 
-    var name = document.createElement('div');
+    const name = document.createElement('div');
     name.className = 'user-card-name';
     name.textContent = user.display_name || user.login;
     info.appendChild(name);
 
     if (user.display_name && user.display_name !== user.login) {
-      var loginEl = document.createElement('div');
+      const loginEl = document.createElement('div');
       loginEl.className = 'user-card-login';
       loginEl.textContent = user.login;
       info.appendChild(loginEl);
@@ -90,7 +117,7 @@
     header.appendChild(info);
 
     if (user.comment_count > 0) {
-      var countEl = document.createElement('span');
+      const countEl = document.createElement('span');
       countEl.className = 'user-card-count';
       countEl.textContent = formatCount(user.comment_count);
       header.appendChild(countEl);
@@ -99,34 +126,34 @@
     card.appendChild(header);
 
     if (user.last_comment_at) {
-      var meta = document.createElement('div');
+      const meta = document.createElement('div');
       meta.className = 'user-card-meta';
-      var dateStr = formatDate(user.last_comment_at);
+      const dateStr = formatDate(user.last_comment_at);
       if (dateStr) {
-        meta.textContent = '最終コメント: ' + dateStr;
+        meta.textContent = `最終コメント: ${dateStr}`;
         card.appendChild(meta);
       }
     }
 
     // Links
-    var links = document.createElement('div');
+    const links = document.createElement('div');
     links.className = 'user-card-links';
 
-    var commentsLink = document.createElement('a');
+    const commentsLink = document.createElement('a');
     commentsLink.className = 'user-card-link user-card-link-primary';
-    commentsLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '?platform=twitch';
+    commentsLink.href = `${rootPath}/u/${encodeURIComponent(user.login)}?platform=twitch`;
     commentsLink.innerHTML = '<i class="fa-solid fa-play"></i> コメント一覧';
     links.appendChild(commentsLink);
 
-    var statsLink = document.createElement('a');
+    const statsLink = document.createElement('a');
     statsLink.className = 'user-card-link user-card-link-secondary';
-    statsLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '/stats?platform=twitch';
+    statsLink.href = `${rootPath}/u/${encodeURIComponent(user.login)}/stats?platform=twitch`;
     statsLink.innerHTML = '<i class="fa-solid fa-chart-bar"></i> 統計';
     links.appendChild(statsLink);
 
-    var quizLink = document.createElement('a');
+    const quizLink = document.createElement('a');
     quizLink.className = 'user-card-link user-card-link-secondary';
-    quizLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '/quiz?platform=twitch';
+    quizLink.href = `${rootPath}/u/${encodeURIComponent(user.login)}/quiz?platform=twitch`;
     quizLink.innerHTML = '<i class="fa-solid fa-dice"></i> クイズ';
     links.appendChild(quizLink);
 
@@ -135,24 +162,36 @@
     return card;
   }
 
+  /**
+   * ユーザがクエリ文字列に一致するか判定する。
+   * @param user - 判定対象のユーザオブジェクト
+   * @param query - 検索クエリ文字列
+   * @returns クエリに一致する場合はtrue
+   */
   function matchesQuery(user, query) {
     if (!query) { return true; }
-    var q = query.toLowerCase();
-    var login = (user.login || '').toLowerCase();
-    var display = (user.display_name || '').toLowerCase();
+    const q = query.toLowerCase();
+    const login = (user.login || '').toLowerCase();
+    const display = (user.display_name || '').toLowerCase();
     return login.indexOf(q) !== -1 || display.indexOf(q) !== -1;
   }
 
+  /**
+   * 指定されたソート条件でユーザ配列を並び替えた新しい配列を返す。
+   * @param users - 並び替え対象のユーザ配列
+   * @param sort - ソートキー文字列
+   * @returns ソートされた新しいユーザ配列
+   */
   function sortUsers(users, sort) {
-    var copy = users.slice();
+    const copy = users.slice();
     if (sort === 'count_desc') {
       copy.sort(function (a, b) { return (b.comment_count || 0) - (a.comment_count || 0); });
     } else if (sort === 'count_asc') {
       copy.sort(function (a, b) { return (a.comment_count || 0) - (b.comment_count || 0); });
     } else if (sort === 'recent') {
       copy.sort(function (a, b) {
-        var ta = a.last_comment_at ? new Date(a.last_comment_at).getTime() : 0;
-        var tb = b.last_comment_at ? new Date(b.last_comment_at).getTime() : 0;
+        const ta = a.last_comment_at ? new Date(a.last_comment_at).getTime() : 0;
+        const tb = b.last_comment_at ? new Date(b.last_comment_at).getTime() : 0;
         return tb - ta;
       });
     } else {
@@ -161,13 +200,16 @@
     return copy;
   }
 
+  /**
+   * フィルタとソートを適用してユーザグリッドを再描画する。
+   */
   function render() {
-    var filtered = allUsers.filter(function (u) {
+    const filtered = allUsers.filter(function (u) {
       if (activeLogins !== null && !activeLogins.has(u.login)) { return false; }
       return matchesQuery(u, currentQuery);
     });
 
-    var sorted = sortUsers(filtered, currentSort);
+    const sorted = sortUsers(filtered, currentSort);
 
     usersGrid.innerHTML = '';
 
@@ -175,14 +217,18 @@
       showStatus('該当するユーザが見つかりませんでした。');
     } else {
       hideStatus();
-      var frag = document.createDocumentFragment();
+      const frag = document.createDocumentFragment();
       sorted.forEach(function (u) { frag.appendChild(buildCard(u)); });
       usersGrid.appendChild(frag);
     }
 
-    usersCount.textContent = sorted.length + ' 人';
+    usersCount.textContent = `${sorted.length} 人`;
   }
 
+  /**
+   * 配信者ログインに基づいてコメントしたユーザをAPIから取得してフィルタを設定する。
+   * @param streamerLogin - フィルタに使う配信者のログイン名
+   */
   function loadStreamerFilter(streamerLogin) {
     if (!streamerLogin) {
       activeLogins = null;
@@ -190,7 +236,7 @@
       return;
     }
     showStatus('読み込み中...');
-    fetch(rootPath + '/api/users/commenters?streamer=' + encodeURIComponent(streamerLogin))
+    fetch(`${rootPath}/api/users/commenters?streamer=${encodeURIComponent(streamerLogin)}`)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         activeLogins = new Set(data.logins || []);
@@ -202,9 +248,12 @@
       });
   }
 
+  /**
+   * APIからユーザ一覧を取得してグリッドに描画する。
+   */
   function loadUsers() {
     showStatus('ユーザ一覧を読み込み中...');
-    fetch(rootPath + '/api/users/index')
+    fetch(`${rootPath}/api/users/index`)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         allUsers = data.users || [];

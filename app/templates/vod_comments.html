@@ -97,11 +97,11 @@
   {% if pages > 1 %}
   <div class="pagination">
     {% if page > 1 %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
+      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}
@@ -169,11 +169,11 @@
   {% if pages > 1 %}
   <div class="pagination" style="margin-top:16px;">
     {% if page > 1 %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
+      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}

@@ -1,29 +1,36 @@
 (function () {
-  var searchInput = document.getElementById('streamers-search');
-  var searchClear = document.getElementById('streamers-search-clear');
-  var countEl = document.getElementById('streamers-count');
-  var grid = document.getElementById('streamers-grid');
+  const searchInput = document.getElementById('streamers-search');
+  const searchClear = document.getElementById('streamers-search-clear');
+  const countEl = document.getElementById('streamers-count');
+  const grid = document.getElementById('streamers-grid');
 
   if (!grid) { return; }
 
-  var cards = Array.from(grid.querySelectorAll('.streamer-card'));
+  const cards = Array.from(grid.querySelectorAll('.streamer-card'));
 
+  /**
+   * 表示中のカード数をカウント表示要素に反映する。
+   */
   function updateCount() {
-    var visible = cards.filter(function (c) { return !c.hidden; }).length;
+    const visible = cards.filter(function (c) { return !c.hidden; }).length;
     if (countEl) {
-      countEl.textContent = visible.toLocaleString('ja-JP') + ' 件';
+      countEl.textContent = `${visible.toLocaleString('ja-JP')} 件`;
     }
   }
 
+  /**
+   * クエリ文字列に一致するカードだけを表示してカウントを更新する。
+   * @param query - フィルタに使う検索文字列
+   */
   function filterCards(query) {
-    var q = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     cards.forEach(function (card) {
       if (!q) {
         card.hidden = false;
         return;
       }
-      var login = (card.dataset.login || '').toLowerCase();
-      var name = (card.dataset.name || '').toLowerCase();
+      const login = (card.dataset.login || '').toLowerCase();
+      const name = (card.dataset.name || '').toLowerCase();
       card.hidden = login.indexOf(q) === -1 && name.indexOf(q) === -1;
     });
     updateCount();
@@ -31,7 +38,7 @@
 
   if (searchInput) {
     searchInput.addEventListener('input', function () {
-      var q = searchInput.value;
+      const q = searchInput.value;
       if (searchClear) { searchClear.style.display = q ? 'flex' : 'none'; }
       filterCards(q);
     });
