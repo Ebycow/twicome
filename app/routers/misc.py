@@ -4,8 +4,8 @@ import pandas as pd
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from clients.twitch import get_user_id
 from core.templates import templates
-from services.twitch import get_user_id
 
 router = APIRouter()
 

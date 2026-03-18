@@ -64,11 +64,10 @@ convention = "google"
 [tool.ruff.lint.isort]
 # app/ 配下は作業ディレクトリから直接 import するため first-party 扱い
 known-first-party = [
+    "clients",
     "services",
     "repositories",
     "core",
-    "cache",
-    "faiss_search",
     "app_factory",
 ]
 split-on-trailing-comma = true

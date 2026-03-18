@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-import faiss_search
+import clients.faiss as faiss_search
 
 
 class _DummyResponse:

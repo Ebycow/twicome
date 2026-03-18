@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
-from cache import (
+from core.cache import (
     get_comments_html_cache,
     get_data_version,
     get_index_html_cache,

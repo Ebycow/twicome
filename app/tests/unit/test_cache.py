@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-import cache as cache_module
+import core.cache as cache_module
 
 
 class _FakeRedis:
@@ -95,7 +95,7 @@ class TestComputeRenderVersion:
         target = app_dir / "services" / "index_service.py"
         target.write_text("index-service", encoding="utf-8")
 
-        monkeypatch.setattr(cache_module, "Path", lambda *_args, **_kwargs: app_dir / "cache.py")
+        monkeypatch.setattr(cache_module, "Path", lambda *_args, **_kwargs: app_dir / "core" / "cache.py")
 
         assert cache_module._compute_render_version() == str(target.stat().st_mtime_ns)
 

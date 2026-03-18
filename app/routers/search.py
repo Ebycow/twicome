@@ -4,9 +4,9 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from clients.faiss import centroid_search, emotion_search, get_emotion_axes, is_index_available, similar_search
 from core.config import DEFAULT_PLATFORM, FAISS_ENABLED
 from core.db import SessionLocal
-from faiss_search import centroid_search, emotion_search, get_emotion_axes, is_index_available, similar_search
 from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body_select_sql, _decorate_comment
 
 router = APIRouter()

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-import faiss_search
+import clients.faiss as faiss_search
 from core.config import DEFAULT_PLATFORM
 from core.db import SessionLocal
 from core.templates import templates

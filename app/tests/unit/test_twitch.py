@@ -1,6 +1,6 @@
 import pytest
 
-import services.twitch as twitch_service
+import clients.twitch as twitch_service
 
 
 class _DummyResponse:

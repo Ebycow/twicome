@@ -8,9 +8,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from routers import ALL_ROUTERS
 
+from clients.faiss import ping_faiss_api
 from core.config import FAISS_API_URL, ROOT_PATH, SERVICE_WORKER_CACHE_NAME
 from core.middleware import CSRFProtectionMiddleware, HostCheckMiddleware, SecurityHeadersMiddleware
-from faiss_search import ping_faiss_api
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
