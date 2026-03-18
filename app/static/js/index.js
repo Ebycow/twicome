@@ -994,3 +994,85 @@
     });
   }
 })();
+
+(function () {
+  var stats = document.querySelectorAll('.hero-stat-value[data-count]');
+  if (!stats.length) { return; }
+  var duration = 1200;
+  function easeOut(t) { return 1 - (1 - t) * (1 - t); }
+  function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function animate(el) {
+    var target = parseInt(el.dataset.count, 10);
+    if (isNaN(target)) { return; }
+    var start = performance.now();
+    el.textContent = '0';
+    function step(now) {
+      var t = Math.min((now - start) / duration, 1);
+      el.textContent = fmt(target * easeOut(t));
+      if (t < 1) { requestAnimationFrame(step); }
+    }
+    requestAnimationFrame(step);
+  }
+  stats.forEach(animate);
+}());
+
+(function () {
+  var comments = [
+    'wwwwwwwwwwwwww',
+    'ドンマイドンマイ！',
+    'それな',
+    'これはひどい笑',
+    'クリップ待って',
+    '5000兆点あげたい',
+    'やばすぎて草',
+    'ガチ勢すぎる',
+    'さすがっす',
+    '天才かよ',
+    'リスナー強すぎ',
+    '配信者より上手いの草',
+    '待ってそれは草',
+    '神回確定',
+    '声が好きすぎる',
+    '笑いすぎて涙出てきた',
+    '毎日見てるけど飽きない',
+    'このゲームセンスおかしい',
+    'コメント欄強すぎwww',
+    '今日も来てよかった',
+    '全力で草生やしてる',
+    'もう一回見よ',
+    'ここ何度見ても笑える',
+  ];
+
+  var textEl = document.getElementById('comment-showcase-text');
+  if (!textEl) { return; }
+
+  var idx = Math.floor(Math.random() * comments.length);
+  var pos = 0;
+  var deleting = false;
+
+  function tick() {
+    var text = comments[idx];
+    if (!deleting) {
+      pos++;
+      textEl.textContent = text.slice(0, pos);
+      if (pos >= text.length) {
+        deleting = true;
+        setTimeout(tick, 2200);
+      } else {
+        setTimeout(tick, 72);
+      }
+    } else {
+      pos--;
+      textEl.textContent = text.slice(0, pos);
+      if (pos <= 0) {
+        deleting = false;
+        idx = (idx + 1) % comments.length;
+        setTimeout(tick, 380);
+      } else {
+        setTimeout(tick, 36);
+      }
+    }
+  }
+
+  setTimeout(tick, 800);
+}());

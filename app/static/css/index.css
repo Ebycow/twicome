@@ -55,17 +55,18 @@
       }
 
       .site-logo-svg {
-        height: 1em;
+        height: 1.5em;
         width: auto;
         vertical-align: middle;
       }
 
       .hero-title small {
-        font-size: 1rem;
-        font-weight: 500;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.05rem;
+        font-weight: 600;
         color: var(--accent);
-        letter-spacing: 0;
-        margin-left: 6px;
+        letter-spacing: 0.06em;
+        margin-left: 8px;
       }
 
       .hero-sub {
@@ -215,6 +216,94 @@
         max-width: 720px;
         margin: 0 auto;
         padding: 0 0 60px;
+      }
+
+      /* ─── Comment Showcase ─── */
+      .comment-showcase {
+        margin-bottom: 14px;
+        padding: 18px 22px 14px;
+        border-radius: var(--radius);
+        border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--card-border));
+        background:
+          radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 55%),
+          radial-gradient(ellipse at 100% 100%, color-mix(in srgb, #52c5ff 12%, transparent) 0%, transparent 50%),
+          var(--card-bg);
+        position: relative;
+        overflow: hidden;
+        min-height: 76px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .comment-showcase::before {
+        content: "\201C";
+        position: absolute;
+        top: -10px;
+        left: 10px;
+        font-size: 7rem;
+        line-height: 1;
+        font-family: Georgia, serif;
+        color: var(--accent);
+        opacity: 0.07;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .comment-showcase-inner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .comment-showcase-icon {
+        color: var(--accent);
+        font-size: 0.9rem;
+        flex-shrink: 0;
+        margin-top: 3px;
+        opacity: 0.75;
+      }
+
+      .comment-showcase-body {
+        flex: 1;
+        min-width: 0;
+        word-break: break-word;
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: var(--text-color);
+        line-height: 1.6;
+      }
+
+      .comment-showcase-text {
+        vertical-align: baseline;
+      }
+
+      .comment-showcase-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1em;
+        background: var(--accent);
+        border-radius: 1px;
+        margin-left: 2px;
+        vertical-align: text-bottom;
+        animation: showcase-blink 0.85s step-end infinite;
+      }
+
+      @keyframes showcase-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      .comment-showcase-footer {
+        margin-top: 10px;
+        font-size: 0.7rem;
+        color: var(--meta-color);
+        letter-spacing: 0.04em;
+        padding-left: 34px;
+        position: relative;
+        z-index: 1;
       }
 
       /* ─── Main Card ─── */

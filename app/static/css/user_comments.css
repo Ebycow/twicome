@@ -127,6 +127,18 @@
         #drawer-backdrop { display: none !important; }
         #drawer-close-row { display: none; }
         .fab { display: none; }
+        #fab-top {
+          display: flex;
+          position: fixed; bottom: 24px; right: 24px;
+          width: 44px; height: 44px; border-radius: 50%; border: none;
+          font-size: 1.2rem; cursor: pointer; z-index: 200;
+          box-shadow: 0 3px 14px rgba(0,0,0,0.25);
+          align-items: center; justify-content: center;
+          background: var(--button-bg); color: var(--button-text); padding: 0;
+          opacity: 0; pointer-events: none;
+          transition: opacity 0.2s;
+        }
+        #fab-top.visible { opacity: 1; pointer-events: auto; }
       }
       .best9-bar { position:fixed; bottom:0; left:0; right:0; background:var(--card-bg); border-top:2px solid #4caf50; padding:12px 24px; z-index:100; flex-direction:column; gap:10px; }
       .best9-bar-controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; width:100%; }

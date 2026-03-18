@@ -1017,7 +1017,12 @@
     });}
     if (backdrop) {backdrop.addEventListener('click', closeDrawer);}
     if (closeBtn) {closeBtn.addEventListener('click', closeDrawer);}
-    if (fabTop) {fabTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });}
+    if (fabTop) {
+      fabTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      window.addEventListener('scroll', function () {
+        fabTop.classList.toggle('visible', window.scrollY > 300);
+      }, { passive: true });
+    }
     const filterForm = document.querySelector('form');
     if (filterForm) {filterForm.addEventListener('submit', closeDrawer);}
   })();
