@@ -99,7 +99,7 @@ button:active { transform: translateY(0); box-shadow: none; }
 .list { display: flex; flex-direction: column; gap: 10px; }
 .comment { padding: 12px; border: 1px solid var(--comment-border); border-radius: 12px; background: var(--comment-bg); }
 .comment-head { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; font-size: 0.9rem; }
-.body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: bold; }
+.body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: 600; }
 .emote { height: 1.35em; vertical-align: -0.2em; }
 .recent { color: #c00000; }
 
