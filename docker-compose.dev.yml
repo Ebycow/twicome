@@ -210,7 +210,7 @@ services:
     volumes:
       - .:/workspace
     working_dir: /workspace
-    command: ["djlint", "app/templates", "--lint", "--warn"]
+    command: ["djlint", "app/templates", "--lint"]
 
   lint-js:
     profiles: [lint]
