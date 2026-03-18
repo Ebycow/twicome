@@ -60,7 +60,7 @@
         if (sc.size >= 8) {
           const subBtn = document.createElement('button');
           subBtn.className = 'sub-drill-btn';
-          subBtn.textContent = 'さらに分解 →';
+          subBtn.innerHTML = 'さらに分解 <i class="fa-solid fa-arrow-right"></i>';
           subBtn.dataset.centroid = JSON.stringify(sc.centroid);
           subBtn.dataset.size = String(sc.size);
           subBtn.dataset.path = myPath;

@@ -10,8 +10,8 @@
 
 <div class="page-header">
   <div class="page-header-inner">
-    <a class="page-back nav-link" href="{{ root_path }}/">&#8592; トップ</a>
-    <h1 class="page-title">&#127909; 配信者一覧</h1>
+    <a class="page-back nav-link" href="{{ root_path }}/"><i class="fa-solid fa-arrow-left"></i> トップ</a>
+    <h1 class="page-title"><i class="fa-solid fa-video"></i> 配信者一覧</h1>
   </div>
 </div>
 
@@ -28,7 +28,7 @@
           autocomplete="off"
           spellcheck="false"
         />
-        <button type="button" id="streamers-search-clear" class="streamers-search-clear" aria-label="クリア">&#x2715;</button>
+        <button type="button" id="streamers-search-clear" class="streamers-search-clear" aria-label="クリア"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div id="streamers-count" class="streamers-count"></div>
     </div>
@@ -62,8 +62,8 @@
         </div>
       </div>
       <div class="streamer-card-links">
-        <a class="streamer-card-link streamer-card-link-primary" href="{{ root_path }}/u/{{ s.login }}">&#128172; コメント検索</a>
-        <a class="streamer-card-link streamer-card-link-secondary" href="{{ root_path }}/vods?owner_login={{ s.login }}">&#127916; VOD一覧</a>
+        <a class="streamer-card-link streamer-card-link-primary" href="{{ root_path }}/u/{{ s.login }}"><i class="fa-solid fa-comment"></i> コメント検索</a>
+        <a class="streamer-card-link streamer-card-link-secondary" href="{{ root_path }}/vods?owner_login={{ s.login }}"><i class="fa-solid fa-film"></i> VOD一覧</a>
       </div>
     </div>
     {% endfor %}

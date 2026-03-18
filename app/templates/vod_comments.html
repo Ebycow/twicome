@@ -10,8 +10,8 @@
 
 <div class="page-header">
   <div class="page-header-inner">
-    <a class="page-back nav-link" href="{{ root_path }}/vods">&#8592; VOD 一覧</a>
-    <h1 class="page-title">&#127916; VOD コメント</h1>
+    <a class="page-back nav-link" href="{{ root_path }}/vods"><i class="fa-solid fa-arrow-left"></i> VOD 一覧</a>
+    <h1 class="page-title"><i class="fa-solid fa-film"></i> VOD コメント</h1>
   </div>
 </div>
 
@@ -97,11 +97,11 @@
   {% if pages > 1 %}
   <div class="pagination">
     {% if page > 1 %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn">&#8592; 前</a>
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 &#8594;</a>
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}
@@ -138,8 +138,8 @@
               data-vote-controls="deferred"
               data-comment-id="{{ c.comment_id }}"
             >
-              <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0">😂 0</button>
-              <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0">❓ 0</button>
+              <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-up"></i> 0</button>
+              <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-down"></i> 0</button>
             </span>
           </div>
         </div>
@@ -156,7 +156,7 @@
               {% if c.cn_status %}
                 <span class="cn-status-badge">{{ {"supported": "裏付けあり", "insufficient": "情報不足", "inconsistent": "矛盾あり", "not_applicable": "該当なし"}[c.cn_status] or c.cn_status }}</span>
               {% endif %}
-              &#x1f4dd; {{ c.community_note_body }}
+              <i class="fa-solid fa-note-sticky"></i> {{ c.community_note_body }}
             </div>
           </div>
         {% endif %}
@@ -169,11 +169,11 @@
   {% if pages > 1 %}
   <div class="pagination" style="margin-top:16px;">
     {% if page > 1 %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn">&#8592; 前</a>
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 &#8594;</a>
+      <a href="?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.exclude_q %}exclude_q={{ filters.exclude_q }}&{% endif %}sort={{ filters.sort or 'offset' }}&page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}

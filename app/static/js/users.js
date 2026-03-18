@@ -115,19 +115,19 @@
     var commentsLink = document.createElement('a');
     commentsLink.className = 'user-card-link user-card-link-primary';
     commentsLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '?platform=twitch';
-    commentsLink.textContent = '▶ コメント一覧';
+    commentsLink.innerHTML = '<i class="fa-solid fa-play"></i> コメント一覧';
     links.appendChild(commentsLink);
 
     var statsLink = document.createElement('a');
     statsLink.className = 'user-card-link user-card-link-secondary';
     statsLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '/stats?platform=twitch';
-    statsLink.textContent = '📊 統計';
+    statsLink.innerHTML = '<i class="fa-solid fa-chart-bar"></i> 統計';
     links.appendChild(statsLink);
 
     var quizLink = document.createElement('a');
     quizLink.className = 'user-card-link user-card-link-secondary';
     quizLink.href = rootPath + '/u/' + encodeURIComponent(user.login) + '/quiz?platform=twitch';
-    quizLink.textContent = '🎲 クイズ';
+    quizLink.innerHTML = '<i class="fa-solid fa-dice"></i> クイズ';
     links.appendChild(quizLink);
 
     card.appendChild(links);

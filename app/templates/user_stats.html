@@ -26,7 +26,7 @@
           <a href="{{ request.url_for('cluster_explorer', login=user.login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">発言パターン探索</a>
           {% endif %}
           <a href="{{ request.url_for('manual_page') }}">使い方ガイド</a>
-          <a href="{{ request.url_for('index') }}">← 検索に戻る</a>
+          <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> 検索に戻る</a>
         </div>
       </div>
 

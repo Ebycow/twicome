@@ -93,13 +93,14 @@
     var dur = formatDuration(vod.length_seconds);
     if (dur) {
       var durSpan = document.createElement('span');
-      durSpan.textContent = '⏱ ' + dur;
+      durSpan.innerHTML = '<i class="fa-regular fa-clock"></i> ' + dur;
       meta.appendChild(durSpan);
     }
 
     if (vod.game_name) {
       var gameSpan = document.createElement('span');
-      gameSpan.textContent = '🎮 ' + vod.game_name;
+      gameSpan.innerHTML = '<i class="fa-solid fa-gamepad"></i> ';
+      gameSpan.append(vod.game_name);
       meta.appendChild(gameSpan);
     }
 
@@ -120,7 +121,7 @@
     var link = document.createElement('a');
     link.className = 'vod-card-link';
     link.href = rootPath + '/vods/' + vod.vod_id;
-    link.textContent = '▶ コメントを見る';
+    link.innerHTML = '<i class="fa-solid fa-play"></i> コメントを見る';
     card.appendChild(link);
 
     return card;

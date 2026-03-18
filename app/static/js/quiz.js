@@ -65,7 +65,7 @@
     for (let i = 0; i < 3; i++) {
       const span = document.createElement('span');
       span.className = 'heart';
-      span.innerHTML = '&#x2764;&#xFE0F;';
+      span.innerHTML = '<i class="fa-solid fa-heart"></i>';
       livesContainer.appendChild(span);
     }
   }

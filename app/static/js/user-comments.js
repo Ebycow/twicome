@@ -98,7 +98,7 @@
       const statusJa = {supported: '裏付けあり', insufficient: '情報不足', inconsistent: '矛盾あり', not_applicable: '該当なし'};
       html += `<span class="cn-status-badge">${  escapeHtml(statusJa[comment.cn_status] || comment.cn_status)  }</span>`;
     }
-    html += ` &#x1f4dd; ${  escapeHtml(comment.community_note_body)  }</div>`;
+    html += ` <i class="fa-solid fa-note-sticky"></i> ${  escapeHtml(comment.community_note_body)  }</div>`;
     if (comment.cn_harm_risk != null) {
       html += '<div class="cn-scores">';
       const scores = [
@@ -206,8 +206,8 @@
     const safeCommentId = escapeHtml(commentId);
     const safeLikes = escapeHtml(likesCount);
     const safeDislikes = escapeHtml(dislikesCount);
-    return `<button onclick="vote(this, '${  safeCommentId  }', 'like')" class="vote-btn" data-count="${  safeLikes  }">😂 ${  safeLikes  }</button>` +
-           `<button onclick="vote(this, '${  safeCommentId  }', 'dislike')" class="vote-btn" data-count="${  safeDislikes  }">❓ ${  safeDislikes  }</button>`;
+    return `<button onclick="vote(this, '${  safeCommentId  }', 'like')" class="vote-btn" data-count="${  safeLikes  }"><i class="fa-solid fa-thumbs-up"></i> ${  safeLikes  }</button>` +
+           `<button onclick="vote(this, '${  safeCommentId  }', 'dislike')" class="vote-btn" data-count="${  safeDislikes  }"><i class="fa-solid fa-thumbs-down"></i> ${  safeDislikes  }</button>`;
   }
 
   /**
@@ -415,7 +415,7 @@
     const key = `${commentId  }-${  type}`;
     const currentCount = parseInt(button.dataset.count || '0', 10) + 1;
     button.dataset.count = currentCount;
-    button.textContent = (type === 'like' ? '😂 ' : '❓️ ') + currentCount;
+    button.innerHTML = (type === 'like' ? '<i class="fa-solid fa-thumbs-up"></i> ' : '<i class="fa-solid fa-thumbs-down"></i> ') + currentCount;
     if (votePending.has(key)) {
       const pending = votePending.get(key);
       pending.count++;
@@ -478,7 +478,7 @@
     const btn = document.createElement('button');
     const isSelected = best9Selected.has(commentId);
     btn.className = `best9-add-btn${  isSelected ? ' selected' : ''}`;
-    btn.textContent = isSelected ? '選択済み ✓' : '+ Best9';
+    btn.innerHTML = isSelected ? '選択済み <i class="fa-solid fa-check"></i>' : '+ Best9';
     btn.type = 'button';
     btn.addEventListener('click', function (e) {
       e.preventDefault();
@@ -525,7 +525,7 @@
       if (best9List.length >= 9) { alert('9件まで選択できます'); return; }
       best9List.push(commentId);
       best9Selected.add(commentId);
-      if (btn) { btn.className = 'best9-add-btn selected'; btn.textContent = '選択済み ✓'; }
+      if (btn) { btn.className = 'best9-add-btn selected'; btn.innerHTML = '選択済み <i class="fa-solid fa-check"></i>'; }
       if (commentDiv) {commentDiv.classList.add('best9-selected');}
       captureBest9Text(commentId, commentDiv);
     }

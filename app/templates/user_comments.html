@@ -18,7 +18,7 @@
     <div id="drawer-backdrop"></div>
     <div id="side-drawer">
       <div id="drawer-close-row">
-        <button type="button" id="drawer-close-btn">✕ 閉じる</button>
+        <button type="button" id="drawer-close-btn"><i class="fa-solid fa-xmark"></i> 閉じる</button>
       </div>
       <div class="top">
         <div>
@@ -38,7 +38,7 @@
           <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link">クラスタ探索</a>
           <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link">クイズで遊ぶ</a>
           <a href="{{ root_path }}/manual" class="nav-link">使い方ガイド</a>
-          <a href="{{ root_path }}/" class="nav-link">← 検索に戻る</a>
+          <a href="{{ root_path }}/" class="nav-link"><i class="fa-solid fa-arrow-left"></i> 検索に戻る</a>
         </div>
       </div>
     <div style="margin:2rem 2rem 0;">
@@ -325,8 +325,8 @@
                   data-vote-controls="deferred"
                   data-comment-id="{{ c.comment_id }}"
                 >
-                  <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0">😂 0</button>
-                  <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0">❓ 0</button>
+                  <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-up"></i> 0</button>
+                  <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-down"></i> 0</button>
                 </span>
                 {% if c.vod_link %}
                   <a href="{{ c.vod_link }}" target="_blank" rel="noopener">VODで開く</a>
@@ -348,7 +348,7 @@
                   {% if c.cn_status %}
                     <span class="cn-status-badge">{{ {"supported": "裏付けあり", "insufficient": "情報不足", "inconsistent": "矛盾あり", "not_applicable": "該当なし"}[c.cn_status] or c.cn_status }}</span>
                   {% endif %}
-                  &#x1f4dd; {{ c.community_note_body }}
+                  <i class="fa-solid fa-note-sticky"></i> {{ c.community_note_body }}
                 </div>
                 {% if c.cn_harm_risk is not none %}
                 <div class="cn-scores">
@@ -400,7 +400,7 @@
         <div id="best9-url-box" style="display:none; flex:1; gap:8px; align-items:center; min-width:0; flex-wrap:wrap;">
           <input id="best9-url-input" readonly style="flex:1; min-width:200px; padding:6px 10px; border-radius:6px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); font-size:0.85rem;" />
           <button type="button" id="best9-copy-btn">URLをコピー</button>
-          <button type="button" id="best9-go-btn" style="background:#4caf50; color:white; border:0; font-weight:bold;">Best9を表示 →</button>
+          <button type="button" id="best9-go-btn" style="background:#4caf50; color:white; border:0; font-weight:bold;">Best9を表示 <i class="fa-solid fa-arrow-right"></i></button>
         </div>
         <button type="button" id="best9-clear-btn" style="margin-left:auto;">選択リセット</button>
       </div>

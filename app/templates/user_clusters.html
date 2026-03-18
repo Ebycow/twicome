@@ -16,7 +16,7 @@
           {% endif %}
         </div>
         <div class="top-links">
-          <a href="{{ request.url_for('user_stats_page', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 統計に戻る</a>
+          <a href="{{ request.url_for('user_stats_page', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}"><i class="fa-solid fa-arrow-left"></i> 統計に戻る</a>
         </div>
       </div>
 
@@ -53,7 +53,7 @@
                     data-size="{{ cl.size }}"
                     data-path="{{ loop.index0 }}"
                     data-member-indices="{{ cl.member_indices | tojson if cl.member_indices else 'null' }}"
-                    onclick="drillDown(this, 4, this.dataset.path)">さらに分解 →</button>
+                    onclick="drillDown(this, 4, this.dataset.path)">さらに分解 <i class="fa-solid fa-arrow-right"></i></button>
             {% if cl.size <= 200 %}
             <a href="{{ request.url_for('cluster_comments_page', login=login) }}?n_clusters={{ n_clusters }}&path={{ loop.index0 }}{{ '&platform=' ~ platform if platform != 'twitch' else '' }}"
                target="_blank" class="view-btn">コメント一覧を見る ({{ cl.size }} 件)</a>

@@ -12,7 +12,7 @@
         <div>
           <h1>使い方ガイド</h1>
         </div>
-        <a href="{{ request.url_for('index') }}">← トップに戻る</a>
+        <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> トップに戻る</a>
       </header>
 
       <nav class="toc">
@@ -252,8 +252,8 @@
       <section id="reactions" class="section">
         <h2>7. リアクション</h2>
         <ul>
-          <li><strong>😂</strong> いいね</li>
-          <li><strong>❓</strong> わるいね</li>
+          <li><strong><i class="fa-solid fa-thumbs-up"></i></strong> いいね</li>
+          <li><strong><i class="fa-solid fa-thumbs-down"></i></strong> わるいね</li>
         </ul>
         <p>
           ボタンを押すと画面上のカウントが即時増加し、裏側では同一コメント・同一種別の連打を
@@ -462,7 +462,7 @@
       </section>
 
       <div class="footer">
-        <a href="{{ request.url_for('index') }}">← トップに戻る</a>
+        <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> トップに戻る</a>
       </div>
     </main>
 {% endblock %}

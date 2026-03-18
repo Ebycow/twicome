@@ -61,7 +61,7 @@
     const key = `${commentId  }-${  type}`;
     const currentCount = parseInt(button.dataset.count || '0', 10) + 1;
     button.dataset.count = currentCount;
-    button.textContent = (type === 'like' ? '😂 ' : '❓️ ') + currentCount;
+    button.innerHTML = (type === 'like' ? '<i class="fa-solid fa-thumbs-up"></i> ' : '<i class="fa-solid fa-thumbs-down"></i> ') + currentCount;
     if (votePending.has(key)) {
       const pending = votePending.get(key);
       pending.count++;
@@ -111,8 +111,8 @@
     if (!container) {return;}
     const safeId = escapeHtml(commentId);
     container.innerHTML =
-      `<button onclick="vote(this, '${  safeId  }', 'like')" class="vote-btn" data-count="${  likesCount  }">😂 ${  likesCount  }</button>` +
-      `<button onclick="vote(this, '${  safeId  }', 'dislike')" class="vote-btn" data-count="${  dislikesCount  }">❓ ${  dislikesCount  }</button>`;
+      `<button onclick="vote(this, '${  safeId  }', 'like')" class="vote-btn" data-count="${  likesCount  }"><i class="fa-solid fa-thumbs-up"></i> ${  likesCount  }</button>` +
+      `<button onclick="vote(this, '${  safeId  }', 'dislike')" class="vote-btn" data-count="${  dislikesCount  }"><i class="fa-solid fa-thumbs-down"></i> ${  dislikesCount  }</button>`;
   }
 
   /**

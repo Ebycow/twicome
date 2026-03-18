@@ -22,14 +22,14 @@
               {% if loop.first %}
                 {{ n_clusters_top }}グループ分類の #{{ idx | int + 1 }}
               {% else %}
-                → サブグループ #{{ idx | int + 1 }}
+                <i class="fa-solid fa-arrow-right"></i> サブグループ #{{ idx | int + 1 }}
               {% endif %}
             {% endfor %}
           </div>
           {% endif %}
         </div>
         <div style="display:flex; gap:16px; align-items:center;">
-          <a href="{{ request.url_for('cluster_explorer', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}">← 発言パターン探索に戻る</a>
+          <a href="{{ request.url_for('cluster_explorer', login=login) }}{{ '?platform=' ~ platform if platform != 'twitch' else '' }}"><i class="fa-solid fa-arrow-left"></i> 発言パターン探索に戻る</a>
         </div>
       </div>
 
@@ -59,8 +59,8 @@
                 data-vote-controls="deferred"
                 data-comment-id="{{ c.comment_id }}"
               >
-                <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0">😂 0</button>
-                <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0">❓ 0</button>
+                <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-up"></i> 0</button>
+                <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-down"></i> 0</button>
               </span>
               {% if c.vod_link %}
                 <a href="{{ c.vod_link }}" target="_blank" rel="noopener">VODで開く</a>

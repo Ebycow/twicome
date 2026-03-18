@@ -15,8 +15,8 @@
         if (data.error) { return; }
         var count = parseInt(btn.getAttribute('data-count') || '0', 10) + 1;
         btn.setAttribute('data-count', count);
-        var emoji = type === 'like' ? '😂' : '❓';
-        btn.textContent = emoji + ' ' + count;
+        var icon = type === 'like' ? '<i class="fa-solid fa-thumbs-up"></i>' : '<i class="fa-solid fa-thumbs-down"></i>';
+        btn.innerHTML = icon + ' ' + count;
       })
       .catch(function () {});
   };
@@ -51,11 +51,11 @@
           var btns = el.querySelectorAll('.vote-btn');
           if (btns[0]) {
             btns[0].setAttribute('data-count', counts.twicome_likes_count || 0);
-            btns[0].textContent = '😂 ' + (counts.twicome_likes_count || 0);
+            btns[0].innerHTML = '<i class="fa-solid fa-thumbs-up"></i> ' + (counts.twicome_likes_count || 0);
           }
           if (btns[1]) {
             btns[1].setAttribute('data-count', counts.twicome_dislikes_count || 0);
-            btns[1].textContent = '❓ ' + (counts.twicome_dislikes_count || 0);
+            btns[1].innerHTML = '<i class="fa-solid fa-thumbs-down"></i> ' + (counts.twicome_dislikes_count || 0);
           }
         });
       })

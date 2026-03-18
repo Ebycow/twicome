@@ -96,7 +96,7 @@
                   spellcheck="false"
                   required
                 />
-                <button type="button" id="login-search-clear" class="search-clear-btn" aria-label="検索をクリア">&#x2715;</button>
+                <button type="button" id="login-search-clear" class="search-clear-btn" aria-label="検索をクリア"><i class="fa-solid fa-xmark"></i></button>
               </div>
               <div id="login-search-results" class="search-results" role="listbox" hidden></div>
             </div>
@@ -122,9 +122,9 @@
             </section>
 
             <div class="actions">
-              <button id="go-btn" class="btn btn-primary" type="submit">&#9654; コメント一覧を表示</button>
-              <a id="stats-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/stats?platform=twitch">&#128202; 統計ページ</a>
-              <a id="quiz-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/quiz?platform=twitch">&#127922; コメント当てクイズで遊ぶ</a>
+              <button id="go-btn" class="btn btn-primary" type="submit"><i class="fa-solid fa-play"></i> コメント一覧を表示</button>
+              <a id="stats-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/stats?platform=twitch"><i class="fa-solid fa-chart-bar"></i> 統計ページ</a>
+              <a id="quiz-link" class="btn btn-secondary" aria-disabled="{{ 'false' if selected_login_for_links else 'true' }}" href="{{ root_path }}/u/{{ selected_login_for_links or '__LOGIN_PLACEHOLDER__' }}/quiz?platform=twitch"><i class="fa-solid fa-dice"></i> コメント当てクイズで遊ぶ</a>
             </div>
           </section>
         </form>
@@ -159,11 +159,11 @@
 
         <!-- Sub Links -->
         <div class="sub-links">
-          <a class="sub-link" href="{{ root_path }}/users">&#128100; ユーザ一覧</a>
-          <a class="sub-link" href="{{ root_path }}/vod">&#127910; VOD 一覧</a>
-          <a class="sub-link" href="{{ root_path }}/streamers">&#127909; 配信者一覧</a>
-          <a class="sub-link" href="{{ root_path }}/add_user">&#43; 配信者を追加</a>
-          <a class="sub-link" href="{{ root_path }}/manual">&#128214; 使い方ガイド</a>
+          <a class="sub-link" href="{{ root_path }}/users"><i class="fa-solid fa-user"></i> ユーザ一覧</a>
+          <a class="sub-link" href="{{ root_path }}/vod"><i class="fa-solid fa-music"></i> VOD 一覧</a>
+          <a class="sub-link" href="{{ root_path }}/streamers"><i class="fa-solid fa-video"></i> 配信者一覧</a>
+          <a class="sub-link" href="{{ root_path }}/add_user"><i class="fa-solid fa-plus"></i> 配信者を追加</a>
+          <a class="sub-link" href="{{ root_path }}/manual"><i class="fa-solid fa-book"></i> 使い方ガイド</a>
         </div>
 
         <!-- <p class="hint">例: /u/someone?platform=twitch でも直接アクセスできます。</p> -->
@@ -186,7 +186,7 @@
       <!-- Ranking -->
       {% if popular_comments %}
       <div class="ranking-card">
-        <h2 class="section-title">&#127942; 人気コメントランキング</h2>
+        <h2 class="section-title"><i class="fa-solid fa-trophy"></i> 人気コメントランキング</h2>
         <ol class="ranking-list">
           {% for comment in popular_comments %}
           <a class="ranking-item" href="{{ root_path }}/u/{{ comment.commenter_login_snapshot }}?cursor={{ comment.comment_id }}">
