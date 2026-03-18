@@ -844,7 +844,7 @@
     }
     if (offlineMode) {refreshOfflineAccessibleRoutes();}
     const resolved = resolveLogin(loginInput.value);
-    if (resolved) { window.location.href = buildCommentsUrl(resolved); return; }
+    if (resolved) { if (goBtn) { goBtn.disabled = false; } window.location.href = buildCommentsUrl(resolved); return; }
     void renderCandidates(loginInput.value);
     loginInput.setCustomValidity(offlineMode
       ? 'オフライン中は閲覧済みのユーザのみ開けます'
@@ -906,7 +906,7 @@
     })(quickLinkElements[i]);
   }
 
-  window.addEventListener('pageshow', function () { refreshOfflineState({ rerender: true }); });
+  window.addEventListener('pageshow', function (event) { if (goBtn && event.persisted) { goBtn.disabled = false; } refreshOfflineState({ rerender: true }); });
   window.addEventListener('focus', function () { refreshOfflineState({ rerender: true }); });
   window.addEventListener('storage', function (event) {
     if (offlineAccessStorageKey && event.key && event.key !== offlineAccessStorageKey) {return;}
