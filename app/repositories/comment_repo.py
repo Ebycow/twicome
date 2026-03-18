@@ -746,7 +746,9 @@ def fetch_showcase_comments(db, uid: int, limit: int = 30) -> list[str]:
     """
     max_row = (
         db.execute(
-            text("SELECT DATE(MAX(comment_created_at_utc)) AS latest_date FROM comments WHERE commenter_user_id = :uid"),
+            text(
+                "SELECT DATE(MAX(comment_created_at_utc)) AS latest_date FROM comments WHERE commenter_user_id = :uid"
+            ),
             {"uid": uid},
         )
         .mappings()

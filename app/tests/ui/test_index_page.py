@@ -46,8 +46,8 @@ class TestPageLoad:
         page.goto("/")
         hero = page.locator(".hero-title")
         expect(hero).to_be_visible()
-        # テキストが含まれていることも確認できる（実際のテキスト: "ツイコメ Twicome"）
-        expect(hero).to_contain_text("ツイコメ")
+        # テキストが含まれていることも確認できる（ロゴSVGは aria-label="ツイコメ"、テキストは "Twicome"）
+        expect(hero).to_contain_text("Twicome")
 
     def test_search_input_exists(self, page: Page):
         """

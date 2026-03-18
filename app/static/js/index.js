@@ -996,18 +996,32 @@
 })();
 
 (function () {
-  var stats = document.querySelectorAll('.hero-stat-value[data-count]');
+  const stats = document.querySelectorAll('.hero-stat-value[data-count]');
   if (!stats.length) { return; }
-  var duration = 1200;
+  const duration = 1200;
+  /**
+   * @param {number} t - 0〜1の進行度
+   * @returns {number} イージング後の値
+   */
   function easeOut(t) { return 1 - (1 - t) * (1 - t); }
+  /**
+   * @param {number} n - 整数値
+   * @returns {string} カンマ区切りの文字列
+   */
   function fmt(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  /**
+   * @param {Element} el - アニメーション対象要素
+   */
   function animate(el) {
-    var target = parseInt(el.dataset.count, 10);
+    const target = parseInt(el.dataset.count, 10);
     if (isNaN(target)) { return; }
-    var start = performance.now();
+    const start = performance.now();
     el.textContent = '0';
+    /**
+     * @param {number} now - DOMHighResTimeStamp
+     */
     function step(now) {
-      var t = Math.min((now - start) / duration, 1);
+      const t = Math.min((now - start) / duration, 1);
       el.textContent = fmt(target * easeOut(t));
       if (t < 1) { requestAnimationFrame(step); }
     }
@@ -1017,7 +1031,7 @@
 }());
 
 (function () {
-  var fallbackComments = [
+  const fallbackComments = [
     'wwwwwwwwwwwwww',
     'ドンマイドンマイ！',
     'それな',
@@ -1042,27 +1056,28 @@
     'もう一回見よ',
     'ここ何度見ても笑える',
   ];
-  var dataEl = document.getElementById('showcase-comments-data');
-  var loaded = [];
+  const dataEl = document.getElementById('showcase-comments-data');
+  let loaded = [];
   if (dataEl) {
     try { loaded = JSON.parse(dataEl.textContent) || []; } catch (e) { loaded = []; }
   }
-  var comments = loaded.length > 0 ? loaded : fallbackComments;
+  const comments = loaded.length > 0 ? loaded : fallbackComments;
   // ランダムな順序に並び替え
-  for (var i = comments.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var tmp = comments[i]; comments[i] = comments[j]; comments[j] = tmp;
+  for (let i = comments.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = comments[i]; comments[i] = comments[j]; comments[j] = tmp;
   }
 
-  var textEl = document.getElementById('comment-showcase-text');
+  const textEl = document.getElementById('comment-showcase-text');
   if (!textEl) { return; }
 
-  var idx = Math.floor(Math.random() * comments.length);
-  var pos = 0;
-  var deleting = false;
+  let idx = Math.floor(Math.random() * comments.length);
+  let pos = 0;
+  let deleting = false;
 
+  /** タイプアニメーションの1ステップ */
   function tick() {
-    var text = comments[idx];
+    const text = comments[idx];
     if (!deleting) {
       pos++;
       textEl.textContent = text.slice(0, pos);

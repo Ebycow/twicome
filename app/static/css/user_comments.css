@@ -127,6 +127,7 @@
         #drawer-backdrop { display: none !important; }
         #drawer-close-row { display: none; }
         .fab { display: none; }
+
         #fab-top {
           display: flex;
           position: fixed; bottom: 24px; right: 24px;
