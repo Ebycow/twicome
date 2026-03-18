@@ -976,10 +976,14 @@
     });
   })();
 
-  // ---- SW version update listener ----
+  // ---- SW version update / auth redirect listener ----
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', function (event) {
       const data = event.data || {};
+      if (data.type === 'twicome-auth-redirect') {
+        window.location.reload();
+        return;
+      }
       if (data.type !== 'twicome-top-page-updated') {return;}
       if (!data.dataVersion || data.dataVersion === currentDataVersion) {return;}
       try {

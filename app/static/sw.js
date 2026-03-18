@@ -51,7 +51,13 @@ async function fetchDataVersion() {
   const response = await fetch(DATA_VERSION_URL, {
     cache: 'no-store',
     headers: { Accept: 'application/json' },
+    redirect: 'manual',
   });
+  if (response.type === 'opaqueredirect') {
+    const err = new Error('auth-redirect');
+    err.isAuthRedirect = true;
+    throw err;
+  }
   if (!response.ok) throw new Error(`data-version:${response.status}`);
   const data = await response.json();
   return typeof data.data_version === 'string' && data.data_version ? data.data_version : null;
@@ -66,7 +72,12 @@ async function cacheTopPageResponse(cache, request, response, fallbackVersion) {
 }
 
 async function fetchAndCacheTopPage(cache, request, fallbackVersion) {
-  const response = await fetch(request);
+  const url = typeof request === 'string' ? request : request.url;
+  const response = await fetchNavigate(url, {}, 'same-origin');
+  if (response.type === 'opaqueredirect') {
+    await cache.delete(request);
+    return response;
+  }
   return cacheTopPageResponse(cache, request, response, fallbackVersion);
 }
 
@@ -182,19 +193,32 @@ async function precacheTopPage(cache) {
 
 async function revalidateTopPage(cache, request) {
   const cachedVersion = await readTopPageVersion(cache);
+  const requestUrl = typeof request === 'string' ? request : request.url;
   try {
     const latestVersion = await fetchDataVersion();
     if (latestVersion && latestVersion === cachedVersion) return;
 
     const response = await fetchAndCacheTopPage(cache, request, latestVersion);
-    if (!response || !response.ok) return;
+    if (!response) return;
+
+    if (response.type === 'opaqueredirect') {
+      await notifyAuthRedirect(requestUrl);
+      return;
+    }
+
+    if (!response.ok) return;
 
     const updatedVersion = response.headers.get('X-Twicome-Data-Version') || latestVersion;
     if (updatedVersion && updatedVersion !== cachedVersion) {
       await notifyTopPageUpdated(updatedVersion);
     }
-  } catch {
-    // 背景再検証に失敗しても現在のキャッシュは維持する
+  } catch (e) {
+    if (e && e.isAuthRedirect) {
+      // CF Access セッション切れ: キャッシュを削除してクライアントにリロード要求
+      await cache.delete(request);
+      await notifyAuthRedirect(requestUrl);
+    }
+    // その他のネットワークエラーはキャッシュを維持する
   }
 }
 
