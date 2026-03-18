@@ -1,3 +1,5 @@
+編集後積極的にテストとレビューを行うこと
+
 ## Playwright MCP
 
 ブラウザ閲覧してレビューしたい場合は、http://localhost:8011/ が利用可能
@@ -15,8 +17,10 @@ docker compose -f docker-compose.dev.yml --profile faiss up --build
 - `.js` → eslint
 - `.css` → stylelint
 
+lintエラーを受け取ったのを放置しないこと
+
 # Test
 testはdocker-compose.dev.ymlで実行
-最重要　docker-compose.dev.ymlをよく読め。: テスト実行用サービス・Lint 実行用サービスがあるためappコンテナでテスト・lintを実行してはいけない
-個別で実行を推奨するが、手動で全体 lint + test を一括実行したい場合は `ci-local.sh`（プロジェクトルート）を使う。
-docker-compose.dev.yml はプロジェクトルートにある。
+appコンテナでテスト・lintを実行してはいけない。テスト実行用サービス・Lint 実行用サービスが個別に存在する。
+サービスは個別で実行を推奨するが、大規模な変更で全体 lint + test を一括実行したい場合は `ci-local.sh`（プロジェクトルート）を使う。
+docker-compose.dev.yml はプロジェクトルートにある。appディレクトリにはない。

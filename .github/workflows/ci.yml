@@ -119,15 +119,14 @@ jobs:
         run: pip install -r app/requirements.txt
 
       - name: Run unit tests
-        working-directory: app
         env:
           DATABASE_URL: "mysql+pymysql://dummy:dummy@localhost:3306/dummy"
           COVERAGE_FILE: .coverage.unit
         run: |
           mkdir -p test-reports/unit
-          pytest tests/unit -v \
+          pytest app/tests/unit -v \
             --junitxml=test-reports/unit/junit.xml \
-            --cov=. \
+            --cov=app \
             --cov-config=.coveragerc \
             --cov-report=
 
@@ -137,8 +136,8 @@ jobs:
         with:
           name: unit-test-artifacts
           path: |
-            app/.coverage.unit
-            app/test-reports/unit/junit.xml
+            .coverage.unit
+            test-reports/unit/junit.xml
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14
@@ -246,15 +245,14 @@ jobs:
           exit 1
 
       - name: Run integration tests
-        working-directory: app
         env:
           TEST_DATABASE_URL: mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?charset=utf8mb4
           COVERAGE_FILE: .coverage.integration
         run: |
           mkdir -p test-reports/integration
-          pytest tests/integration -v \
+          pytest app/tests/integration -v \
             --junitxml=test-reports/integration/junit.xml \
-            --cov=. \
+            --cov=app \
             --cov-config=.coveragerc \
             --cov-report=
 
@@ -264,8 +262,8 @@ jobs:
         with:
           name: integration-test-artifacts
           path: |
-            app/.coverage.integration
-            app/test-reports/integration/junit.xml
+            .coverage.integration
+            test-reports/integration/junit.xml
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14
@@ -329,7 +327,6 @@ jobs:
         run: alembic -c migrate/alembic.ini upgrade head
 
       - name: Run UI tests
-        working-directory: app
         env:
           TEST_DATABASE_URL: mysql+pymysql://appuser:apppass@127.0.0.1:3306/appdb_test?charset=utf8mb4
           REDIS_URL: ""
@@ -339,9 +336,9 @@ jobs:
           COVERAGE_FILE: .coverage.ui
         run: |
           mkdir -p test-reports/ui
-          pytest tests/ui -v \
+          pytest app/tests/ui -v \
             --junitxml=test-reports/ui/junit.xml \
-            --cov=. \
+            --cov=app \
             --cov-config=.coveragerc \
             --cov-report=
 
@@ -351,8 +348,8 @@ jobs:
         with:
           name: ui-test-artifacts
           path: |
-            app/.coverage.ui
-            app/test-reports/ui/junit.xml
+            .coverage.ui
+            test-reports/ui/junit.xml
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14
@@ -385,22 +382,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unit-test-artifacts
-          path: app/.ci-artifacts/unit
+          path: .ci-artifacts/unit
 
       - name: Download integration test artifacts
         uses: actions/download-artifact@v4
         with:
           name: integration-test-artifacts
-          path: app/.ci-artifacts/integration
+          path: .ci-artifacts/integration
 
       - name: Download UI test artifacts
         uses: actions/download-artifact@v4
         with:
           name: ui-test-artifacts
-          path: app/.ci-artifacts/ui
+          path: .ci-artifacts/ui
 
       - name: Combine coverage and build reports
-        working-directory: app
         run: |
           mkdir -p test-reports/combined
           coverage combine .ci-artifacts/unit .ci-artifacts/integration .ci-artifacts/ui
@@ -423,10 +419,10 @@ jobs:
         with:
           name: ci-reports
           path: |
-            app/test-reports/combined/coverage.xml
-            app/test-reports/combined/coverage.txt
-            app/test-reports/combined/junit-unit.xml
-            app/test-reports/combined/junit-integration.xml
-            app/test-reports/combined/junit-ui.xml
+            test-reports/combined/coverage.xml
+            test-reports/combined/coverage.txt
+            test-reports/combined/junit-unit.xml
+            test-reports/combined/junit-integration.xml
+            test-reports/combined/junit-ui.xml
           if-no-files-found: warn
           retention-days: 14

@@ -157,13 +157,13 @@ do_db_migrate() {
 do_unit() {
     $DC --profile test run --rm \
         -e COVERAGE_FILE=.coverage.unit \
-        test pytest tests/unit -v
+        test pytest app/tests/unit -v
 }
 
 do_integration() {
     $DC --profile test run --rm \
         -e COVERAGE_FILE=.coverage.integration \
-        test pytest tests/integration -v
+        test pytest app/tests/integration -v
 }
 
 do_ui() {

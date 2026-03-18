@@ -1,0 +1,9 @@
+[run]
+relative_files = True
+concurrency = thread
+omit =
+    app/tests/*
+
+[report]
+omit =
+    app/tests/*

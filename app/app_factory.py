@@ -12,12 +12,14 @@ from core.config import FAISS_API_URL, ROOT_PATH, SERVICE_WORKER_CACHE_NAME
 from core.middleware import CSRFProtectionMiddleware, HostCheckMiddleware, SecurityHeadersMiddleware
 from faiss_search import ping_faiss_api
 
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
 app = FastAPI(root_path=ROOT_PATH)
 app.add_middleware(CSRFProtectionMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(HostCheckMiddleware)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 SERVICE_WORKER_CACHE_NAME_PLACEHOLDER = "__TWICOME_CACHE_NAME__"
 
@@ -43,7 +45,7 @@ def service_worker():
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     """Favicon を返す。"""
-    return FileResponse("static/icons/favicon.ico", media_type="image/x-icon")
+    return FileResponse(str(_STATIC_DIR / "icons" / "favicon.ico"), media_type="image/x-icon")
 
 
 @app.get("/manifest.json", include_in_schema=False)

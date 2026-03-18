@@ -175,9 +175,8 @@ services:
       HOST_CHECK_ENABLED: "false"
       ROOT_PATH: ""
     volumes:
-      - ./app:/app
-      - ./migrate:/migrate:ro
-    working_dir: /app
+      - .:/workspace
+    working_dir: /workspace
     command: ["pytest"]
     depends_on:
       db:
@@ -253,10 +252,9 @@ services:
       HOST_CHECK_ENABLED: "false"
       ROOT_PATH: ""
     volumes:
-      - ./app:/app
-      - ./migrate:/migrate:ro
-    working_dir: /app
-    command: ["pytest", "tests/ui", "-v"]
+      - .:/workspace
+    working_dir: /workspace
+    command: ["pytest", "app/tests/ui", "-v"]
     depends_on:
       db:
         condition: service_healthy

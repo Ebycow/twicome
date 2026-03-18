@@ -22,7 +22,7 @@ def test_favicon_response_points_to_icon_file():
     resp = app_factory.favicon()
 
     assert resp.media_type == "image/x-icon"
-    assert resp.path == "static/icons/favicon.ico"
+    assert resp.path.endswith("static/icons/favicon.ico")
 
 
 def test_pwa_manifest_uses_root_path(monkeypatch):

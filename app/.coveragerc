@@ -1,9 +1,1 @@
-[run]
-relative_files = True
-concurrency = thread
-omit =
-    tests/*
-
-[report]
-omit =
-    tests/*
+# カバレッジ設定はプロジェクトルートの .coveragerc に移動しました。
