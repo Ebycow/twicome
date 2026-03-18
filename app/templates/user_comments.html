@@ -32,12 +32,12 @@
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           {% if user %}
-            <button type="button" id="best9-toggle-btn" class="nav-link">Best9モード</button>
+            <button type="button" id="best9-toggle-btn" class="nav-link"><i class="fa-solid fa-trophy"></i> Best9モード</button>
           {% endif %}
-          <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link">統計</a>
-          <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link">クラスタ探索</a>
-          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link">クイズで遊ぶ</a>
-          <a href="{{ root_path }}/manual" class="nav-link">使い方ガイド</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-chart-bar"></i> 統計</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-diagram-project"></i> クラスタ探索</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-gamepad"></i> クイズで遊ぶ</a>
+          <a href="{{ root_path }}/manual" class="nav-link"><i class="fa-solid fa-book"></i> 使い方ガイド</a>
           <a href="{{ root_path }}/" class="nav-link"><i class="fa-solid fa-arrow-left"></i> 検索に戻る</a>
         </div>
       </div>

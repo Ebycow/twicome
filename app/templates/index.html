@@ -18,7 +18,9 @@
     <!-- Hero -->
     <div class="hero">
       <div class="hero-copy">
-        <h1 class="hero-title">ツイコメ <small>Twicome</small></h1>
+        <h1 class="hero-title">
+          <span class="hero-title-logo" aria-label="ツイコメ">{% include "partials/_logo_svg.html" %}</span><small>Twicome</small>
+        </h1>
         <p class="hero-sub">Twitch VOD コメント検索・分析ツール</p>
       </div>
       {% if app_stats %}

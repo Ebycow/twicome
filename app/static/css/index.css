@@ -49,6 +49,17 @@
         letter-spacing: -0.02em;
       }
 
+      .hero-title-logo {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .site-logo-svg {
+        height: 1em;
+        width: auto;
+        vertical-align: middle;
+      }
+
       .hero-title small {
         font-size: 1rem;
         font-weight: 500;
