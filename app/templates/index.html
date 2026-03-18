@@ -61,7 +61,7 @@
           <span class="comment-showcase-icon"><i class="fa-solid fa-comment-dots"></i></span>
           <span class="comment-showcase-body"><span class="comment-showcase-text" id="comment-showcase-text"></span><span class="comment-showcase-cursor"></span></span>
         </div>
-        <div class="comment-showcase-footer">データベースに眠るコメントより</div>
+        <div class="comment-showcase-footer">{{ showcase_user_name or "データベースに眠るコメント" }}より</div>
       </div>
 
       <!-- Main Card -->
@@ -221,6 +221,7 @@
 
     </div>
 
+    <script type="application/json" id="showcase-comments-data">{{ showcase_comments | tojson }}</script>
     <script type="application/json" id="root-path-data">{{ root_path | tojson }}</script>
     <script type="application/json" id="data-version-data">{{ data_version | tojson }}</script>
     <script type="application/json" id="sw-cache-name-data">{{ service_worker_cache_name | tojson }}</script>

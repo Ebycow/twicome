@@ -110,6 +110,10 @@ def build_index_context(db, data_version: str) -> dict:
     placeholder_login = DEFAULT_LOGIN or "sample_user"
     placeholder_user = user_repo.find_user(db, placeholder_login, "twitch") if DEFAULT_LOGIN else None
     placeholder_display_name = (placeholder_user or {}).get("display_name") or "表示名"
+    showcase_comments: list[str] = []
+    showcase_user_name: str = placeholder_display_name if DEFAULT_LOGIN else ""
+    if DEFAULT_LOGIN and placeholder_user:
+        showcase_comments = comment_repo.fetch_showcase_comments(db, placeholder_user["user_id"], limit=30)
     return {
         "selected_login": DEFAULT_LOGIN or "",
         "selected_login_for_links": DEFAULT_LOGIN or "",
@@ -120,4 +124,6 @@ def build_index_context(db, data_version: str) -> dict:
         "app_stats": app_stats,
         "data_version": data_version,
         "service_worker_cache_name": SERVICE_WORKER_CACHE_NAME,
+        "showcase_comments": showcase_comments,
+        "showcase_user_name": showcase_user_name,
     }

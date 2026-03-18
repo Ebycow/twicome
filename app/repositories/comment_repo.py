@@ -739,6 +739,40 @@ def fetch_recent_comments_by_users(db, user_ids: list[int], limit_per_user: int)
     return result
 
 
+def fetch_showcase_comments(db, uid: int, limit: int = 30) -> list[str]:
+    """DEFAULT_LOGIN ユーザの直近日のコメント本文をランダムに取得。
+
+    最新コメントの日付と前日分のコメントを対象にランダム取得する。
+    """
+    max_row = (
+        db.execute(
+            text("SELECT DATE(MAX(comment_created_at_utc)) AS latest_date FROM comments WHERE commenter_user_id = :uid"),
+            {"uid": uid},
+        )
+        .mappings()
+        .first()
+    )
+    if not max_row or not max_row["latest_date"]:
+        return []
+    latest_date = max_row["latest_date"]
+    rows = (
+        db.execute(
+            text("""
+            SELECT body FROM comments
+            WHERE commenter_user_id = :uid
+              AND DATE(comment_created_at_utc) >= DATE_SUB(:latest_date, INTERVAL 1 DAY)
+              AND CHAR_LENGTH(body) BETWEEN 1 AND 50
+            ORDER BY RAND()
+            LIMIT :limit
+        """),
+            {"uid": uid, "latest_date": latest_date, "limit": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return [r["body"] for r in rows if r["body"]]
+
+
 def fetch_popular_comments(db, limit: int = 20) -> list[dict]:
     """いいね・dislike の合計が多い順でコメントを取得（トップページ用）。"""
     from services.comment_utils import build_comment_body_select_sql

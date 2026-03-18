@@ -1017,7 +1017,7 @@
 }());
 
 (function () {
-  var comments = [
+  var fallbackComments = [
     'wwwwwwwwwwwwww',
     'ドンマイドンマイ！',
     'それな',
@@ -1042,6 +1042,17 @@
     'もう一回見よ',
     'ここ何度見ても笑える',
   ];
+  var dataEl = document.getElementById('showcase-comments-data');
+  var loaded = [];
+  if (dataEl) {
+    try { loaded = JSON.parse(dataEl.textContent) || []; } catch (e) { loaded = []; }
+  }
+  var comments = loaded.length > 0 ? loaded : fallbackComments;
+  // ランダムな順序に並び替え
+  for (var i = comments.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = comments[i]; comments[i] = comments[j]; comments[j] = tmp;
+  }
 
   var textEl = document.getElementById('comment-showcase-text');
   if (!textEl) { return; }
