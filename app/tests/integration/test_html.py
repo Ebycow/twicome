@@ -209,8 +209,8 @@ class TestCommentCards:
             assert deferred is not None, f"comment #{card.get('id')} の deferred vote container が見つからない"
             vote_btns = card.find_all(class_="vote-btn")
             assert len(vote_btns) == 2, f"comment #{card.get('id')} の初期 HTML に vote-btn が {len(vote_btns)} 個ある"
-            assert vote_btns[0].get_text(strip=True) == "😂 0"
-            assert vote_btns[1].get_text(strip=True) == "❓ 0"
+            assert vote_btns[0].get_text(strip=True) == "0"
+            assert vote_btns[1].get_text(strip=True) == "0"
 
     def test_no_comments_shows_zero_cards(self, client, db):
         seed_user(db, user_id=1, login="streamer", platform="twitch")

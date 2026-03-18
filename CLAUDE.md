@@ -17,5 +17,6 @@ docker compose -f docker-compose.dev.yml --profile faiss up --build
 
 # Test
 testはdocker-compose.dev.ymlで実行
+最重要　docker-compose.dev.ymlをよく読め。: テスト実行用サービス・Lint 実行用サービスがあるためappコンテナでテスト・lintを実行してはいけない
 個別で実行を推奨するが、手動で全体 lint + test を一括実行したい場合は `ci-local.sh`（プロジェクトルート）を使う。
 docker-compose.dev.yml はプロジェクトルートにある。

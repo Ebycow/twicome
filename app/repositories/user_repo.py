@@ -127,13 +127,17 @@ def fetch_app_stats(db) -> dict:
         .mappings()
         .first()
     )
-    return dict(row) if row else {
-        "total_users": 0,
-        "active_commenters": 0,
-        "total_vods": 0,
-        "total_comments": 0,
-        "tracked_streamers": 0,
-    }
+    return (
+        dict(row)
+        if row
+        else {
+            "total_users": 0,
+            "active_commenters": 0,
+            "total_vods": 0,
+            "total_comments": 0,
+            "tracked_streamers": 0,
+        }
+    )
 
 
 def fetch_commenters_for_streamer(db, streamer_login: str) -> list[str]:

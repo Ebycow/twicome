@@ -5,7 +5,6 @@ import math
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from core.config import DEFAULT_PLATFORM
 from core.db import SessionLocal
 from core.templates import templates
 from repositories import user_repo, vod_repo

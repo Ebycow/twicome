@@ -1,7 +1,7 @@
 """VOD コメント閲覧ページの業務ロジック。"""
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from repositories import comment_repo, vod_repo

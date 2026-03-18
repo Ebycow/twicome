@@ -16,6 +16,7 @@
   border-bottom: 1px solid var(--card-border);
   padding: 14px 24px;
   background: var(--card-bg);
+
   /* body { margin: 24px } を打ち消してフル幅にする */
   margin: -24px -24px 0;
 }
@@ -341,7 +342,7 @@
   }
 
   .users-toolbar {
-    padding: 14px 14px;
+    padding: 14px;
   }
 
   .users-grid {
