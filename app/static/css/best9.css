@@ -324,12 +324,12 @@
         to   { opacity: 1; transform: translateY(0); }
       }
 
-      @media (width <= 680px) {
+      @media (max-width: 680px) {
         .container { padding: 36px 14px 80px; }
         .grid { grid-template-columns: 1fr; gap: 10px; }
         .cell-bg-num { font-size: 4rem; }
       }
 
-      @media (width >= 681px) and (width <= 880px) {
+      @media (min-width: 681px) and (max-width: 880px) {
         .grid { grid-template-columns: repeat(2, 1fr); }
       }

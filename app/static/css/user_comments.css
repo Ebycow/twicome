@@ -68,7 +68,7 @@
       .slider-row input[type="range"] { flex:1; min-width:0; padding:0; border:none; background:transparent; }
       .slider-row .slider-val { min-width:32px; text-align:right; font-size:0.85rem; color:var(--meta-color); }
 
-      @media (width <= 480px) {
+      @media (max-width: 480px) {
         .slider-row label { min-width:60px; font-size:0.8rem; }
       }
       .centroid-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e3f2fd; border:1px solid #2196f3; color:#1565c0; }
@@ -80,11 +80,11 @@
       .card details summary::-webkit-details-marker { margin-right:6px; }
       .card details > :not(summary) { margin-top:10px; }
 
-      @media (width <= 980px) {
+      @media (max-width: 980px) {
         .filters > .wide { grid-column: span 1; }
       }
 
-      @media (width <= 720px) {
+      @media (max-width: 720px) {
         .usage-toggle-btn { display: inline-block; }
         #usage-content { display: none; }
         #usage-content.open { display: block; }
@@ -119,7 +119,7 @@
         #fab-top { right: 16px; }
       }
 
-      @media (width >= 721px) {
+      @media (min-width: 721px) {
         .usage-toggle-btn { display: none; }
         #usage-content { display: block !important; }
         #mobile-header { display: none; }

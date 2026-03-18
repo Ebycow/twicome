@@ -273,7 +273,7 @@
         word-break: break-all;
       }
 
-      @media (width <= 960px) {
+      @media (max-width: 960px) {
         body {
           padding: 16px;
         }

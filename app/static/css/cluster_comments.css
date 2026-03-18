@@ -4,6 +4,6 @@
 
       .top { margin-bottom: 16px; }
 
-      @media (width <= 720px) {
+      @media (max-width: 720px) {
         /* body margin は base.css が処理 */
       }

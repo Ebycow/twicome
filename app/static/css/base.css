@@ -152,6 +152,6 @@ button:active { transform: translateY(0); box-shadow: none; }
 }
 
 /* ─── Responsive ─── */
-@media (width <= 720px) {
+@media (max-width: 720px) {
   body { margin: 12px; }
 }

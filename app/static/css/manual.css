@@ -113,7 +113,7 @@
       }
       .toc li { margin: 2px 0; }
 
-      @media (width <= 780px) {
+      @media (max-width: 780px) {
         .toc ol { columns: 1; }
       }
 

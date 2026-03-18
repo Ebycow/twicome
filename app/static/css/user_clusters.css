@@ -181,7 +181,7 @@
         background: var(--error-bg);
       }
 
-      @media (width <= 700px) {
+      @media (max-width: 700px) {
         body { padding: 14px; }
         .clusters-grid { grid-template-columns: 1fr; }
       }

@@ -484,7 +484,7 @@
       }
 
       /* --- Responsive --- */
-      @media (width <= 600px) {
+      @media (max-width: 600px) {
         .start-card, .gameover-card { margin: 24px 16px; padding: 28px 20px; }
         .game-header { margin: 12px 16px 0; flex-wrap: wrap; justify-content: center; }
         .question-container { margin: 12px 16px; }
