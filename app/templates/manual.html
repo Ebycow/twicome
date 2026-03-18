@@ -1,76 +1,91 @@
 {% extends "base.html" %}
 
-{% block title %}使い方ガイド - Twitch VOD コメント検索{% endblock %}
+{% block title %}使い方ガイド - Twicome{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/manual.css?v={{ static_version }}" />
 {% endblock %}
 
 {% block body %}
-    <main class="container">
-      <header class="top">
-        <div>
-          <h1>使い方ガイド</h1>
-        </div>
-        <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> トップに戻る</a>
-      </header>
+<main class="manual-container">
+  <header class="page-header">
+    <a class="header-back" href="{{ request.url_for('index') }}">
+      <i class="fa-solid fa-arrow-left"></i> トップに戻る
+    </a>
+    <div class="header-content">
+      <h1 class="header-title">
+        <i class="fa-solid fa-book-open"></i>
+        使い方ガイド
+      </h1>
+      <p class="header-sub">Twicome の機能・操作方法・API リファレンス</p>
+    </div>
+  </header>
 
-      <nav class="toc">
-        <h2>目次</h2>
-        <ol>
-          <li><a href="#overview">システム概要</a></li>
-          <li><a href="#page-map">画面一覧</a></li>
-          <li><a href="#top-page">トップページ</a></li>
-          <li><a href="#comments">コメント一覧ページ</a></li>
-          <li><a href="#filters">フィルター/並び替え</a></li>
-          <li><a href="#search-modes">特殊検索（類似/典型度/感情）</a></li>
-          <li><a href="#reactions">リアクション</a></li>
-          <li><a href="#cursor">コメント個別ページ（cursor）</a></li>
-          <li><a href="#community-note">コミュニティノート</a></li>
-          <li><a href="#stats">統計ページ</a></li>
-          <li><a href="#quiz">コメント当てクイズ</a></li>
-          <li><a href="#add-user">配信者追加</a></li>
-          <li><a href="#url">URLとクエリ</a></li>
-          <li><a href="#api">APIリファレンス</a></li>
-        </ol>
-      </nav>
+  <div class="page-body">
+    <nav class="toc" aria-label="目次">
+      <h2 class="toc-heading">目次</h2>
+      <ol class="toc-list">
+        <li><a href="#overview">システム概要</a></li>
+        <li><a href="#page-map">画面一覧</a></li>
+        <li><a href="#top-page">トップページ</a></li>
+        <li><a href="#comments">コメント一覧</a></li>
+        <li><a href="#filters">フィルター/並び替え</a></li>
+        <li><a href="#search-modes">特殊検索</a></li>
+        <li><a href="#reactions">リアクション</a></li>
+        <li><a href="#cursor">コメント個別表示</a></li>
+        <li><a href="#community-note">コミュニティノート</a></li>
+        <li><a href="#stats">統計ページ</a></li>
+        <li><a href="#quiz">クイズ</a></li>
+        <li><a href="#add-user">配信者追加</a></li>
+        <li><a href="#url">URL / クエリ</a></li>
+        <li><a href="#api">API リファレンス</a></li>
+      </ol>
+    </nav>
+
+    <div class="sections">
 
       <section id="overview" class="section">
-        <h2>1. システム概要</h2>
+        <h2><span class="section-num">1</span>システム概要</h2>
         <p>
-          Twitch VOD コメントを、ユーザ単位で検索・分析する Web アプリです。
-          取得済みコメントを対象に、通常検索だけでなく意味検索・感情検索・統計分析・クイズまで行えます。
+          <strong>Twicome</strong> は Twitch の VOD コメントをユーザ単位で検索・分析する Web アプリです。
+          取得済みコメントに対して、通常のキーワード検索だけでなく意味ベクトル検索・感情検索・統計分析・クイズまで幅広く活用できます。
         </p>
-        <div class="grid">
+        <div class="feature-grid">
           <div class="feature">
+            <span class="feature-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
             <strong>コメント閲覧</strong>
-            VOD/配信者/キーワード/除外ワードで絞り込みしながら閲覧。
+            <span>VOD・配信者・キーワード・除外ワードで絞り込みながら快適に閲覧できます。</span>
           </div>
           <div class="feature">
+            <span class="feature-icon"><i class="fa-solid fa-brain"></i></span>
             <strong>意味検索</strong>
-            FAISS ベクトル検索で、言い換えを含む類似コメントを探索。
+            <span>FAISS ベクトル検索で、表現が違っても意味が近いコメントを探索できます。</span>
           </div>
           <div class="feature">
+            <span class="feature-icon"><i class="fa-solid fa-face-smile"></i></span>
             <strong>感情検索</strong>
-            感情スライダーを合成して、狙ったトーンのコメントを抽出。
+            <span>笑い・驚き・称賛など6軸のスライダーを合成して、狙ったトーンのコメントを抽出します。</span>
           </div>
           <div class="feature">
+            <span class="feature-icon"><i class="fa-solid fa-clipboard-check"></i></span>
             <strong>コミュニティノート</strong>
-            コメントに判定/危険度スコア付きの注釈を表示。
+            <span>コメントに AI 判定ステータス・危険度スコア付きの注釈が表示されます。</span>
           </div>
           <div class="feature">
-            <strong>統計</strong>
-            時間帯・曜日・配信者別活動率・影響度を可視化。
+            <span class="feature-icon"><i class="fa-solid fa-chart-bar"></i></span>
+            <strong>統計分析</strong>
+            <span>時間帯・曜日分布・配信者別活動率・影響度などを多角的に可視化します。</span>
           </div>
           <div class="feature">
+            <span class="feature-icon"><i class="fa-solid fa-gamepad"></i></span>
             <strong>クイズ</strong>
-            指定ユーザの発言かどうかを当てるゲーム。
+            <span>指定ユーザの発言かどうかを当てる二択ゲームです。スコアと正答率が記録されます。</span>
           </div>
         </div>
       </section>
 
       <section id="page-map" class="section">
-        <h2>2. 画面一覧</h2>
+        <h2><span class="section-num">2</span>画面一覧</h2>
         <div class="card">
           <table>
             <thead>
@@ -82,32 +97,32 @@
             </thead>
             <tbody>
               <tr>
-                <td>トップ</td>
+                <td><i class="fa-solid fa-house table-icon"></i>トップ</td>
                 <td>ユーザ選択、ランキング、導線</td>
                 <td><code>/</code></td>
               </tr>
               <tr>
-                <td>コメント一覧</td>
-                <td>検索/フィルタ/リアクション/特殊検索</td>
+                <td><i class="fa-solid fa-comments table-icon"></i>コメント一覧</td>
+                <td>検索・フィルタ・リアクション・特殊検索</td>
                 <td><code>/u/{login}?platform=twitch</code></td>
               </tr>
               <tr>
-                <td>統計</td>
+                <td><i class="fa-solid fa-chart-line table-icon"></i>統計</td>
                 <td>時間分布、配信者別活動率、影響度</td>
                 <td><code>/u/{login}/stats?platform=twitch</code></td>
               </tr>
               <tr>
-                <td>クイズ</td>
+                <td><i class="fa-solid fa-gamepad table-icon"></i>クイズ</td>
                 <td>コメント当てゲーム</td>
                 <td><code>/u/{login}/quiz?platform=twitch</code></td>
               </tr>
               <tr>
-                <td>配信者追加</td>
+                <td><i class="fa-solid fa-user-plus table-icon"></i>配信者追加</td>
                 <td>監視対象の追加</td>
                 <td><code>/add_user</code></td>
               </tr>
               <tr>
-                <td>このガイド</td>
+                <td><i class="fa-solid fa-book-open table-icon"></i>このガイド</td>
                 <td>操作説明</td>
                 <td><code>/manual</code></td>
               </tr>
@@ -117,10 +132,10 @@
       </section>
 
       <section id="top-page" class="section">
-        <h2>3. トップページ</h2>
+        <h2><span class="section-num">3</span>トップページ</h2>
         <h3>基本操作</h3>
-        <ol>
-          <li>ドロップダウンで Twitch ユーザを選択</li>
+        <ol class="steps">
+          <li>ドロップダウンで Twitch ユーザを選択（名前で検索可）</li>
           <li>「コメント一覧を表示」でコメントページへ遷移</li>
           <li>「統計ページ」「クイズで遊ぶ」も選択ユーザに連動して遷移先が切り替わる</li>
         </ol>
@@ -139,17 +154,18 @@
       </section>
 
       <section id="comments" class="section">
-        <h2>4. コメント一覧ページ</h2>
-        <div class="url">/u/{ユーザ名}?platform=twitch</div>
+        <h2><span class="section-num">4</span>コメント一覧ページ</h2>
+        <div class="url-display"><i class="fa-solid fa-link"></i>/u/{ユーザ名}?platform=twitch</div>
+
         <h3>コメントカードで見られる情報</h3>
         <ul>
           <li><strong>VOD</strong>: Twitch の該当時刻へジャンプ</li>
-          <li><strong>YouTube</strong>: 対応 URL がある場合だけ表示。該当秒にジャンプ</li>
+          <li><strong>YouTube</strong>: 対応 URL がある場合のみ表示。該当秒にジャンプ</li>
           <li><strong>VODタイトル / 配信者 / 投稿者</strong>: どの文脈の発言か把握できます</li>
           <li><strong>オフセット</strong>: 配信内の位置（<code>hh:mm:ss</code>）</li>
-          <li><strong>投稿時刻</strong>: JST表示 + 相対時間（24時間以内は赤表示）</li>
-          <li><strong>bits</strong>: Bits付きコメントをバッジ表示</li>
-          <li><strong>本文</strong>: Twitchエモートは画像として描画されます</li>
+          <li><strong>投稿時刻</strong>: JST 表示 + 相対時間（24時間以内は赤表示）</li>
+          <li><strong>bits</strong>: Bits 付きコメントをバッジ表示</li>
+          <li><strong>本文</strong>: Twitch エモートは画像として描画されます</li>
         </ul>
 
         <h3>ページング挙動</h3>
@@ -160,7 +176,7 @@
       </section>
 
       <section id="filters" class="section">
-        <h2>5. フィルター/並び替え</h2>
+        <h2><span class="section-num">5</span>フィルター/並び替え</h2>
         <div class="card">
           <table>
             <thead>
@@ -172,23 +188,23 @@
             <tbody>
               <tr>
                 <td><code>VOD</code></td>
-                <td>特定VODに限定</td>
+                <td>特定 VOD のコメントのみに限定</td>
               </tr>
               <tr>
                 <td><code>配信者</code></td>
-                <td>特定チャンネルに限定</td>
+                <td>特定チャンネルのコメントのみに限定</td>
               </tr>
               <tr>
                 <td><code>本文検索 (q)</code></td>
-                <td>部分一致のキーワード検索</td>
+                <td>部分一致のキーワード検索（大文字・小文字区別なし）</td>
               </tr>
               <tr>
                 <td><code>除外ワード (exclude_q)</code></td>
-                <td>指定語を含むコメントを除外。空白 / カンマ / 読点「、」区切り</td>
+                <td>指定語を含むコメントを除外。空白・カンマ・読点「、」区切りで複数指定可</td>
               </tr>
               <tr>
-                <td><code>1ページ</code></td>
-                <td>20 / 50 / 100 / 200</td>
+                <td><code>1ページ表示件数</code></td>
+                <td>20 / 50 / 100 / 200 から選択</td>
               </tr>
             </tbody>
           </table>
@@ -204,178 +220,207 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><code>created_at</code></td><td>コメント時刻順（新しい順）</td></tr>
-              <tr><td><code>vod_time</code></td><td>VOD/オフセット順</td></tr>
-              <tr><td><code>likes</code></td><td>いいね順</td></tr>
-              <tr><td><code>dislikes</code></td><td>わるいね順</td></tr>
-              <tr><td><code>community_note</code></td><td>最新コミュニティノート順</td></tr>
-              <tr><td><code>danger</code></td><td>危険度順</td></tr>
-              <tr><td><code>random</code></td><td>ランダム</td></tr>
+              <tr><td><code>created_at</code></td><td>コメント投稿時刻順（新しい順）</td></tr>
+              <tr><td><code>vod_time</code></td><td>VOD 内のオフセット順</td></tr>
+              <tr><td><code>likes</code></td><td>いいね数が多い順</td></tr>
+              <tr><td><code>dislikes</code></td><td>わるいね数が多い順</td></tr>
+              <tr><td><code>community_note</code></td><td>最新コミュニティノートが付いた順</td></tr>
+              <tr><td><code>danger</code></td><td>危険度スコアが高い順</td></tr>
+              <tr><td><code>random</code></td><td>ランダム順</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
       <section id="search-modes" class="section">
-        <h2>6. 特殊検索（類似/典型度/感情）</h2>
+        <h2><span class="section-num">6</span>特殊検索（類似/典型度/感情）</h2>
+
         <h3>類似検索</h3>
         <ul>
-          <li>入力文と意味が近いコメントを検索します</li>
-          <li>件数は 20/50/100 を選択</li>
-          <li>結果に「類似度」が表示されます</li>
+          <li>入力文と意味が近いコメントを検索します（表現が違っても意味が近いものを発見できます）</li>
+          <li>件数は 20 / 50 / 100 から選択</li>
+          <li>結果に「類似度」スコアが表示されます</li>
         </ul>
 
         <h3>典型度スライダー（重心検索）</h3>
         <ul>
-          <li>0% に近いほど「そのユーザらしい発言」</li>
-          <li>100% に近いほど「珍しい発言」</li>
+          <li><strong>0%</strong> に近いほど「そのユーザらしい・典型的な発言」</li>
+          <li><strong>100%</strong> に近いほど「普段と違う・珍しい発言」</li>
           <li>結果には「重心類似度」が表示されます</li>
         </ul>
 
         <h3>感情スライダー</h3>
         <ul>
           <li>笑い・驚き・称賛・怒り・悲しみ・応援を 0〜100 で合成</li>
-          <li>1軸も上げていない場合は検索できません</li>
-          <li>一致度バッジ付きで結果表示、リセットボタンあり</li>
+          <li>1軸も有効にしていない状態では検索できません</li>
+          <li>一致度バッジ付きで結果表示。リセットボタンで全スライダーをリセット</li>
         </ul>
 
         <div class="note">
-          類似/典型度/感情のいずれかを実行中は特殊モードになります。
-          この間は通常の無限スクロールは停止し、「通常表示に戻す」で通常一覧へ戻ります。
+          <i class="fa-solid fa-circle-info"></i>
+          <span>類似・典型度・感情のいずれかを実行中は特殊モードになります。
+          この間は通常の無限スクロールは停止し、「通常表示に戻す」ボタンで通常一覧へ戻ります。</span>
         </div>
         <div class="warning">
-          類似検索・典型度検索・感情検索にはユーザごとの FAISS インデックスが必要です。
-          未作成ユーザでは検索できません。
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>類似検索・典型度検索・感情検索にはユーザごとの FAISS インデックスが必要です。
+          インデックス未作成のユーザでは利用できません。</span>
         </div>
       </section>
 
       <section id="reactions" class="section">
-        <h2>7. リアクション</h2>
-        <ul>
-          <li><strong><i class="fa-solid fa-thumbs-up"></i></strong> いいね</li>
-          <li><strong><i class="fa-solid fa-thumbs-down"></i></strong> わるいね</li>
-        </ul>
+        <h2><span class="section-num">7</span>リアクション</h2>
+        <div class="reaction-row">
+          <span class="reaction-item like"><i class="fa-solid fa-thumbs-up"></i> いいね</span>
+          <span class="reaction-item dislike"><i class="fa-solid fa-thumbs-down"></i> わるいね</span>
+        </div>
         <p>
           ボタンを押すと画面上のカウントが即時増加し、裏側では同一コメント・同一種別の連打を
           500ms 単位でまとめて送信します（<code>count</code> パラメータ）。
         </p>
-        <div class="note">このリアクション値はランキングや並び替え、コミュニティノート運用に使われます。</div>
+        <div class="note">
+          <i class="fa-solid fa-circle-info"></i>
+          <span>このリアクション値はランキングや並び替え、コミュニティノート運用に使われます。</span>
+        </div>
       </section>
 
       <section id="cursor" class="section">
-        <h2>8. コメント個別ページ（cursor）</h2>
-        <div class="url">/u/{ユーザ名}?cursor={コメントID}</div>
+        <h2><span class="section-num">8</span>コメント個別ページ（cursor）</h2>
+        <div class="url-display"><i class="fa-solid fa-link"></i>/u/{ユーザ名}?cursor={コメントID}</div>
         <ul>
           <li>コメントカード全体をクリックするとこの表示に遷移します</li>
-          <li>対象コメントが黄色でハイライト表示されます</li>
-          <li>同一 VOD のコメントをまとめて表示し、前後文脈を確認できます</li>
-          <li>対象ユーザの発言はグレー背景で区別されます</li>
-          <li>URLを共有して、特定発言を直接参照できます</li>
+          <li>対象コメントが<strong>黄色でハイライト</strong>表示されます</li>
+          <li>同一 VOD のコメントをまとめて表示し、前後の文脈を確認できます</li>
+          <li>対象ユーザの発言は<strong>グレー背景</strong>で区別されます</li>
+          <li>URL を共有することで、特定の発言を直接参照できます</li>
         </ul>
         <div class="warning">
-          <code>cursor</code> 指定時は、通常のフィルター条件より「対象コメントがあるVODの表示」が優先されます。
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span><code>cursor</code> 指定時は、通常のフィルター条件より「対象コメントがある VOD の表示」が優先されます。</span>
         </div>
       </section>
 
       <section id="community-note" class="section">
-        <h2>9. コミュニティノート</h2>
+        <h2><span class="section-num">9</span>コミュニティノート</h2>
         <p>
           条件を満たしたコメントに、注釈テキスト・判定ステータス・スコアが表示されます。
+          AI による自動審査で付与されます。
         </p>
 
         <h3>判定ステータス</h3>
         <div class="card">
           <table>
             <thead>
-              <tr><th>内部値</th><th>表示名</th></tr>
+              <tr><th>内部値</th><th>表示名</th><th>意味</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>supported</code></td><td>裏付けあり</td></tr>
-              <tr><td><code>insufficient</code></td><td>情報不足</td></tr>
-              <tr><td><code>inconsistent</code></td><td>矛盾あり</td></tr>
-              <tr><td><code>not_applicable</code></td><td>該当なし</td></tr>
+              <tr>
+                <td><code>supported</code></td>
+                <td>裏付けあり</td>
+                <td>内容に根拠・裏付けがある</td>
+              </tr>
+              <tr>
+                <td><code>insufficient</code></td>
+                <td>情報不足</td>
+                <td>判断するには情報が不十分</td>
+              </tr>
+              <tr>
+                <td><code>inconsistent</code></td>
+                <td>矛盾あり</td>
+                <td>事実と矛盾する情報が含まれる</td>
+              </tr>
+              <tr>
+                <td><code>not_applicable</code></td>
+                <td>該当なし</td>
+                <td>コミュニティノート対象外</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        <h3>危険度</h3>
+        <h3>危険度スコア</h3>
         <p>危険度は次の4軸平均で算出されます。</p>
-        <p><code>(被害可能性 + 誇張度 + 根拠不足 + 主観度) / 4</code></p>
+        <div class="formula">
+          <code>(被害可能性 + 誇張度 + 根拠不足 + 主観度) ÷ 4</code>
+        </div>
         <div class="badge-row">
-          <span class="badge good">0-29: 低</span>
-          <span class="badge mid">30-59: 中</span>
-          <span class="badge bad">60-100: 高</span>
+          <span class="badge good"><i class="fa-solid fa-circle-check"></i> 0–29: 低</span>
+          <span class="badge mid"><i class="fa-solid fa-circle-exclamation"></i> 30–59: 中</span>
+          <span class="badge bad"><i class="fa-solid fa-circle-xmark"></i> 60–100: 高</span>
         </div>
         <p class="meta">検証可能性を含む5軸スコアバーもコメント単位で表示されます。</p>
       </section>
 
       <section id="stats" class="section">
-        <h2>10. 統計ページ</h2>
-        <div class="url">/u/{ユーザ名}/stats?platform=twitch</div>
+        <h2><span class="section-num">10</span>統計ページ</h2>
+        <div class="url-display"><i class="fa-solid fa-link"></i>/u/{ユーザ名}/stats?platform=twitch</div>
 
         <h3>表示内容</h3>
         <ul>
-          <li>書き込み時間分布（JST 24時間）</li>
-          <li>曜日分布（ドーナツ）</li>
-          <li>配信者ごとのアクティブ状況（上位50）</li>
+          <li>書き込み時間分布（JST 24時間・棒グラフ）</li>
+          <li>曜日分布（ドーナツチャート）</li>
+          <li>配信者ごとのアクティブ状況（上位 50）</li>
           <li>コメント影響度分析（条件を満たす場合のみ）</li>
           <li>コミュニティノート分析（ノートがある場合のみ）</li>
         </ul>
 
         <h3>コミュニティノート分析</h3>
         <ul>
-          <li>危険度ヒストグラム（10刻み）</li>
+          <li>危険度ヒストグラム（10点刻み）</li>
           <li>5軸平均のレーダーチャート</li>
-          <li>判定ステータス分布（裏付けあり/情報不足/矛盾あり/該当なし）</li>
+          <li>判定ステータス分布（裏付けあり / 情報不足 / 矛盾あり / 該当なし）</li>
         </ul>
 
         <h3>配信者ごとのアクティブ状況</h3>
         <p>
-          配信時間を5分区間に分け、対象ユーザが書き込んだ区間を活動、書き込んでいない区間を非活動として比率表示します。
-          テーブル見出しクリックでソートできます。
+          配信時間を5分区間に分け、対象ユーザが書き込んだ区間を活動・書き込んでいない区間を非活動として比率表示します。
+          テーブルの見出し行をクリックするとその列でソートできます。
         </p>
 
         <h3>コメント影響度分析</h3>
         <p>
-          活動区間と非活動区間で、他コメンターのコメント数/人数を比較します。
-          有意性は Mann-Whitney U 検定で表示されます（*** / ** / * / n.s.）。
+          活動区間と非活動区間で、他コメンターのコメント数・人数を比較します。
+          有意性は Mann-Whitney U 検定で表示されます（<code>***</code> / <code>**</code> / <code>*</code> / <code>n.s.</code>）。
         </p>
         <div class="warning">
-          影響度分析は対象ユーザの関与 VOD 数が 500 以下の場合に計算されます。データ不足時は表示されません。
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>影響度分析は対象ユーザの関与 VOD 数が 500 以下の場合に計算されます。データ不足時は表示されません。</span>
         </div>
       </section>
 
       <section id="quiz" class="section">
-        <h2>11. コメント当てクイズ</h2>
-        <div class="url">/u/{ユーザ名}/quiz?platform=twitch</div>
+        <h2><span class="section-num">11</span>コメント当てクイズ</h2>
+        <div class="url-display"><i class="fa-solid fa-link"></i>/u/{ユーザ名}/quiz?platform=twitch</div>
         <ul>
-          <li>30問固定、ライフ3、3ミスで終了</li>
+          <li>30問固定・ライフ3、3ミスで終了</li>
           <li>「対象ユーザの発言」か「他の人の発言」かを二択で回答</li>
           <li>正解で +1 点、不正解時は投稿者名を表示</li>
           <li>終了時にスコア・正答率・最大連続正解を表示</li>
           <li>問題は対象ユーザ発言と他ユーザ発言を半々で構成（同じ配信集合から抽出）</li>
         </ul>
         <div class="note">
-          問題セットは開始時に API で生成されます（対象ユーザ発言と他ユーザ発言を混在）。
+          <i class="fa-solid fa-circle-info"></i>
+          <span>問題セットは開始時に API で生成されます（対象ユーザ発言と他ユーザ発言を混在）。</span>
         </div>
       </section>
 
       <section id="add-user" class="section">
-        <h2>12. 配信者追加</h2>
-        <div class="url">/add_user</div>
-        <ol>
-          <li>Twitchユーザ名またはチャンネルURLを入力</li>
-          <li>追加を実行すると、存在確認後に監視対象CSVへ登録</li>
+        <h2><span class="section-num">12</span>配信者追加</h2>
+        <div class="url-display"><i class="fa-solid fa-link"></i>/add_user</div>
+        <ol class="steps">
+          <li>Twitch ユーザ名またはチャンネル URL を入力</li>
+          <li>追加を実行すると、存在確認後に監視対象 CSV へ登録</li>
           <li>同ページ下部に現在の監視対象一覧を表示</li>
         </ol>
         <div class="warning">
-          追加直後にコメントが増えるわけではありません。定期バッチの取得タイミングで反映されます。
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>追加直後にコメントが増えるわけではありません。定期バッチの取得タイミングで反映されます。</span>
         </div>
       </section>
 
       <section id="url" class="section">
-        <h2>13. URLとクエリ</h2>
-        <h3>コメント一覧の主なクエリ</h3>
+        <h2><span class="section-num">13</span>URL とクエリ</h2>
+        <h3>コメント一覧の主なクエリパラメータ</h3>
         <div class="card">
           <table>
             <thead>
@@ -386,69 +431,105 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><code>platform</code></td><td>プラットフォーム</td><td><code>twitch</code></td></tr>
-              <tr><td><code>vod_id</code></td><td>VOD絞り込み</td><td><code>2690327787</code></td></tr>
-              <tr><td><code>owner_user_id</code></td><td>配信者ID絞り込み</td><td><code>123456789</code></td></tr>
-              <tr><td><code>q</code></td><td>本文検索</td><td><code>おもしろい</code></td></tr>
-              <tr><td><code>exclude_q</code></td><td>除外ワード</td><td><code>ネタバレ, 既読</code></td></tr>
-              <tr><td><code>sort</code></td><td>並び順</td><td><code>created_at</code></td></tr>
-              <tr><td><code>page</code></td><td>ページ番号</td><td><code>1</code></td></tr>
-              <tr><td><code>page_size</code></td><td>件数</td><td><code>50</code></td></tr>
-              <tr><td><code>cursor</code></td><td>個別表示対象コメントID</td><td><code>uuid</code></td></tr>
+              <tr>
+                <td><code>platform</code></td>
+                <td>プラットフォーム</td>
+                <td><code>twitch</code></td>
+              </tr>
+              <tr>
+                <td><code>vod_id</code></td>
+                <td>VOD 絞り込み</td>
+                <td><code>2690327787</code></td>
+              </tr>
+              <tr>
+                <td><code>owner_user_id</code></td>
+                <td>配信者 ID 絞り込み</td>
+                <td><code>123456789</code></td>
+              </tr>
+              <tr>
+                <td><code>q</code></td>
+                <td>本文検索キーワード</td>
+                <td><code>おもしろい</code></td>
+              </tr>
+              <tr>
+                <td><code>exclude_q</code></td>
+                <td>除外ワード（複数指定可）</td>
+                <td><code>ネタバレ, 既読</code></td>
+              </tr>
+              <tr>
+                <td><code>sort</code></td>
+                <td>並び順</td>
+                <td><code>created_at</code></td>
+              </tr>
+              <tr>
+                <td><code>page</code></td>
+                <td>ページ番号（1〜）</td>
+                <td><code>1</code></td>
+              </tr>
+              <tr>
+                <td><code>page_size</code></td>
+                <td>1ページの表示件数</td>
+                <td><code>50</code></td>
+              </tr>
+              <tr>
+                <td><code>cursor</code></td>
+                <td>個別表示対象のコメント ID</td>
+                <td><code>uuid</code></td>
+              </tr>
             </tbody>
           </table>
         </div>
       </section>
 
       <section id="api" class="section">
-        <h2>14. APIリファレンス</h2>
+        <h2><span class="section-num">14</span>API リファレンス</h2>
         <div class="card">
           <table>
             <thead>
               <tr>
-                <th>メソッド</th>
+                <th class="col-method">メソッド</th>
                 <th>パス</th>
                 <th>用途</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/u/{login}</code></td>
                 <td>コメント一覧取得（<code>vod_id</code> / <code>owner_user_id</code> / <code>q</code> / <code>exclude_q</code> / <code>sort</code> / <code>cursor</code> など対応）</td>
               </tr>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/u/{login}/similar</code></td>
                 <td>類似検索（<code>q</code>, <code>top_k</code>）</td>
               </tr>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/u/{login}/centroid</code></td>
                 <td>典型度検索（<code>position=0.0-1.0</code>, <code>top_k</code>）</td>
               </tr>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/u/{login}/emotion</code></td>
-                <td>感情検索（<code>joy/surprise/admiration/anger/sadness/cheer</code>）</td>
+                <td>感情検索（<code>joy</code> / <code>surprise</code> / <code>admiration</code> / <code>anger</code> / <code>sadness</code> / <code>cheer</code>）</td>
               </tr>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/emotion_axes</code></td>
                 <td>感情軸定義の取得</td>
               </tr>
               <tr>
-                <td>POST</td>
+                <td><span class="method-badge post">POST</span></td>
                 <td><code>/like/{comment_id}?count=1</code></td>
                 <td>いいね加算（1〜100）</td>
               </tr>
               <tr>
-                <td>POST</td>
+                <td><span class="method-badge post">POST</span></td>
                 <td><code>/dislike/{comment_id}?count=1</code></td>
                 <td>わるいね加算（1〜100）</td>
               </tr>
               <tr>
-                <td>GET</td>
+                <td><span class="method-badge get">GET</span></td>
                 <td><code>/api/u/{login}/quiz/start</code></td>
                 <td>クイズ問題生成（<code>count=10-100</code>）</td>
               </tr>
@@ -456,13 +537,17 @@
           </table>
         </div>
         <div class="note">
-          ブラウザ外から <code>POST /like</code> / <code>POST /dislike</code> を呼ぶ場合は、
-          <code>X-Requested-With: XMLHttpRequest</code> ヘッダーを付けてください。
+          <i class="fa-solid fa-circle-info"></i>
+          <span>ブラウザ外から <code>POST /like</code> / <code>POST /dislike</code> を呼ぶ場合は、
+          <code>X-Requested-With: XMLHttpRequest</code> ヘッダーを付けてください。</span>
         </div>
       </section>
 
-      <div class="footer">
-        <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> トップに戻る</a>
-      </div>
-    </main>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <a href="{{ request.url_for('index') }}"><i class="fa-solid fa-arrow-left"></i> トップに戻る</a>
+  </footer>
+</main>
 {% endblock %}
