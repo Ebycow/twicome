@@ -32,13 +32,13 @@
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           {% if user %}
-            <button type="button" id="best9-toggle-btn" class="nav-link"><i class="fa-solid fa-trophy"></i> Best9モード</button>
+            <button type="button" id="best9-toggle-btn" class="nav-link"><i class="fa-solid fa-trophy" style="margin-right:4px;"></i>Best9モード</button>
           {% endif %}
-          <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-chart-bar"></i> 統計</a>
-          <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-diagram-project"></i> クラスタ探索</a>
-          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-gamepad"></i> クイズで遊ぶ</a>
-          <a href="{{ root_path }}/manual" class="nav-link"><i class="fa-solid fa-book"></i> 使い方ガイド</a>
-          <a href="{{ root_path }}/" class="nav-link"><i class="fa-solid fa-arrow-left"></i> 検索に戻る</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-chart-bar" style="margin-right:4px;"></i>統計</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-diagram-project" style="margin-right:4px;"></i>クラスタ探索</a>
+          <a href="{{ root_path }}/u/{{ user.login }}/quiz?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-gamepad" style="margin-right:4px;"></i>クイズで遊ぶ</a>
+          <a href="{{ root_path }}/manual" class="nav-link"><i class="fa-solid fa-book" style="margin-right:4px;"></i>使い方ガイド</a>
+          <a href="{{ root_path }}/" class="nav-link"><i class="fa-solid fa-arrow-left" style="margin-right:4px;"></i>検索に戻る</a>
         </div>
       </div>
     <div style="margin:2rem 2rem 0;">
@@ -103,7 +103,7 @@
               <input type="date" name="date_to" value="{{ filters.date_to or '' }}" style="flex:1; min-width:0;" />
             </div>
           </div>
-          <div>
+          <div class="wide">
             <label for="select-sort">並び</label>
             <select id="select-sort" name="sort">
               <option value="created_at" {% if not filters.sort or filters.sort == 'created_at' %}selected{% endif %}>コメント時刻</option>

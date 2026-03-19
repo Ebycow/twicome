@@ -7,7 +7,7 @@
 
       .filters {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
         align-items: end;
       }
@@ -81,6 +81,7 @@
       .card details > :not(summary) { margin-top:10px; }
 
       @media (max-width: 980px) {
+        .filters { grid-template-columns: repeat(2, 1fr); }
         .filters > .wide { grid-column: span 1; }
       }
 
