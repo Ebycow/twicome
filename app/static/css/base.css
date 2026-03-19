@@ -133,6 +133,7 @@ button:active { transform: translateY(0); box-shadow: none; }
 .vote-btn:hover { background: var(--vote-btn-hover); }
 .vote-btn:nth-child(1) { color: #5a9e6f; }
 .vote-btn:nth-child(2) { color: #c9605a; }
+.vote-btn i, .vote-btn svg { pointer-events: none; }
 .vote-controls { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; }
 
 /* ─── Confetti Animation ─── */
