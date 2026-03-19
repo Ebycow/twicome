@@ -131,92 +131,101 @@
 
       {% if faiss_enabled %}
       <div class="card" style="margin-top:12px;">
-        <div class="section-title">類似検索（意味的に近いコメントを検索）</div>
-        <div class="filters">
-          <div class="wide">
-            <label>検索テキスト</label>
-            <input id="similar-q" placeholder="例: おもしろい、ありがとう、草" />
+        <details id="smart-search-details">
+          <summary>スマート検索</summary>
+
+          <div style="margin-top:14px;">
+            <div class="section-title">類似検索（意味的に近いコメントを検索）</div>
+            <div class="filters">
+              <div class="wide">
+                <label>検索テキスト</label>
+                <input id="similar-q" placeholder="例: おもしろい、ありがとう、草" />
+              </div>
+              <div>
+                <label for="similar-top-k">件数</label>
+                <select id="similar-top-k">
+                  <option value="20">20</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="action">
+                <button type="button" id="similar-search-btn">類似検索</button>
+              </div>
+              <div class="action" id="similar-clear" style="display:none;">
+                <button type="button" id="similar-clear-btn">通常表示に戻す</button>
+              </div>
+            </div>
+            <div class="slider-row" style="margin-top:10px;">
+              <label style="white-space:nowrap;">多様優先</label>
+              <input type="range" id="diversity-slider" min="0" max="100" value="100" step="10" />
+              <label style="white-space:nowrap;">類似優先</label>
+              <span class="slider-val" id="diversity-val">OFF</span>
+            </div>
+            <div id="similar-status" class="meta" style="margin-top:8px;"></div>
           </div>
+
+          <div style="margin:14px 0; height:1px; background:var(--card-border);"></div>
           <div>
-            <label for="similar-top-k">件数</label>
-            <select id="similar-top-k">
-              <option value="20">20</option>
-              <option value="50" selected>50</option>
-              <option value="100">100</option>
-            </select>
+            <details id="centroid-details">
+              <summary>典型度スライダー（重心からの距離で検索）</summary>
+              <div class="slider-row">
+                <label>典型的</label>
+                <input type="range" id="centroid-slider" min="0" max="100" value="0" step="1" />
+                <label>珍しい</label>
+                <span class="slider-val" id="centroid-val">0%</span>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                <label for="centroid-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
+                <select id="centroid-top-k">
+                  <option value="20">20</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+                <button type="button" id="centroid-search-btn">検索</button>
+                <div id="centroid-clear" style="display:none;">
+                  <button type="button" id="centroid-clear-btn">通常表示に戻す</button>
+                </div>
+              </div>
+              <div id="centroid-status" class="meta" style="margin-top:8px;"></div>
+            </details>
           </div>
-          <div class="action">
-            <button type="button" id="similar-search-btn">類似検索</button>
-          </div>
-          <div class="action" id="similar-clear" style="display:none;">
-            <button type="button" id="similar-clear-btn">通常表示に戻す</button>
-          </div>
-        </div>
-        <div class="slider-row" style="margin-top:10px;">
-          <label style="white-space:nowrap;">多様優先</label>
-          <input type="range" id="diversity-slider" min="0" max="100" value="100" step="10" />
-          <label style="white-space:nowrap;">類似優先</label>
-          <span class="slider-val" id="diversity-val">OFF</span>
-        </div>
-        <div id="similar-status" class="meta" style="margin-top:8px;"></div>
-      </div>
 
-      <div class="card" style="margin-top:12px;">
-        <details id="centroid-details">
-          <summary>典型度スライダー（重心からの距離で検索）</summary>
-          <div class="slider-row">
-            <label>典型的</label>
-            <input type="range" id="centroid-slider" min="0" max="100" value="0" step="1" />
-            <label>珍しい</label>
-            <span class="slider-val" id="centroid-val">0%</span>
+          <div style="margin:14px 0; height:1px; background:var(--card-border);"></div>
+          <div>
+            <details id="emotion-details">
+              <summary>感情スライダー（感情を合成して検索）</summary>
+              <div id="emotion-sliders">
+                <div class="slider-row"><label>笑い・楽しさ</label><input type="range" data-emotion="joy" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+                <div class="slider-row"><label>驚き</label><input type="range" data-emotion="surprise" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+                <div class="slider-row"><label>称賛・感動</label><input type="range" data-emotion="admiration" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+                <div class="slider-row"><label>怒り・不満</label><input type="range" data-emotion="anger" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+                <div class="slider-row"><label>悲しみ</label><input type="range" data-emotion="sadness" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+                <div class="slider-row"><label>応援</label><input type="range" data-emotion="cheer" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
+              </div>
+              <div class="slider-row" style="margin-top:10px;">
+                <label style="white-space:nowrap;">多様優先</label>
+                <input type="range" id="emotion-diversity-slider" min="0" max="100" value="100" step="10" />
+                <label style="white-space:nowrap;">類似優先</label>
+                <span class="slider-val" id="emotion-diversity-val">OFF</span>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                <label for="emotion-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
+                <select id="emotion-top-k">
+                  <option value="20">20</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+                <button type="button" id="emotion-search-btn">感情検索</button>
+                <button type="button" id="emotion-reset-btn" style="opacity:0.7;">スライダーリセット</button>
+                <div id="emotion-clear" style="display:none;">
+                  <button type="button" id="emotion-clear-btn">通常表示に戻す</button>
+                </div>
+              </div>
+              <div id="emotion-status" class="meta" style="margin-top:8px;"></div>
+            </details>
           </div>
-          <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
-            <label for="centroid-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
-            <select id="centroid-top-k">
-              <option value="20">20</option>
-              <option value="50" selected>50</option>
-              <option value="100">100</option>
-            </select>
-            <button type="button" id="centroid-search-btn">検索</button>
-            <div id="centroid-clear" style="display:none;">
-              <button type="button" id="centroid-clear-btn">通常表示に戻す</button>
-            </div>
-          </div>
-          <div id="centroid-status" class="meta" style="margin-top:8px;"></div>
-        </details>
-      </div>
 
-      <div class="card" style="margin-top:12px;">
-        <details id="emotion-details">
-          <summary>感情スライダー（感情を合成して検索）</summary>
-          <div id="emotion-sliders">
-            <div class="slider-row"><label>笑い・楽しさ</label><input type="range" data-emotion="joy" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-            <div class="slider-row"><label>驚き</label><input type="range" data-emotion="surprise" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-            <div class="slider-row"><label>称賛・感動</label><input type="range" data-emotion="admiration" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-            <div class="slider-row"><label>怒り・不満</label><input type="range" data-emotion="anger" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-            <div class="slider-row"><label>悲しみ</label><input type="range" data-emotion="sadness" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-            <div class="slider-row"><label>応援</label><input type="range" data-emotion="cheer" min="0" max="100" value="0" step="1" /><span class="slider-val">0</span></div>
-          </div>
-          <div class="slider-row" style="margin-top:10px;">
-            <label style="white-space:nowrap;">多様優先</label>
-            <input type="range" id="emotion-diversity-slider" min="0" max="100" value="100" step="10" />
-            <label style="white-space:nowrap;">類似優先</label>
-            <span class="slider-val" id="emotion-diversity-val">OFF</span>
-          </div>
-          <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
-            <label for="emotion-top-k" style="white-space:nowrap; font-size:0.9rem; color:var(--label-color); margin:0;">件数</label>
-            <select id="emotion-top-k">
-              <option value="20">20</option>
-              <option value="50" selected>50</option>
-              <option value="100">100</option>
-            </select>
-            <button type="button" id="emotion-search-btn">感情検索</button>
-            <button type="button" id="emotion-reset-btn" style="opacity:0.7;">スライダーリセット</button>
-            <div id="emotion-clear" style="display:none;">
-              <button type="button" id="emotion-clear-btn">通常表示に戻す</button>
-            </div>
-          </div>
-          <div id="emotion-status" class="meta" style="margin-top:8px;"></div>
         </details>
       </div>
       {% endif %}
