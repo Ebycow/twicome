@@ -33,6 +33,7 @@
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           {% if user %}
             <button type="button" id="best9-toggle-btn" class="nav-link"><i class="fa-solid fa-trophy" style="margin-right:4px;"></i>Best9モード</button>
+          <button type="button" id="zen-mode-btn" class="nav-link"><i class="fa-solid fa-moon" style="margin-right:4px;"></i>Zenモード</button>
           {% endif %}
           <a href="{{ root_path }}/u/{{ user.login }}/stats?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-chart-bar" style="margin-right:4px;"></i>統計</a>
           <a href="{{ root_path }}/u/{{ user.login }}/clusters?platform={{ filters.platform }}" class="nav-link"><i class="fa-solid fa-diagram-project" style="margin-right:4px;"></i>クラスタ探索</a>
@@ -428,6 +429,21 @@
     <script type="application/json" id="faiss-enabled-data">{{ faiss_enabled | tojson }}</script>
     <script src="{{ root_path }}/static/offline-access.js?v={{ static_version }}"></script>
     <script src="{{ root_path }}/static/js/user-comments.js?v={{ static_version }}"></script>
+
+    {% if user %}
+    <!-- Zen モード オーバーレイ -->
+    <div id="zen-overlay" hidden>
+      <canvas id="zen-canvas"></canvas>
+      <div id="zen-comment-wrap">
+        <div id="zen-comment"></div>
+      </div>
+      <div id="zen-ui">
+        <button id="zen-fs-btn" title="フルスクリーン"><i class="fa-solid fa-expand"></i></button>
+        <button id="zen-close-btn" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <script src="{{ root_path }}/static/js/zen-mode.js?v={{ static_version }}"></script>
+    {% endif %}
 {% endblock %}
 
 {% block sw_script %}{% endblock %}
