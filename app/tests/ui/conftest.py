@@ -4,7 +4,7 @@ Playwright UI テスト用フィクスチャ
 【UIテストの仕組み】
   - 実際の uvicorn サーバーをバックグラウンドスレッドで起動する
   - Playwright がそのサーバーにブラウザ経由でアクセスする
-  - DB は統合テストと同じ appdb_test を使い、テストごとに TRUNCATE する
+  - DB は統合テストと同じ appdb_test を使い、テストごとにテーブルをクリアする
 
 【pytest-playwright の主なフィクスチャ】
   - playwright : Playwright インスタンス
@@ -46,9 +46,18 @@ os.environ.setdefault("HOST_CHECK_ENABLED", "false")
 os.environ.setdefault("ROOT_PATH", "")
 os.environ.setdefault("DEFAULT_PLATFORM", "twitch")
 
-# ── テーブル truncate 順（外部キー制約を考慮した逆順）────────────────────────
+# ── テーブル削除順（外部キー制約を考慮した逆順）─────────────────────────────
 
-_TRUNCATE_TABLES = ["community_notes", "comments", "vods", "users"]
+_TRUNCATE_TABLES = ["community_notes", "vod_ingest_markers", "comments", "vods", "users"]
+
+
+def _clear_all_tables(conn) -> None:
+    """テスト用テーブルを DDL を使わずにクリアする。"""
+    conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+    for table in _TRUNCATE_TABLES:
+        conn.execute(text(f"DELETE FROM `{table}`"))
+    conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+    conn.commit()
 
 
 # ── ヘルパー ─────────────────────────────────────────────────────────────────
@@ -153,7 +162,7 @@ def base_url(live_server: str) -> str:
 @pytest.fixture()
 def db(db_engine):
     """
-    テストごとに DB セッションを提供し、終了後に全テーブルを TRUNCATE する。
+    テストごとに DB セッションを提供し、終了後に全テーブルをクリアする。
 
     これにより各テストが独立したデータ状態で実行される。
     """
@@ -162,8 +171,4 @@ def db(db_engine):
     yield session
     session.close()
     with db_engine.connect() as conn:
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-        for table in _TRUNCATE_TABLES:
-            conn.execute(text(f"TRUNCATE TABLE `{table}`"))
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-        conn.commit()
+        _clear_all_tables(conn)

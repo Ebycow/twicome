@@ -3,7 +3,7 @@
 
 テスト用データベース: appdb_test（本番/開発 DBとは別）
 - セッション開始時に Alembic マイグレーションを適用
-- 各統合テスト後に全テーブルを TRUNCATE してクリーンアップ
+- 各統合テスト後に全テーブルを DELETE してクリーンアップ
 
 環境変数:
   TEST_DATABASE_URL: テスト用DB URL（デフォルト: appuser/apppass@127.0.0.1:3306/appdb_test）
@@ -27,7 +27,7 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", _DEFAULT_TEST_DB)
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
-# ── テーブル truncate 順（外部キー制約を考慮した逆順）───────────────────────
+# ── テーブル削除順（外部キー制約を考慮した逆順）─────────────────────────────
 _TRUNCATE_TABLES = [
     "community_notes",
     "vod_ingest_markers",
@@ -35,6 +35,15 @@ _TRUNCATE_TABLES = [
     "vods",
     "users",
 ]
+
+
+def _clear_all_tables(conn) -> None:
+    """テスト用テーブルを DDL を使わずにクリアする。"""
+    conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+    for table in _TRUNCATE_TABLES:
+        conn.execute(text(f"DELETE FROM `{table}`"))
+    conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+    conn.commit()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -61,17 +70,13 @@ def db_engine():
 
 @pytest.fixture()
 def db(db_engine):
-    """テストごとにセッションを提供し、終了後に全テーブルを TRUNCATE する。"""
+    """テストごとにセッションを提供し、終了後に全テーブルをクリアする。"""
     Session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
     session = Session()
     yield session
     session.close()
     with db_engine.connect() as conn:
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-        for table in _TRUNCATE_TABLES:
-            conn.execute(text(f"TRUNCATE TABLE `{table}`"))
-        conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-        conn.commit()
+        _clear_all_tables(conn)
 
 
 @pytest.fixture()

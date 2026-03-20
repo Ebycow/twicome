@@ -15,7 +15,13 @@ def seed_user(
         text("""
             INSERT INTO users (user_id, login, display_name, profile_image_url, platform, created_at, updated_at)
             VALUES (:user_id, :login, :display_name, :profile_image_url, :platform, NOW(6), NOW(6))
-            ON DUPLICATE KEY UPDATE login=VALUES(login)
+            ON DUPLICATE KEY UPDATE
+                user_id=VALUES(user_id),
+                login=VALUES(login),
+                display_name=VALUES(display_name),
+                profile_image_url=VALUES(profile_image_url),
+                platform=VALUES(platform),
+                updated_at=VALUES(updated_at)
         """),
         {
             "user_id": user_id,
@@ -45,7 +51,12 @@ def seed_vod(
         text("""
             INSERT INTO vods (vod_id, owner_user_id, title, url, youtube_url, length_seconds, created_at_utc)
             VALUES (:vod_id, :owner_user_id, :title, :url, :youtube_url, :length_seconds, NOW(6))
-            ON DUPLICATE KEY UPDATE title=VALUES(title)
+            ON DUPLICATE KEY UPDATE
+                owner_user_id=VALUES(owner_user_id),
+                title=VALUES(title),
+                url=VALUES(url),
+                youtube_url=VALUES(youtube_url),
+                length_seconds=VALUES(length_seconds)
         """),
         {
             "vod_id": vod_id,
@@ -89,7 +100,15 @@ def seed_comment(
                 :body, :offset_seconds, :created_at,
                 :likes, :dislikes
             )
-            ON DUPLICATE KEY UPDATE body=VALUES(body)
+            ON DUPLICATE KEY UPDATE
+                vod_id=VALUES(vod_id),
+                commenter_user_id=VALUES(commenter_user_id),
+                commenter_login_snapshot=VALUES(commenter_login_snapshot),
+                body=VALUES(body),
+                offset_seconds=VALUES(offset_seconds),
+                comment_created_at_utc=VALUES(comment_created_at_utc),
+                twicome_likes_count=VALUES(twicome_likes_count),
+                twicome_dislikes_count=VALUES(twicome_dislikes_count)
         """),
         {
             "comment_id": comment_id,
