@@ -309,6 +309,106 @@ void main() {
 }
 `;
 
+  const DAWN_LAKE_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1.,0.)),f.x),mix(h2(i+vec2(0.,1.)),h2(i+vec2(1.,1.)),f.x),f.y);}
+float fbm(vec2 p){
+  float v = 0.0;
+  v += vn(p) * .5;
+  p = p * 2.03 + vec2(3.1, 1.7);
+  v += vn(p) * .25;
+  p = p * 2.01 + vec2(2.4, 8.3);
+  v += vn(p) * .125;
+  return v;
+}
+
+vec3 dawnSky(vec2 uv, float horizon, float ar, float t) {
+  vec3 zenith = vec3(.015,.055,.120);
+  vec3 midSky = vec3(.16,.29,.42);
+  vec3 horizonGlow = vec3(.94,.63,.43);
+  vec3 col = mix(midSky, zenith, smoothstep(horizon + .05, 1.0, uv.y));
+  col = mix(col, horizonGlow, exp(-abs(uv.y - horizon) * 16.0) * .72);
+
+  vec2 sunPos = vec2(.54, horizon + .09 + sin(t * .12) * .004);
+  vec2 sunVec = (uv - sunPos) * vec2(ar * 1.12, 1.35);
+  float sun = exp(-dot(sunVec, sunVec) * 16.0);
+  float halo = exp(-length(sunVec) * 4.5);
+  col += vec3(1.,.80,.58) * sun * .65;
+  col += vec3(.95,.72,.54) * halo * .14;
+
+  float cloud = fbm(vec2(uv.x * 2.6 - t * .012, uv.y * 4.0 + 1.3));
+  float veil = smoothstep(.46, .86, cloud);
+  veil *= smoothstep(horizon + .02, 1.0, uv.y) * (1.0 - smoothstep(horizon + .34, 1.0, uv.y));
+  col = mix(col, col + vec3(.09,.08,.07), veil * .18);
+  return col;
+}
+
+float mountainRidge(float x) {
+  float ridge = .49;
+  ridge += (vn(vec2(x * 2.3, 1.4)) - .5) * .12;
+  ridge += (vn(vec2(x * 5.8, 8.2)) - .5) * .04;
+  ridge += sin(x * 2.4 + .8) * .015;
+  return ridge;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float ar = u_res.x / u_res.y;
+  float t = u_time;
+  float horizon = .48;
+  vec3 col = dawnSky(uv, horizon, ar, t);
+
+  float ridge = mountainRidge(uv.x);
+  float mountain = 1.0 - smoothstep(ridge - .006, ridge + .004, uv.y);
+  vec3 mountainCol = mix(vec3(.06,.10,.12), vec3(.13,.16,.18), smoothstep(.0, 1.0, uv.x));
+  mountainCol += vec3(.25,.18,.10) * exp(-abs(uv.x - .56) * 12.0) * .12;
+  col = mix(col, mountainCol, mountain * .92);
+
+  if (uv.y < horizon) {
+    float depth = horizon - uv.y;
+    float ripA = sin(uv.x * 25.0 - t * .55 + depth * 90.0) * .0035;
+    float ripB = sin(uv.x * 12.0 + t * .35 + depth * 58.0) * .0060;
+    float drift = (fbm(vec2(uv.x * 3.8, depth * 7.5 - t * .025)) - .5) * .010;
+    vec2 reflUv = vec2(uv.x + ripA + drift, horizon + depth * .92 + ripB);
+    vec3 refl = dawnSky(clamp(reflUv, vec2(0.0), vec2(1.0)), horizon, ar, t);
+    float reflectFade = exp(-depth * 4.8);
+    col = mix(vec3(.014,.044,.060), refl, reflectFade * .95);
+    float path = exp(-abs(uv.x - .54 + ripA * 12.0) * 10.0);
+    col += vec3(1.0,.74,.48) * path * reflectFade * .18;
+    float crest = smoothstep(.84, 1.0, sin(depth * 145.0 + uv.x * 22.0 - t * .6) * .5 + .5);
+    col += vec3(.36,.42,.48) * crest * .025 * reflectFade;
+  }
+
+  float mistBand = exp(-abs(uv.y - (horizon - .01)) * 24.0);
+  float mistNoise = fbm(vec2(uv.x * 2.0 - t * .010, uv.y * 12.0 + 4.0));
+  col += vec3(.74,.66,.56) * mistBand * smoothstep(.34, .86, mistNoise) * .12;
+
+  vec2 s = uv * vec2(30., 14.);
+  vec2 si = floor(s);
+  vec2 sf = fract(s) - .5;
+  float h = h2(si + vec2(12.4, 7.8));
+  if (h > .94) {
+    vec2 drift = vec2(
+      sin(t * (.10 + h * .16) + h * 18.0),
+      cos(t * (.09 + h * .12) + h * 10.0)
+    ) * .18;
+    float mote = 1.0 - smoothstep(.06, .26, length(sf - drift));
+    float fade = smoothstep(horizon - .06, 1.0, uv.y) * (1.0 - smoothstep(.78, 1.0, uv.y));
+    vec3 moteCol = mix(vec3(.78,.88,1.0), vec3(1.0,.84,.60), h2(si + 3.2));
+    col += moteCol * mote * fade * .18;
+  }
+
+  vec2 vp = uv - .5;
+  col *= clamp(1.0 - dot(vp * vec2(1.36, 1.12), vp * vec2(1.36, 1.12)) * .54, 0.0, 1.0);
+  col = col / (col + .12);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
   const SCENES = [
     {
       id: 'night-sky',
@@ -321,6 +421,12 @@ void main() {
       label: '雨の窓辺',
       emoji: '🌧️',
       fragmentSource: RAIN_WINDOW_FRAG
+    },
+    {
+      id: 'dawn-lake',
+      label: '朝凪',
+      emoji: '🌅',
+      fragmentSource: DAWN_LAKE_FRAG
     }
   ];
 
@@ -331,6 +437,7 @@ void main() {
   const overlay = document.getElementById('zen-overlay');
   const canvas = document.getElementById('zen-canvas');
   const commentEl = document.getElementById('zen-comment');
+  const commentWrap = document.getElementById('zen-comment-wrap');
   const closeBtn = document.getElementById('zen-close-btn');
   const fsBtn = document.getElementById('zen-fs-btn');
   const triggerBtn = document.getElementById('zen-mode-btn');
@@ -433,16 +540,38 @@ void main() {
 
     commentEl.style.transition = 'none';
     commentEl.style.opacity = '0';
+    commentEl.style.transform = 'translate3d(0, 24px, 0) scale(0.985)';
+    commentEl.style.filter = 'blur(14px)';
     commentEl.textContent = text;
+    pulseCommentAura();
     void commentEl.offsetHeight;
-    commentEl.style.transition = 'opacity 1.5s ease';
+    commentEl.style.transition =
+      'opacity 1.8s ease, transform 2.3s cubic-bezier(0.22, 1, 0.36, 1), filter 2.1s ease';
     commentEl.style.opacity = '1';
+    commentEl.style.transform = 'translate3d(0, 0, 0) scale(1)';
+    commentEl.style.filter = 'blur(0)';
 
     slideTimer = setTimeout(function () {
-      commentEl.style.transition = 'opacity 1.2s ease';
+      commentEl.style.transition = 'opacity 1.4s ease, transform 1.8s ease, filter 1.8s ease';
       commentEl.style.opacity = '0';
-      slideTimer = setTimeout(showNextComment, 1300);
-    }, 5000);
+      commentEl.style.transform = 'translate3d(0, -18px, 0) scale(1.015)';
+      commentEl.style.filter = 'blur(10px)';
+      slideTimer = setTimeout(showNextComment, 1500);
+    }, 5200);
+  }
+
+  /**
+   * コメント表示に合わせて背景の波紋をやり直す。
+   * @returns {void}
+   */
+  function pulseCommentAura() {
+    if (!commentWrap) {
+      return;
+    }
+
+    commentWrap.classList.remove('is-pulsing');
+    void commentWrap.offsetWidth;
+    commentWrap.classList.add('is-pulsing');
   }
 
   /**
@@ -728,6 +857,9 @@ void main() {
     overlay.hidden = false;
     overlay.dataset.zenScene = currentSceneId;
     document.body.style.overflow = 'hidden';
+    if (commentWrap) {
+      commentWrap.classList.remove('is-pulsing');
+    }
 
     if (initGL()) {
       resizeCanvas();
@@ -768,6 +900,11 @@ void main() {
     overlay.hidden = true;
     document.body.style.overflow = '';
     commentEl.style.opacity = '0';
+    commentEl.style.transform = 'translate3d(0, 18px, 0) scale(0.985)';
+    commentEl.style.filter = 'blur(12px)';
+    if (commentWrap) {
+      commentWrap.classList.remove('is-pulsing');
+    }
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(function () {});
     }
@@ -821,6 +958,13 @@ void main() {
   }
   if (fsBtn) {
     fsBtn.addEventListener('click', toggleFullscreen);
+  }
+  if (commentWrap) {
+    commentWrap.addEventListener('animationend', function (event) {
+      if (event.animationName === 'zen-comment-ripple') {
+        commentWrap.classList.remove('is-pulsing');
+      }
+    });
   }
 
   document.addEventListener('keydown', function (event) {

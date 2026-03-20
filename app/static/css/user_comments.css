@@ -183,6 +183,10 @@
         --zen-switch-active-bg: rgba(243, 223, 176, 0.16);
         --zen-switch-active-border: rgba(245, 229, 194, 0.24);
         --zen-switch-active-text: rgba(255, 247, 230, 0.95);
+        --zen-aura-core: rgba(244, 222, 167, 0.2);
+        --zen-aura-mid: rgba(120, 155, 255, 0.09);
+        --zen-ripple-ring: rgba(255, 239, 202, 0.28);
+        --zen-ripple-glow: rgba(248, 223, 164, 0.2);
       }
 
       #zen-overlay[data-zen-scene="night-sky"] {
@@ -204,6 +208,31 @@
         --zen-switch-active-bg: rgba(149, 190, 214, 0.2);
         --zen-switch-active-border: rgba(189, 222, 241, 0.26);
         --zen-switch-active-text: rgba(244, 250, 255, 0.96);
+        --zen-aura-core: rgba(162, 204, 230, 0.2);
+        --zen-aura-mid: rgba(96, 157, 190, 0.1);
+        --zen-ripple-ring: rgba(214, 238, 252, 0.22);
+        --zen-ripple-glow: rgba(131, 178, 207, 0.22);
+      }
+
+      #zen-overlay[data-zen-scene="dawn-lake"] {
+        background: #07131b;
+
+        --zen-comment-color: rgba(255, 244, 225, 0.97);
+        --zen-comment-shadow:
+          0 0 26px rgba(250, 200, 146, 0.28),
+          0 0 64px rgba(248, 168, 103, 0.14),
+          0 2px 14px rgba(0, 0, 0, 0.88);
+        --zen-comment-spacing: 0.12em;
+        --zen-switch-bg: rgba(8, 16, 24, 0.42);
+        --zen-switch-border: rgba(255, 226, 189, 0.14);
+        --zen-switch-text: rgba(255, 237, 214, 0.76);
+        --zen-switch-active-bg: rgba(255, 192, 132, 0.16);
+        --zen-switch-active-border: rgba(255, 221, 180, 0.28);
+        --zen-switch-active-text: rgba(255, 246, 234, 0.98);
+        --zen-aura-core: rgba(255, 202, 146, 0.22);
+        --zen-aura-mid: rgba(126, 181, 211, 0.1);
+        --zen-ripple-ring: rgba(255, 226, 190, 0.3);
+        --zen-ripple-glow: rgba(255, 191, 122, 0.2);
       }
 
       #zen-canvas {
@@ -222,6 +251,44 @@
         justify-content: center;
         pointer-events: none;
         padding: 40px;
+        isolation: isolate;
+      }
+
+      #zen-comment-wrap::before,
+      #zen-comment-wrap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+
+      #zen-comment-wrap::before {
+        width: min(68vw, 960px);
+        height: min(68vw, 960px);
+        background:
+          radial-gradient(circle, var(--zen-aura-core) 0%, var(--zen-aura-mid) 30%, rgba(0, 0, 0, 0) 72%);
+        filter: blur(26px);
+        mix-blend-mode: screen;
+        opacity: 0.62;
+        transform: translate(-50%, -50%) scale(0.94);
+        animation: zen-aura-breathe 18s ease-in-out infinite;
+      }
+
+      #zen-comment-wrap::after {
+        width: min(62vw, 820px);
+        height: min(62vw, 820px);
+        border: 1px solid var(--zen-ripple-ring);
+        box-shadow:
+          0 0 50px var(--zen-ripple-glow),
+          inset 0 0 26px rgba(255, 255, 255, 0.04);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.76);
+      }
+
+      #zen-comment-wrap.is-pulsing::after {
+        animation: zen-comment-ripple 3.2s cubic-bezier(0.19, 1, 0.22, 1);
       }
 
       #zen-theme-switcher {
@@ -281,6 +348,8 @@
       }
 
       #zen-comment {
+        position: relative;
+        z-index: 1;
         font-family: "Noto Serif JP", "Yu Mincho", "Hiragino Mincho Pro", "MS Mincho", serif;
         font-weight: 300;
         font-size: clamp(1.3rem, 3.2vw, 2.6rem);
@@ -297,6 +366,9 @@
         text-shadow: var(--zen-comment-shadow);
         opacity: 0;
         letter-spacing: var(--zen-comment-spacing);
+        transform: translate3d(0, 18px, 0) scale(0.985);
+        filter: blur(12px);
+        will-change: opacity, transform, filter;
       }
 
       #zen-ui {
@@ -330,6 +402,34 @@
         color: rgba(255, 255, 255, 1);
       }
 
+      @keyframes zen-aura-breathe {
+        0%, 100% {
+          opacity: 0.48;
+          transform: translate(-50%, -50%) scale(0.92);
+        }
+
+        50% {
+          opacity: 0.78;
+          transform: translate(-50%, -50%) scale(1.06);
+        }
+      }
+
+      @keyframes zen-comment-ripple {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.76);
+        }
+
+        18% {
+          opacity: 0.34;
+        }
+
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1.18);
+        }
+      }
+
       @media (max-width: 720px) {
         #zen-theme-switcher {
           top: 14px;
@@ -351,6 +451,16 @@
 
         #zen-comment-wrap {
           padding: 92px 22px 30px;
+        }
+
+        #zen-comment-wrap::before {
+          width: min(112vw, 720px);
+          height: min(112vw, 720px);
+        }
+
+        #zen-comment-wrap::after {
+          width: min(94vw, 560px);
+          height: min(94vw, 560px);
         }
 
         #zen-comment {
