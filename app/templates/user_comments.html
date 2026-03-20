@@ -434,12 +434,13 @@
     <!-- Zen モード オーバーレイ -->
     <div id="zen-overlay" hidden>
       <canvas id="zen-canvas"></canvas>
+      <div id="zen-theme-switcher" aria-label="Zenテーマ切り替え"></div>
       <div id="zen-comment-wrap">
         <div id="zen-comment"></div>
       </div>
       <div id="zen-ui">
-        <button id="zen-fs-btn" title="フルスクリーン"><i class="fa-solid fa-expand"></i></button>
-        <button id="zen-close-btn" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" id="zen-fs-btn" title="フルスクリーン" aria-label="フルスクリーン"><i class="fa-solid fa-expand"></i></button>
+        <button type="button" id="zen-close-btn" title="閉じる" aria-label="Zenモードを閉じる"><i class="fa-solid fa-xmark"></i></button>
       </div>
     </div>
     <script src="{{ root_path }}/static/js/zen-mode.js?v={{ static_version }}"></script>

@@ -1,300 +1,397 @@
-/* zen-mode.js – Zenモード: 最適化GLSLナイトシーン + コメントスライドショー */
+/* zen-mode.js – Zenモード: 拡張可能な複数GLSLシーン + コメントスライドショー */
 (function () {
   'use strict';
 
-  /* ─────────────────────────────────────────
-     GLSL シェーダー
-  ───────────────────────────────────────── */
-  const VERT = [
-    'attribute vec2 a_pos;',
-    'void main(){gl_Position=vec4(a_pos,0.0,1.0);}'
-  ].join('\n');
+  const STORAGE_KEY = 'twicome-zen-scene';
+  const ATTR_POSITION = 0;
 
-  /*
-   * 手続き的ナイトシーン
-   *  ・月: アスペクト比補正で真円, 適切な輝度
-   *  ・草: 地面から上向きに成長（正しい方向）
-   *  ・星: 3スケール グリッドベース, キラキラ点滅
-   *  ・全体的に暗く静寂なシーン
-   */
-  const FRAG = [
-    'precision mediump float;',
-    'uniform float u_time;',
-    'uniform vec2  u_res;',
-    'uniform float u_phase;',   /* 月相: 0=新月, 0.5=満月, 1=新月 */
+  const VERT = `
+attribute vec2 a_pos;
+void main() {
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
 
-    /* --- 高速ハッシュ (sin 不使用) --- */
-    'float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}',
-    'float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}',
-    'float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}',
+  const NIGHT_SKY_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_phase;
 
-    'void main(){',
-    '  vec2 uv = gl_FragCoord.xy / u_res;',
-    '  float ar = u_res.x / u_res.y;',    /* アスペクト比 */
-    '  float t  = u_time;',
-    '  float GY = 0.20;',                  /* 草の地平線 (画面下20%) */
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
 
-    /* === 夜空 ===
-       ・下端: 漆黒 (地平線帯なし)
-       ・上部: ごくわずかに深紺
-       ・二次関数グラデーション → 均一に暗く帯なし */
-    '  vec3 skyTop  = vec3(.004,.003,.022);',
-    '  vec3 skyBot  = vec3(.0,.0,.004);',
-    '  vec3 col = mix(skyBot, skyTop, uv.y*uv.y);',
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float ar = u_res.x / u_res.y;
+  float t = u_time;
+  float GY = 0.20;
 
-    /* === 天の川 (非常に控えめ、草エリアより上のみ) === */
-    '  float mw = vn(vec2(uv.x*2.8+.4, uv.y*9.+t*.006))*.22',
-    '           + vn(vec2(uv.x*5.5, uv.y*18.))*.11;',
-    '  col += vec3(.010,.007,.025)*mw',
-    '        *smoothstep(GY+.18,GY+.45,uv.y)',
-    '        *smoothstep(0.,.3,uv.y*(1.-uv.y)*4.);',
+  vec3 skyTop = vec3(.004,.003,.022);
+  vec3 skyBot = vec3(.0,.0,.004);
+  vec3 col = mix(skyBot, skyTop, uv.y * uv.y);
 
-    /* === 月 (アスペクト比補正で真円, 実際の月相に同期) ===
-       位置: 右上エリア
-       大きさ: 控えめ, 輝度: 穏やか */
-    '  vec2 mpos = vec2(.74,.80);',
-    '  vec2 mvec = (uv - mpos) * vec2(ar, 1.0);',
-    '  float md  = length(mvec);',
-    '  float mr  = .030;',
+  float mw = vn(vec2(uv.x * 2.8 + .4, uv.y * 9. + t * .006)) * .22
+           + vn(vec2(uv.x * 5.5, uv.y * 18.)) * .11;
+  col += vec3(.010,.007,.025) * mw
+      * smoothstep(GY + .18, GY + .45, uv.y)
+      * smoothstep(0., .3, uv.y * (1. - uv.y) * 4.);
 
-    /* 月相: pa=0で新月, pa=PIで満月 */
-    '  float pa   = u_phase*6.28318;',
-    '  float illum = (1.-cos(pa))*.5;',  /* 輝面比: 0=新月,1=満月 */
-    '  float moonLit = 0.0;',
-    '  if(md < mr){',
-    '    float muX = mvec.x/mr;',
-    '    float muY = mvec.y/mr;',
-    '    float disc = sqrt(max(0.,1.-muY*muY));',
-    '    float tx = cos(pa)*disc;',          /* 明暗境界線のX位置 */
-    '    if(u_phase<0.5){',                  /* 上弦: 右側が輝く */
-    '      moonLit = smoothstep(tx-.04,tx+.04,muX);',
-    '    } else {',                           /* 下弦: 左側が輝く */
-    '      moonLit = 1.0-smoothstep(-tx-.04,-tx+.04,muX);',
-    '    }',
-    '  }',
+  vec2 mpos = vec2(.74,.80);
+  vec2 mvec = (uv - mpos) * vec2(ar, 1.0);
+  float md = length(mvec);
+  float mr = .030;
 
-    '  float limb = md<mr ? sqrt(max(0.,1.-(md/mr)*(md/mr)))*.08 : 0.;',
-    /* 地球照: 月の暗い面にごく薄く青みがかった反射 */
-    '  float earthshine = smoothstep(mr+.002,mr-.002,md)*(1.-moonLit)*.018;',
-    '  col += vec3(.94,.91,.80) * (',
-    '    smoothstep(mr+.002,mr-.002,md)*moonLit*(.90+limb)',
-    '    + exp(-md*16.)*illum*.18',
-    '    + exp(-md*5.5)*illum*.06);',
-    '  col += vec3(.72,.82,.98)*earthshine;',
+  float pa = u_phase * 6.28318;
+  float illum = (1. - cos(pa)) * .5;
+  float moonLit = 0.0;
+  if (md < mr) {
+    float muX = mvec.x / mr;
+    float muY = mvec.y / mr;
+    float disc = sqrt(max(0., 1. - muY * muY));
+    float tx = cos(pa) * disc;
+    if (u_phase < 0.5) {
+      moonLit = smoothstep(tx - .04, tx + .04, muX);
+    } else {
+      moonLit = 1.0 - smoothstep(-tx - .04, -tx + .04, muX);
+    }
+  }
 
-    /* 月面テクスチャ (照らされた面のみ) */
-    '  if(md < mr){',
-    '    vec2 mu = mvec/mr;',
-    '    float cr = vn(mu*7.+1.8)*.040 + vn(mu*18.)*.016;',
-    '    col -= vec3(cr,cr*.84,cr*.60) * smoothstep(mr,.0,md) * moonLit;',
-    '  }',
+  float limb = md < mr ? sqrt(max(0., 1. - (md / mr) * (md / mr))) * .08 : 0.;
+  float earthshine = smoothstep(mr + .002, mr - .002, md) * (1. - moonLit) * .018;
+  col += vec3(.94,.91,.80) * (
+    smoothstep(mr + .002, mr - .002, md) * moonLit * (.90 + limb)
+    + exp(-md * 16.) * illum * .18
+    + exp(-md * 5.5) * illum * .06
+  );
+  col += vec3(.72,.82,.98) * earthshine;
 
-    /* === 星 (3スケール, キラキラ) === */
-    '  {',
-    '    vec2 s,si,sf,jit; float h,sp,tw;',
+  if (md < mr) {
+    vec2 mu = mvec / mr;
+    float cr = vn(mu * 7. + 1.8) * .040 + vn(mu * 18.) * .016;
+    col -= vec3(cr, cr * .84, cr * .60) * smoothstep(mr, .0, md) * moonLit;
+  }
 
-    /* 大きい星: 色のバリエーション付き */
-    '    s=uv*vec2(43.,25.); si=floor(s); sf=fract(s)-.5; h=h2(si);',
-    '    if(h>.875){jit=vec2(h2(si+.3)-.5,h2(si+.7)-.5)*.6;tw=.55+.45*sin(t*(1.+h*3.)+h*27.);sp=smoothstep(.050,.0,length(sf-jit));col+=mix(vec3(.68,.80,1.),vec3(1.,.88,.62),h2(si+1.1))*sp*tw;}',
+  {
+    vec2 s;
+    vec2 si;
+    vec2 sf;
+    vec2 jit;
+    float h;
+    float sp;
+    float tw;
 
-    /* 中くらいの星 */
-    '    s=uv*vec2(87.,50.); si=floor(s); sf=fract(s)-.5; h=h2(si+50.);',
-    '    if(h>.895){jit=vec2(h2(si+10.3)-.5,h2(si+10.7)-.5)*.65;tw=.48+.52*sin(t*(1.5+h*4.)+h*48.);sp=smoothstep(.028,.0,length(sf-jit));col+=vec3(.72,.84,1.)*sp*tw*.50;}',
+    s = uv * vec2(43.,25.);
+    si = floor(s);
+    sf = fract(s) - .5;
+    h = h2(si);
+    if (h > .875) {
+      jit = vec2(h2(si + .3) - .5, h2(si + .7) - .5) * .6;
+      tw = .55 + .45 * sin(t * (1. + h * 3.) + h * 27.);
+      sp = smoothstep(.050, .0, length(sf - jit));
+      col += mix(vec3(.68,.80,1.), vec3(1.,.88,.62), h2(si + 1.1)) * sp * tw;
+    }
 
-    /* 遠い小さな星: 点滅なし */
-    '    s=uv*vec2(178.,100.); si=floor(s); sf=fract(s)-.5; h=h2(si+200.);',
-    '    if(h>.915){jit=vec2(h2(si+20.3)-.5,h2(si+20.7)-.5)*.6;sp=smoothstep(.020,.0,length(sf-jit));col+=vec3(.56,.60,.82)*sp*.26;}',
-    '  }',
+    s = uv * vec2(87.,50.);
+    si = floor(s);
+    sf = fract(s) - .5;
+    h = h2(si + 50.);
+    if (h > .895) {
+      jit = vec2(h2(si + 10.3) - .5, h2(si + 10.7) - .5) * .65;
+      tw = .48 + .52 * sin(t * (1.5 + h * 4.) + h * 48.);
+      sp = smoothstep(.028, .0, length(sf - jit));
+      col += vec3(.72,.84,1.) * sp * tw * .50;
+    }
 
+    s = uv * vec2(178.,100.);
+    si = floor(s);
+    sf = fract(s) - .5;
+    h = h2(si + 200.);
+    if (h > .915) {
+      jit = vec2(h2(si + 20.3) - .5, h2(si + 20.7) - .5) * .6;
+      sp = smoothstep(.020, .0, length(sf - jit));
+      col += vec3(.56,.60,.82) * sp * .26;
+    }
+  }
 
-    /* === 草 (地面から上向きに成長, セルベース)
-       layer=0: 後ろの列 (暗い, 低め)
-       layer=1: 前の列 (わずかに明るい, 高め) — 後から描いて前面に出す */
-    /* === 草 (細長い三角形, 地面→上向き成長, セルベース)
-       地平線バンドを防ぐため:
-         ・密度を下げてセル間に隙間を確保
-         ・根元をできるだけ広く, 先端を0にする真の三角形
-         ・草の色を空より若干明るくして個々の刃を可視化
-       layer=0: 後ろ列, layer=1: 前列 (後から描いて前面に出す) */
-    '  if(uv.y < GY+.01){',
-    '    float D   = 55.;',            /* セル数: 少なめ→刃間に隙間 */
-    '    float ci0 = floor(uv.x*D);',
-    '    for(int layer=0;layer<2;layer++){',
-    '      float lf = float(layer);',
-    '      float ls = lf*300.;',
-    '      for(int di=0;di<3;di++){',
-    '        float ci  = ci0+float(di)-1.;',
-    /* 前列(lf=1)は若干高め */
-    '        float bh  = (.12+h1(ci+ls)*.10)*(.76+lf*.26);',
-    /* 根元の幅: セル幅の約30%→刃間に明確な隙間 */
-    '        float bw  = .0040+h1(ci+ls+100.)*.0035;',
-    '        float bx  = (ci+.5+(h1(ci+ls+50.)-.5)*.45)/D;',
-    '        float wf  = .8+h1(ci+ls+150.)*.9;',
-    '        float wp  = bx*13.+t*wf;',
-    /* 2周波の自然な風揺らぎ */
-    '        float sw  = sin(wp)*.014+sin(wp*1.7+1.1)*.006;',
+  if (uv.y < GY + .01) {
+    float D = 150.;
+    float ci0 = floor(uv.x * D);
+    for (int layer = 0; layer < 3; layer++) {
+      float lf = float(layer);
+      float ls = lf * 200.;
+      float lsc = .74 + lf * .22;
+      for (int di = 0; di < 3; di++) {
+        float ci = ci0 + float(di) - 1.;
+        for (int bi = 0; bi < 2; bi++) {
+          float bf = float(bi);
+          float seed = ci + ls + bf * 73.;
+          float bh = (.09 + h1(seed) * .11) * lsc;
+          float bw = .0016 + h1(seed + 100.) * .0018;
+          float bx = (ci + bf * .5 + .25 + (h1(seed + 50.) - .5) * .40) / D;
+          float sw = sin(bx * 14. + t * (.75 + h1(seed + 150.) * .85)) * .012;
+          float inB = step(uv.y, bh);
+          float prog = min(uv.y / max(bh, .0001), 1.);
+          float tapW = max(bw * (1. - prog), .0001);
+          float bendX = bx + sw * prog * prog;
+          float dx = abs(uv.x - bendX);
+          float a = (1. - smoothstep(tapW * .3, tapW, dx)) * inB;
+          float br = .007 + prog * .021 + lf * .004;
+          col = mix(col, vec3(br * .58, br, br * .52 + prog * .007), a * .97);
+        }
+      }
+    }
+  }
 
-    /* 真の三角形: prog=0(根元)→最大幅, prog=1(先端)→幅0 */
-    '        if(uv.y < bh){',
-    '          float prog  = uv.y/bh;',
-    '          float bendX = bx+sw*prog*prog;',
-    '          float tapW  = bw*(1.-prog);',
-    '          float dx    = abs(uv.x-bendX);',
-    '          if(dx<tapW){',
-    /* エッジをsmootstepでアンチエイリアス */
-    '            float a  = smoothstep(tapW, tapW*.35, dx);',
-    /* 月光に照らされた草: 先端ほど明るい(月光の反射) */
-    /* 空(skyDark=.001,.001,.006)より明るくして刃を可視化 */
-    '            float br = .009+prog*.020+lf*.004;',
-    '            col = mix(col, vec3(br*.60, br, br*.55+prog*.006), a*.97);',
-    '          }',
-    '        }',
-    '      }',
-    '    }',
-    '  }',
+  vec2 vp = uv - .5;
+  col *= clamp(1. - dot(vp * vec2(1.5, 1.3), vp * vec2(1.5, 1.3)) * .7, 0., 1.);
+  col = col / (col + .07);
+  gl_FragColor = vec4(col, 1.);
+}
+`;
 
-    /* === ビネット (周辺減光) === */
-    '  vec2 vp = uv-.5;',
-    '  col *= clamp(1.-dot(vp*vec2(1.5,1.3),vp*vec2(1.5,1.3))*.7, 0.,1.);',
+  const RAIN_WINDOW_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
 
-    /* === トーンマップ === */
-    '  col = col/(col+.07);',
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
 
-    '  gl_FragColor = vec4(col,1.);',
-    '}'
-  ].join('\n');
+float rainField(vec2 uv, float t, float density, float slant, float speed, float cutoff) {
+  vec2 p = vec2(
+    uv.x * density + uv.y * density * slant,
+    uv.y * density * .82 + t * speed
+  );
+  vec2 id = floor(p);
+  vec2 st = fract(p) - .5;
+  float seed = h2(id);
+  float active = smoothstep(cutoff, 1.0, seed);
+  float width = mix(.008, .026, h2(id + vec2(4.3, 1.7)));
+  float line = 1.0 - smoothstep(width, width * 2.4, abs(st.x + (seed - .5) * .12));
+  float tail = 1.0 - smoothstep(.04, .54, abs(st.y));
+  float translucency = mix(.42, .82, h2(id + vec2(8.1, 2.6)));
+  return line * tail * active * translucency;
+}
 
-  /* ─────────────────────────────────────────
-     DOM 参照
-  ───────────────────────────────────────── */
-  const overlay    = document.getElementById('zen-overlay');
-  const canvas     = document.getElementById('zen-canvas');
-  const commentEl  = document.getElementById('zen-comment');
-  const closeBtn   = document.getElementById('zen-close-btn');
-  const fsBtn      = document.getElementById('zen-fs-btn');
+float waveCurve(float w) {
+  float s = sin(w);
+  return s * abs(s) * abs(s);
+}
+
+vec3 rainLayer(vec2 baseUv, float time, float scale, vec2 shift) {
+  vec2 aspect = vec2(2.0, 1.0);
+  vec2 uv = (baseUv * 2.0 - 1.0) * vec2(u_res.x / u_res.y, 1.0);
+  uv *= scale * aspect;
+  uv += shift;
+  uv.y += time * .22;
+
+  vec2 gv = fract(uv) - .5;
+  vec2 id = floor(uv);
+  float n = h2(id + shift);
+  float active = smoothstep(.46, .94, n);
+  float t = time + n * 6.28318;
+  float w = baseUv.y * 12.0 + shift.x * .35 + n * 8.0;
+  float x = (n - .5) * .78;
+  x += (.36 - abs(x)) * waveCurve(w);
+  float y = -sin(t + sin(t + sin(t) * .5)) * .44;
+  y -= (gv.x - x) * (gv.x - x);
+
+  vec2 dropPos = (gv - vec2(x, y)) / aspect;
+  float drop = smoothstep(.055, .026, length(dropPos));
+  vec2 trailPos = (gv - vec2(x, time * .22)) / aspect;
+  trailPos.y = (fract(trailPos.y * 8.0) - .5) / 8.0;
+  float trail = smoothstep(.028, .010, length(trailPos));
+  float fogTrail = smoothstep(-.05, .05, dropPos.y);
+  fogTrail *= smoothstep(.50, y, gv.y);
+  trail *= fogTrail;
+  fogTrail *= smoothstep(.055, .025, abs(dropPos.x));
+
+  drop *= active;
+  trail *= active;
+  fogTrail *= active;
+
+  vec2 offs = dropPos * drop + trailPos * trail;
+  float clarity = clamp(fogTrail + drop * .45 + trail * .25, 0.0, 1.0);
+  return vec3(offs, clarity);
+}
+
+float windowFrame(vec2 uv) {
+  float left = 1.0 - smoothstep(0.0, .05, uv.x);
+  float right = smoothstep(.95, 1.0, uv.x);
+  float sill = 1.0 - smoothstep(0.0, .05, uv.y);
+  return clamp(left + right + sill * .75, 0.0, 1.0);
+}
+
+vec3 rainyBackdrop(vec2 uv, float t) {
+  vec3 skyBot = vec3(.020,.030,.050);
+  vec3 skyTop = vec3(.11,.15,.21);
+  vec3 col = mix(skyBot, skyTop, clamp(uv.y * .85 + .10, 0.0, 1.0));
+
+  float cloud = vn(vec2(uv.x * 2.2 + .4, uv.y * 3.6 - t * .020));
+  cloud += vn(vec2(uv.x * 4.8 + 5.2, uv.y * 7.2 + 1.4)) * .45;
+  col += vec3(.035,.045,.055) * smoothstep(.48, .94, cloud) * (.18 + uv.y * .28);
+
+  float horizon = smoothstep(0.0, .32, uv.y + vn(vec2(uv.x * 6.0, 8.0)) * .06 - .04);
+  col *= mix(.48, 1.0, horizon);
+
+  vec2 s = uv * vec2(14., 7.);
+  vec2 si = floor(s);
+  vec2 sf = fract(s) - .5;
+  float h = h2(si + vec2(10.3, 4.1));
+  if (h > .93) {
+    vec2 jitter = vec2(h2(si + vec2(1.7, 2.4)) - .5, h2(si + vec2(4.2, 8.5)) - .5) * .68;
+    float glow = 1.0 - smoothstep(.08, .34, length(sf - jitter));
+    vec3 lightColor = mix(vec3(.95,.66,.34), vec3(.44,.61,.82), h2(si + vec2(7.7, 1.8)));
+    col += lightColor * glow * (.025 + .05 * h2(si + vec2(9.4, 2.2))) * (1.0 - smoothstep(.26, .58, uv.y));
+  }
+
+  s = uv * vec2(26., 12.);
+  si = floor(s);
+  sf = fract(s) - .5;
+  h = h2(si + vec2(23.1, 7.4));
+  if (h > .97) {
+    vec2 jitter = vec2(h2(si + vec2(1.1, 6.8)) - .5, h2(si + vec2(8.1, 3.5)) - .5) * .58;
+    float glow = 1.0 - smoothstep(.04, .20, length(sf - jitter));
+    vec3 lightColor = mix(vec3(.84,.90,1.), vec3(.98,.84,.56), h2(si + vec2(4.5, 9.7)));
+    col += lightColor * glow * .035 * (1.0 - smoothstep(.22, .54, uv.y));
+  }
+
+  float lampA = exp(-length((uv - vec2(.12,.78)) * vec2(1.5, 3.1)) * 6.5);
+  float lampB = exp(-length((uv - vec2(.21,.24)) * vec2(1.7, 2.4)) * 7.0);
+  float coolReflect = exp(-length((uv - vec2(.86,.66)) * vec2(1.4, 2.8)) * 6.8);
+  col += vec3(.13,.08,.05) * lampA * .7;
+  col += vec3(.09,.06,.04) * lampB * .5;
+  col += vec3(.04,.07,.11) * coolReflect * .32;
+
+  float rainFar = rainField(uv + vec2(0.0, .06), t, 88., .32, 7.4, .80);
+  float rainMid = rainField(uv + vec2(.1, .10), t, 124., .46, 11.6, .84);
+  col += vec3(.10,.12,.15) * rainFar * .14;
+  col += vec3(.14,.17,.20) * rainMid * .12;
+
+  return col;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float t = u_time;
+
+  vec3 drops = rainLayer(uv, t, 1.65, vec2(0.0, 0.0)) * .65;
+  drops += rainLayer(uv * 1.21 - vec2(9.87, 4.31), t * .96, 2.05, vec2(4.1, 7.3)) * .55;
+  drops += rainLayer(uv * 1.37 + vec2(6.54, 1.12), t * 1.07, 2.55, vec2(12.7, 3.9)) * .45;
+  drops += rainLayer(uv * 2.10 + vec2(3.21, 5.76), t * 1.16, 3.10, vec2(21.3, 15.1)) * .30;
+
+  vec2 refraction = drops.xy * .65;
+  float clarity = clamp(drops.z, 0.0, 1.0);
+  vec3 sharp = rainyBackdrop(clamp(uv + refraction, vec2(0.0), vec2(1.0)), t);
+  vec3 blurred = rainyBackdrop(clamp(uv + refraction * .35 + vec2(.012, .018), vec2(0.0), vec2(1.0)), t);
+  blurred += rainyBackdrop(clamp(uv + refraction * .15 - vec2(.014, .010), vec2(0.0), vec2(1.0)), t);
+  blurred *= .5;
+  float blurMix = clamp(1.0 - clarity * 1.1, 0.0, 1.0);
+  vec3 col = mix(sharp, blurred, blurMix);
+
+  float mist = vn(vec2(uv.x * 80.0, uv.y * 45.0 - t * .04));
+  float condensation = smoothstep(.60, .97, vn(uv * vec2(34., 22.) + t * .02));
+  col = mix(col, col + vec3(.03,.04,.05), mist * .012);
+  col = mix(col, col + vec3(.03,.04,.06), condensation * .018 * (1.0 - clarity));
+  col += vec3(.74,.80,.86) * clarity * .05;
+
+  float frame = windowFrame(uv);
+  float frameHighlight = exp(-abs(uv.x - .06) * 60.) + exp(-abs(uv.x - .94) * 60.);
+  col = mix(col, vec3(.03,.02,.018), frame * .76);
+  col += vec3(.18,.12,.08) * frameHighlight * .04 * (.5 + .5 * smoothstep(0.0, 1.0, uv.y));
+
+  vec2 vp = uv - .5;
+  col *= clamp(1. - dot(vp * vec2(1.45, 1.2), vp * vec2(1.45, 1.2)) * .65, 0., 1.);
+  col = col / (col + .14);
+  gl_FragColor = vec4(col, 1.);
+}
+`;
+
+  const SCENES = [
+    {
+      id: 'night-sky',
+      label: '夜空',
+      emoji: '🌙',
+      fragmentSource: NIGHT_SKY_FRAG
+    },
+    {
+      id: 'rain-window',
+      label: '雨の窓辺',
+      emoji: '🌧️',
+      fragmentSource: RAIN_WINDOW_FRAG
+    }
+  ];
+
+  const sceneMap = new Map(SCENES.map(function (scene) {
+    return [scene.id, scene];
+  }));
+
+  const overlay = document.getElementById('zen-overlay');
+  const canvas = document.getElementById('zen-canvas');
+  const commentEl = document.getElementById('zen-comment');
+  const closeBtn = document.getElementById('zen-close-btn');
+  const fsBtn = document.getElementById('zen-fs-btn');
   const triggerBtn = document.getElementById('zen-mode-btn');
+  const themeSwitcher = document.getElementById('zen-theme-switcher');
 
-  if (!overlay || !canvas || !commentEl) { return; }
+  if (!overlay || !canvas || !commentEl) {
+    return;
+  }
 
-  /* ─────────────────────────────────────────
-     月相計算 (朔望周期 29.530588853 日)
-     基準新月: 2000-01-06 18:14 UTC
-  ───────────────────────────────────────── */
+  let gl = null;
+  let quadBuffer = null;
+  let glReady = false;
+  let raf = null;
+  let sceneStartTime = null;
+  const scenePrograms = new Map();
+  let currentSceneState = null;
+  let currentSceneId = getStoredSceneId();
+  let comments = [];
+  let commentIdx = 0;
+  let slideTimer = null;
+  const lunarPhase = getLunarPhase();
+
   /**
    * 今日の月相を返す。
    * @returns {number} 0=新月, 0.5=満月, 1=新月 の範囲の実数
    */
   function getLunarPhase() {
-    const refNewMoon     = new Date('2000-01-06T18:14:00Z');
-    const synodicPeriod  = 29.530588853; /* days */
+    const refNewMoon = new Date('2000-01-06T18:14:00Z');
+    const synodicPeriod = 29.530588853;
     const daysSince = (Date.now() - refNewMoon.getTime()) / 86400000;
-    return ((daysSince % synodicPeriod) + synodicPeriod) % synodicPeriod / synodicPeriod;
-  }
-
-  const lunarPhase = getLunarPhase();
-
-  /* ─────────────────────────────────────────
-     WebGL 状態
-  ───────────────────────────────────────── */
-  let gl = null, uTime = null, uRes = null, uPhase = null;
-  let raf = null, startTime = null;
-  let glReady = false;
-
-  /**
-   * 指定タイプのGLSLシェーダーをコンパイルして返す。
-   * @param {number} type - gl.VERTEX_SHADER または gl.FRAGMENT_SHADER
-   * @param {string} src - GLSLソースコード
-   * @returns {WebGLShader} コンパイル済みシェーダー
-   */
-  function compileShader(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    return s;
+    return (((daysSince % synodicPeriod) + synodicPeriod) % synodicPeriod) / synodicPeriod;
   }
 
   /**
-   * WebGLコンテキストを初期化してシェーダーをセットアップする。
-   * @returns {boolean} 初期化成功なら true
+   * 保存済みのシーンIDを返す。
+   * @returns {string} 利用可能なシーンID
    */
-  function initGL() {
-    if (glReady) { return true; }
+  function getStoredSceneId() {
     try {
-      gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      if (!gl) { return false; }
-
-      const prog = gl.createProgram();
-      gl.attachShader(prog, compileShader(gl.VERTEX_SHADER,   VERT));
-      gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, FRAG));
-      gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-        console.warn('[ZenMode] shader link error:', gl.getProgramInfoLog(prog));
-        return false;
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored && sceneMap.has(stored)) {
+        return stored;
       }
-      gl.useProgram(prog);
-
-      const buf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.bufferData(gl.ARRAY_BUFFER,
-        new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-      const loc = gl.getAttribLocation(prog, 'a_pos');
-      gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-
-      uTime  = gl.getUniformLocation(prog, 'u_time');
-      uRes   = gl.getUniformLocation(prog, 'u_res');
-      uPhase = gl.getUniformLocation(prog, 'u_phase');
-
-      glReady = true;
-      return true;
-    } catch (e) {
-      console.warn('[ZenMode] WebGL init failed:', e);
-      return false;
+    } catch (error) {
+      console.warn('[ZenMode] localStorage read failed:', error);
     }
+    return SCENES[0].id;
   }
 
   /**
-   * オーバーレイサイズに合わせてキャンバスの解像度を更新する。
-   * DPRは最大2xに制限してパフォーマンスを確保する。
+   * 現在のシーンIDを保存する。
+   * @param {string} sceneId - 保存するシーンID
    * @returns {void}
    */
-  function resizeCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.floor(overlay.clientWidth  * dpr);
-    const h = Math.floor(overlay.clientHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
-      canvas.height = h;
-      if (gl) { gl.viewport(0, 0, w, h); }
+  function storeSceneId(sceneId) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, sceneId);
+    } catch (error) {
+      console.warn('[ZenMode] localStorage write failed:', error);
     }
   }
-
-  /* ─────────────────────────────────────────
-     レンダーループ
-  ───────────────────────────────────────── */
-  /**
-   * rAFコールバック: キャンバスリサイズ後にシェーダーを描画する。
-   * @param {number} ts - requestAnimationFrameのタイムスタンプ (ms)
-   * @returns {void}
-   */
-  function render(ts) {
-    raf = requestAnimationFrame(render);
-    resizeCanvas();
-    if (!glReady) { return; }
-    if (startTime === null) { startTime = ts; }
-    const t = (ts - startTime) * 0.001;
-    gl.uniform1f(uTime,  t);
-    gl.uniform2f(uRes,   canvas.width, canvas.height);
-    gl.uniform1f(uPhase, lunarPhase);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }
-
-  /* ─────────────────────────────────────────
-     コメント収集・スライドショー
-  ───────────────────────────────────────── */
-  let comments   = [];
-  let commentIdx = 0;
-  let slideTimer = null;
 
   /**
    * DOM内のコメント本文をテキストとして収集してシャッフルして返す。
@@ -312,10 +409,12 @@
         out.push(text);
       }
     });
-    /* Fisher-Yates シャッフル */
+
     for (let i = out.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+      const tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
     }
     return out.length ? out : ['コメントがありません'];
   }
@@ -325,19 +424,20 @@
    * @returns {void}
    */
   function showNextComment() {
-    if (!comments.length) { return; }
-    const text = comments[commentIdx % comments.length];
-    commentIdx++;
+    if (!comments.length) {
+      return;
+    }
 
-    /* 瞬時にリセット → フェードイン */
+    const text = comments[commentIdx % comments.length];
+    commentIdx += 1;
+
     commentEl.style.transition = 'none';
     commentEl.style.opacity = '0';
     commentEl.textContent = text;
-    void commentEl.offsetHeight; /* reflow */
+    void commentEl.offsetHeight;
     commentEl.style.transition = 'opacity 1.5s ease';
     commentEl.style.opacity = '1';
 
-    /* 5秒後にフェードアウト → 次へ */
     slideTimer = setTimeout(function () {
       commentEl.style.transition = 'opacity 1.2s ease';
       commentEl.style.opacity = '0';
@@ -345,45 +445,326 @@
     }, 5000);
   }
 
-  /* ─────────────────────────────────────────
-     開く / 閉じる
-  ───────────────────────────────────────── */
   /**
-   * Zenモードを開く。コメントを収集してWebGLレンダリングとスライドショーを開始する。
+   * 指定タイプのGLSLシェーダーをコンパイルして返す。
+   * @param {number} type - gl.VERTEX_SHADER または gl.FRAGMENT_SHADER
+   * @param {string} src - GLSLソースコード
+   * @returns {WebGLShader|null} コンパイル済みシェーダー
+   */
+  function compileShader(type, src) {
+    const shader = gl.createShader(type);
+    if (!shader) {
+      return null;
+    }
+
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.warn('[ZenMode] shader compile error:', gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+
+  /**
+   * シーンに対応するGLプログラムを生成または取得する。
+   * @param {{id: string, fragmentSource: string}} scene - 使用するシーン定義
+   * @returns {{program: WebGLProgram, uniforms: {time: WebGLUniformLocation|null, res: WebGLUniformLocation|null, phase: WebGLUniformLocation|null}}|null} プログラム情報
+   */
+  function buildSceneProgram(scene) {
+    const cached = scenePrograms.get(scene.id);
+    if (cached) {
+      return cached;
+    }
+
+    const vertexShader = compileShader(gl.VERTEX_SHADER, VERT);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, scene.fragmentSource);
+    if (!vertexShader || !fragmentShader) {
+      if (vertexShader) {
+        gl.deleteShader(vertexShader);
+      }
+      if (fragmentShader) {
+        gl.deleteShader(fragmentShader);
+      }
+      return null;
+    }
+
+    const program = gl.createProgram();
+    if (!program) {
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+      return null;
+    }
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.bindAttribLocation(program, ATTR_POSITION, 'a_pos');
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.warn('[ZenMode] shader link error:', gl.getProgramInfoLog(program));
+      gl.deleteProgram(program);
+      return null;
+    }
+
+    const entry = {
+      program,
+      uniforms: {
+        time: gl.getUniformLocation(program, 'u_time'),
+        res: gl.getUniformLocation(program, 'u_res'),
+        phase: gl.getUniformLocation(program, 'u_phase')
+      }
+    };
+    scenePrograms.set(scene.id, entry);
+    return entry;
+  }
+
+  /**
+   * WebGLコンテキストを初期化する。
+   * @returns {boolean} 初期化成功なら true
+   */
+  function initGL() {
+    if (glReady) {
+      return true;
+    }
+
+    try {
+      gl = canvas.getContext('webgl', {
+        alpha: false,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance'
+      }) || canvas.getContext('experimental-webgl');
+      if (!gl) {
+        return false;
+      }
+
+      quadBuffer = gl.createBuffer();
+      if (!quadBuffer) {
+        return false;
+      }
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+        gl.STATIC_DRAW
+      );
+      gl.disable(gl.DEPTH_TEST);
+      gl.disable(gl.BLEND);
+
+      glReady = true;
+      return true;
+    } catch (error) {
+      console.warn('[ZenMode] WebGL init failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * オーバーレイサイズに合わせてキャンバス解像度を更新する。
+   * @returns {void}
+   */
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.floor(overlay.clientWidth * dpr));
+    const height = Math.max(1, Math.floor(overlay.clientHeight * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      if (gl) {
+        gl.viewport(0, 0, width, height);
+      }
+    }
+  }
+
+  /**
+   * シーン切り替えボタンを描画する。
+   * @returns {void}
+   */
+  function renderThemeButtons() {
+    if (!themeSwitcher) {
+      return;
+    }
+
+    themeSwitcher.textContent = '';
+    SCENES.forEach(function (scene) {
+      const button = document.createElement('button');
+      const buttonLabel = `${scene.label}に切り替え`;
+      button.type = 'button';
+      button.className = 'zen-theme-btn';
+      button.dataset.sceneId = scene.id;
+      button.title = buttonLabel;
+      button.setAttribute('aria-label', buttonLabel);
+      button.setAttribute('aria-pressed', scene.id === currentSceneId ? 'true' : 'false');
+      button.innerHTML = `<span class="zen-theme-emoji" aria-hidden="true">${scene.emoji}</span>`;
+      button.addEventListener('click', function () {
+        applyScene(scene.id);
+      });
+      themeSwitcher.appendChild(button);
+    });
+  }
+
+  /**
+   * 現在選択中のシーンに合わせてボタン状態を更新する。
+   * @returns {void}
+   */
+  function updateThemeButtons() {
+    if (!themeSwitcher) {
+      return;
+    }
+
+    themeSwitcher.querySelectorAll('.zen-theme-btn').forEach(function (button) {
+      const isActive = button.dataset.sceneId === currentSceneId;
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  /**
+   * 隣のシーンへ切り替える。
+   * @param {number} step - 前後方向。1で次、-1で前
+   * @returns {void}
+   */
+  function selectAdjacentScene(step) {
+    if (SCENES.length < 2) {
+      return;
+    }
+
+    const currentIndex = SCENES.findIndex(function (scene) {
+      return scene.id === currentSceneId;
+    });
+    const nextIndex = (currentIndex + step + SCENES.length) % SCENES.length;
+    applyScene(SCENES[nextIndex].id);
+  }
+
+  /**
+   * シーンを切り替えて、必要ならGLプログラムも差し替える。
+   * @param {string} sceneId - 切り替え先のシーンID
+   * @returns {void}
+   */
+  function applyScene(sceneId) {
+    const nextScene = sceneMap.get(sceneId) || SCENES[0];
+    currentSceneId = nextScene.id;
+    overlay.dataset.zenScene = currentSceneId;
+    storeSceneId(currentSceneId);
+    updateThemeButtons();
+
+    if (!glReady) {
+      return;
+    }
+
+    const programEntry = buildSceneProgram(nextScene);
+    if (!programEntry) {
+      if (nextScene.id !== SCENES[0].id) {
+        applyScene(SCENES[0].id);
+        return;
+      }
+
+      canvas.style.display = 'none';
+      currentSceneState = null;
+      return;
+    }
+
+    canvas.style.display = 'block';
+    gl.useProgram(programEntry.program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(ATTR_POSITION);
+    gl.vertexAttribPointer(ATTR_POSITION, 2, gl.FLOAT, false, 0, 0);
+    currentSceneState = {
+      scene: nextScene,
+      programEntry
+    };
+    sceneStartTime = null;
+  }
+
+  /**
+   * rAFコールバック。現在アクティブなシーンを描画する。
+   * @param {number} ts - requestAnimationFrame のタイムスタンプ
+   * @returns {void}
+   */
+  function render(ts) {
+    raf = requestAnimationFrame(render);
+    resizeCanvas();
+    if (!glReady || !currentSceneState) {
+      return;
+    }
+
+    if (sceneStartTime === null) {
+      sceneStartTime = ts;
+    }
+
+    const elapsed = (ts - sceneStartTime) * 0.001;
+    const {uniforms} = currentSceneState.programEntry;
+    if (uniforms.time) {
+      gl.uniform1f(uniforms.time, elapsed);
+    }
+    if (uniforms.res) {
+      gl.uniform2f(uniforms.res, canvas.width, canvas.height);
+    }
+    if (uniforms.phase) {
+      gl.uniform1f(uniforms.phase, lunarPhase);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  /**
+   * Zenモードを開く。
    * @returns {void}
    */
   function openZen() {
-    comments   = collectComments();
+    comments = collectComments();
     commentIdx = 0;
-
-    overlay.hidden = false;
-    document.body.style.overflow = 'hidden';
-
-    if (!initGL()) {
-      canvas.style.display = 'none'; /* WebGL 非対応時はキャンバスを隠す */
+    if (slideTimer) {
+      clearTimeout(slideTimer);
+      slideTimer = null;
     }
 
-    startTime = null;
-    raf = requestAnimationFrame(render);
-    showNextComment();
+    overlay.hidden = false;
+    overlay.dataset.zenScene = currentSceneId;
+    document.body.style.overflow = 'hidden';
 
-    /* Noto Serif JP を遅延ロード */
+    if (initGL()) {
+      resizeCanvas();
+      applyScene(currentSceneId);
+    } else {
+      canvas.style.display = 'none';
+    }
+
+    if (raf === null) {
+      raf = requestAnimationFrame(render);
+    }
+    showNextComment();
+    updateFsIcon();
+
     if (!document.getElementById('zen-serif-font')) {
       const link = document.createElement('link');
-      link.id   = 'zen-serif-font';
-      link.rel  = 'stylesheet';
+      link.id = 'zen-serif-font';
+      link.rel = 'stylesheet';
       link.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&display=swap';
       document.head.appendChild(link);
     }
   }
 
   /**
-   * Zenモードを閉じる。アニメーションを停止してオーバーレイを非表示にする。
+   * Zenモードを閉じる。
    * @returns {void}
    */
   function closeZen() {
-    if (raf)        { cancelAnimationFrame(raf); raf = null; }
-    if (slideTimer) { clearTimeout(slideTimer); slideTimer = null; }
+    if (raf !== null) {
+      cancelAnimationFrame(raf);
+      raf = null;
+    }
+    if (slideTimer) {
+      clearTimeout(slideTimer);
+      slideTimer = null;
+    }
+
     overlay.hidden = true;
     document.body.style.overflow = '';
     commentEl.style.opacity = '0';
@@ -392,49 +773,73 @@
     }
   }
 
-  /* ─────────────────────────────────────────
-     フルスクリーン
-  ───────────────────────────────────────── */
   /**
    * フルスクリーン表示を切り替える。
    * @returns {void}
    */
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      overlay.requestFullscreen().catch(function () {});
-    } else {
-      document.exitFullscreen().catch(function () {});
+      if (overlay.requestFullscreen) {
+        overlay.requestFullscreen().catch(function () {});
+      }
+      return;
     }
+    document.exitFullscreen().catch(function () {});
   }
 
   /**
-   * フルスクリーン状態に応じてボタンアイコンを更新する。
+   * フルスクリーン状態に応じてボタン表示を更新する。
    * @returns {void}
    */
   function updateFsIcon() {
-    if (!fsBtn) { return; }
+    if (!fsBtn) {
+      return;
+    }
+
     if (document.fullscreenElement) {
       fsBtn.innerHTML = '<i class="fa-solid fa-compress"></i>';
       fsBtn.title = '全画面を終了';
-    } else {
-      fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
-      fsBtn.title = 'フルスクリーン';
+      fsBtn.setAttribute('aria-label', '全画面を終了');
+      return;
     }
+
+    fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+    fsBtn.title = 'フルスクリーン';
+    fsBtn.setAttribute('aria-label', 'フルスクリーン');
   }
 
-  /* ─────────────────────────────────────────
-     イベントリスナー
-  ───────────────────────────────────────── */
-  if (triggerBtn) { triggerBtn.addEventListener('click', openZen); }
-  if (closeBtn)   { closeBtn.addEventListener('click', closeZen); }
-  if (fsBtn)      { fsBtn.addEventListener('click', toggleFullscreen); }
+  renderThemeButtons();
+  overlay.dataset.zenScene = currentSceneId;
+  updateThemeButtons();
+  updateFsIcon();
 
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !overlay.hidden && !document.fullscreenElement) {
+  if (triggerBtn) {
+    triggerBtn.addEventListener('click', openZen);
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeZen);
+  }
+  if (fsBtn) {
+    fsBtn.addEventListener('click', toggleFullscreen);
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (overlay.hidden) {
+      return;
+    }
+
+    if ((event.key === 'Escape' || event.key === 'Esc') && !document.fullscreenElement) {
       closeZen();
+      return;
+    }
+    if (event.key === 'ArrowRight') {
+      selectAdjacentScene(1);
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
+      selectAdjacentScene(-1);
     }
   });
 
   document.addEventListener('fullscreenchange', updateFsIcon);
-
 })();
