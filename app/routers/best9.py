@@ -1,6 +1,6 @@
 import base64
 import zlib
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
@@ -78,7 +78,7 @@ def best9_page(
             .all()
         )
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     comment_map = {r["comment_id"]: decorate_comment(r, now) for r in rows}
     # id_list の順番を維持
     comments = [comment_map[cid] for cid in id_list if cid in comment_map]

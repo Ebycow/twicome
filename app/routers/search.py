@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -83,7 +83,6 @@ def similar_search_api(
         return {"user": dict(user_row), "query": q, "total": 0, "items": []}
 
     comment_ids = [r[0] for r in results]
-    {r[0]: r[1] for r in results}
 
     placeholders = ",".join([f":id_{i}" for i in range(len(comment_ids))])
     params = {f"id_{i}": cid for i, cid in enumerate(comment_ids)}
@@ -134,7 +133,7 @@ def similar_search_api(
 
     rows_map = {r["comment_id"]: r for r in rows}
     comments = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     for cid, score in results:
         r = rows_map.get(cid)
         if not r:
@@ -191,7 +190,7 @@ def _fetch_comment_details(results: list) -> list:
 
     rows_map = {r["comment_id"]: r for r in rows}
     comments = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     for cid, score in results:
         r = rows_map.get(cid)
         if not r:

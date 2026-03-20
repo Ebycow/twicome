@@ -30,6 +30,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 # ── テーブル truncate 順（外部キー制約を考慮した逆順）───────────────────────
 _TRUNCATE_TABLES = [
     "community_notes",
+    "vod_ingest_markers",
     "comments",
     "vods",
     "users",

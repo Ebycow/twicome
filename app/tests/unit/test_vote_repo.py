@@ -26,7 +26,7 @@ def test_increment_like_returns_true_when_comment_exists():
     updated = vote_repo.increment_like(db, "c1", 2)
 
     assert updated is True
-    assert db.committed is True
+    assert db.committed is False
 
 
 def test_increment_like_returns_false_when_comment_missing():
@@ -35,7 +35,7 @@ def test_increment_like_returns_false_when_comment_missing():
     updated = vote_repo.increment_like(db, "missing", 1)
 
     assert updated is False
-    assert db.committed is True
+    assert db.committed is False
 
 
 def test_increment_dislike_returns_false_when_comment_missing():
@@ -44,4 +44,4 @@ def test_increment_dislike_returns_false_when_comment_missing():
     updated = vote_repo.increment_dislike(db, "missing", 1)
 
     assert updated is False
-    assert db.committed is True
+    assert db.committed is False

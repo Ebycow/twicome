@@ -573,6 +573,8 @@ def like_comment(request: Request, comment_id: str, count: int = Query(1, ge=1, 
 
     with SessionLocal() as db:
         updated = vote_repo.increment_like(db, comment_id, count)
+        if updated:
+            db.commit()
     if not updated:
         return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}
@@ -586,6 +588,8 @@ def dislike_comment(request: Request, comment_id: str, count: int = Query(1, ge=
 
     with SessionLocal() as db:
         updated = vote_repo.increment_dislike(db, comment_id, count)
+        if updated:
+            db.commit()
     if not updated:
         return JSONResponse({"error": "comment_not_found"}, status_code=404)
     return {"status": "ok", "added": count}
