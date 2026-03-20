@@ -409,6 +409,346 @@ void main() {
 }
 `;
 
+  const SAKURA_BREEZE_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+#define TAU 6.28318530718
+
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1.,0.)),f.x),mix(h2(i+vec2(0.,1.)),h2(i+vec2(1.,1.)),f.x),f.y);}
+float fbm(vec2 p){
+  float v = 0.0;
+  v += vn(p) * .5;
+  p = p * 2.02 + vec2(3.7, 1.4);
+  v += vn(p) * .25;
+  p = p * 2.01 + vec2(1.3, 6.9);
+  v += vn(p) * .125;
+  return v;
+}
+
+mat2 rot2(float a) {
+  float s = sin(a);
+  float c = cos(a);
+  return mat2(c, -s, s, c);
+}
+
+float sdSegment(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
+float petalMask(vec2 p) {
+  p.y -= .02;
+  float ang = atan(p.x, p.y + .20);
+  float radius = length(vec2(p.x * .92, p.y + .03));
+  float boundary = .34 + .07 * cos(2.0 * ang);
+  boundary *= .88 + .12 * smoothstep(-.30, .44, p.y);
+  float mask = 1.0 - smoothstep(boundary, boundary + .04, radius);
+  float notch = 1.0 - smoothstep(.03, .09, length((p - vec2(0.0, .26)) * vec2(1.9, .74)));
+  float tail = 1.0 - smoothstep(.42, .62, p.y);
+  return clamp(mask * (1.0 - notch * .84) * tail, 0.0, 1.0);
+}
+
+vec3 springSky(vec2 uv, float t, float ar) {
+  vec3 skyBot = vec3(.98,.71,.61);
+  vec3 skyMid = vec3(.47,.28,.42);
+  vec3 skyTop = vec3(.06,.09,.21);
+  vec3 col = mix(skyBot, skyMid, smoothstep(.0, .34, uv.y));
+  col = mix(col, skyTop, smoothstep(.34, 1.0, uv.y));
+
+  vec2 sunPos = vec2(.72, .66);
+  vec2 sunVec = (uv - sunPos) * vec2(ar * 1.1, 1.24);
+  float sun = exp(-dot(sunVec, sunVec) * 18.0);
+  float halo = exp(-length(sunVec) * 4.2);
+  col += vec3(1.0,.88,.76) * sun * .40;
+  col += vec3(1.0,.78,.76) * halo * .12;
+
+  float cloud = fbm(vec2(uv.x * 2.4 - t * .010, uv.y * 3.8 + 1.2));
+  float veil = smoothstep(.48, .84, cloud);
+  veil *= smoothstep(.20, .92, uv.y) * (1.0 - smoothstep(.78, 1.0, uv.y));
+  col = mix(col, col + vec3(.12,.06,.10), veil * .10);
+
+  float glowBand = exp(-abs(uv.y - .29) * 10.0);
+  col += vec3(.22,.08,.12) * glowBand * .10;
+  return col;
+}
+
+float mountainRidge(float x) {
+  float ridge = .34;
+  ridge += (vn(vec2(x * 2.2, 1.3)) - .5) * .09;
+  ridge += (vn(vec2(x * 5.4, 7.8)) - .5) * .03;
+  ridge += sin(x * 2.7 + .4) * .012;
+  return ridge;
+}
+
+float branchShade(vec2 uv) {
+  float branch = 0.0;
+  branch += 1.0 - smoothstep(.010, .020, sdSegment(uv, vec2(-.08, .98), vec2(.18, .84)));
+  branch += 1.0 - smoothstep(.008, .016, sdSegment(uv, vec2(.06, .89), vec2(.24, .80)));
+  branch += 1.0 - smoothstep(.007, .014, sdSegment(uv, vec2(.16, .85), vec2(.30, .78)));
+  branch += 1.0 - smoothstep(.010, .020, sdSegment(uv, vec2(1.08, .96), vec2(.80, .82)));
+  branch += 1.0 - smoothstep(.008, .016, sdSegment(uv, vec2(.92, .88), vec2(.72, .78)));
+  branch += 1.0 - smoothstep(.007, .014, sdSegment(uv, vec2(.82, .84), vec2(.68, .74)));
+  return clamp(branch, 0.0, 1.0);
+}
+
+vec3 blossomHalo(vec2 uv, vec2 center, float strength, float seed, float ar, float t) {
+  vec2 p = (uv - center) * vec2(ar, 1.0);
+  float halo = exp(-dot(p, p) * strength);
+  float shimmer = .84 + .16 * sin(t * (.28 + h1(seed) * .24) + seed);
+  vec3 col = mix(vec3(1.0,.88,.92), vec3(.97,.72,.82), h1(seed + 2.1));
+  return col * halo * .08 * shimmer;
+}
+
+vec3 branchBlossoms(vec2 uv, float ar, float t) {
+  vec3 col = vec3(0.0);
+  col += blossomHalo(uv, vec2(.16, .84), 42.0, 1.0, ar, t);
+  col += blossomHalo(uv, vec2(.27, .79), 52.0, 2.0, ar, t);
+  col += blossomHalo(uv, vec2(.09, .89), 36.0, 3.0, ar, t);
+  col += blossomHalo(uv, vec2(.33, .76), 64.0, 4.0, ar, t);
+  col += blossomHalo(uv, vec2(.84, .83), 42.0, 5.0, ar, t);
+  col += blossomHalo(uv, vec2(.73, .77), 54.0, 6.0, ar, t);
+  col += blossomHalo(uv, vec2(.92, .88), 34.0, 7.0, ar, t);
+  col += blossomHalo(uv, vec2(.67, .73), 62.0, 8.0, ar, t);
+  return col;
+}
+
+vec3 driftingPetals(vec2 uv, float t, float ar) {
+  vec3 col = vec3(0.0);
+
+  for (int layer = 0; layer < 3; layer++) {
+    float lf = float(layer);
+    float amp = .03 + lf * .02;
+    float drift = .06 + lf * .04;
+
+    for (int i = 0; i < 12; i++) {
+      float fi = float(i);
+      float seed = fi + lf * 31.7;
+      float speed = mix(.035, .095, h1(seed * 4.1 + 2.0)) * (1.0 + lf * .24);
+      float travel = fract(h1(seed * 2.7 + 1.3) + t * speed);
+      vec2 pos;
+      vec2 p;
+      float size;
+      float angle;
+      float petal;
+      float fade;
+      float focus;
+      vec3 petalCol;
+      float glow;
+      float inner;
+      float rim;
+
+      pos.y = 1.10 - travel * 1.28;
+      pos.x = fract(
+        h1(seed * 8.3 + 5.1)
+        + sin(t * (.42 + h1(seed + 7.0) * .78) + seed * 5.7 + travel * (7.0 + lf * 1.8)) * amp
+        + (travel - .5) * drift
+      );
+
+      p = uv - pos;
+      p.x *= ar;
+      size = mix(.020, .042, h1(seed * 6.2 + 9.4)) * (1.0 + lf * .42);
+      p /= size;
+
+      angle = seed * TAU
+        + t * mix(-1.0, 1.0, h1(seed * 5.1 + 3.2)) * (.36 + lf * .22)
+        + travel * 5.0;
+      p = rot2(angle) * p;
+
+      petal = petalMask(p);
+      fade = smoothstep(.02, .12, travel) * (1.0 - smoothstep(.84, 1.0, travel));
+      focus = lf / 2.0;
+      petalCol = mix(vec3(1.0,.86,.92), vec3(.95,.64,.78), h1(seed * 9.1 + 4.8));
+      inner = exp(-length((p + vec2(0.0, .02)) * vec2(.82, 1.18)) * 1.8);
+      rim = exp(-abs(p.x) * 2.5) * smoothstep(.34, -.18, p.y);
+      petalCol += vec3(.10,.04,.08) * inner * .12;
+      petalCol += vec3(1.0,.95,.98) * rim * .10;
+      glow = exp(-length(p * vec2(1.0, 1.35)) * 3.2) * .05;
+
+      col += petalCol * petal * fade * mix(.28, .62, focus);
+      col += vec3(1.0,.90,.96) * glow * fade * mix(.02, .06, focus);
+    }
+  }
+
+  return col;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float ar = u_res.x / u_res.y;
+  float t = u_time;
+  vec3 col = springSky(uv, t, ar);
+
+  float ridge = mountainRidge(uv.x);
+  float mountain = 1.0 - smoothstep(ridge - .010, ridge + .006, uv.y);
+  vec3 mountainCol = mix(vec3(.13,.10,.18), vec3(.23,.16,.20), smoothstep(.0, 1.0, uv.x));
+  mountainCol += vec3(.20,.08,.10) * exp(-abs(uv.x - .72) * 8.0) * .18;
+  col = mix(col, mountainCol, mountain * .94);
+
+  float mist = exp(-abs(uv.y - (ridge + .012)) * 24.0);
+  float mistNoise = fbm(vec2(uv.x * 2.2 - t * .010, uv.y * 12.0 + 2.4));
+  col += vec3(.82,.68,.72) * mist * smoothstep(.32, .82, mistNoise) * .10;
+
+  float groundMask = 1.0 - smoothstep(.10, .20, uv.y + (fbm(vec2(uv.x * 3.2, 1.7)) - .5) * .05);
+  vec3 groundCol = mix(vec3(.03,.02,.04), vec3(.10,.05,.06), smoothstep(.0, 1.0, uv.x));
+  col = mix(col, groundCol, groundMask * .96);
+
+  col += vec3(.90,.48,.32) * exp(-length((uv - vec2(.12, .14)) * vec2(ar * 1.2, 3.0)) * 6.0) * .10;
+  col += vec3(.88,.52,.34) * exp(-length((uv - vec2(.86, .18)) * vec2(ar * 1.2, 2.8)) * 6.4) * .08;
+
+  float branches = branchShade(uv);
+  col = mix(col, vec3(.09,.04,.06), branches * .90);
+  col += branchBlossoms(uv, ar, t) * (1.0 - branches * .20);
+  col += driftingPetals(uv, t, ar);
+
+  float grain = vn(gl_FragCoord.xy * .7 + t * .2);
+  col += vec3((grain - .5) * .014);
+
+  vec2 vp = uv - .5;
+  col *= clamp(1.0 - dot(vp * vec2(1.34, 1.14), vp * vec2(1.34, 1.14)) * .56, 0.0, 1.0);
+  col = col / (col + .13);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+  const EMERALD_CONSOLE_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1.,0.)),f.x),mix(h2(i+vec2(0.,1.)),h2(i+vec2(1.,1.)),f.x),f.y);}
+
+float box(vec2 p, vec2 c, vec2 b) {
+  vec2 d = abs(p - c) - b;
+  return 1.0 - smoothstep(0.0, .05, max(d.x, d.y));
+}
+
+float glyph(vec2 uv, float seed) {
+  float g = 0.0;
+  float diagScaleA = 1.02 + (h1(seed + 8.0) - .5) * .44;
+  float diagScaleB = 1.02 + (h1(seed + 9.0) - .5) * .44;
+  float diagA = 1.0 - smoothstep(.09, .16, abs((uv.x - .5) + (uv.y - .5) * diagScaleA));
+  float diagB = 1.0 - smoothstep(.09, .16, abs((uv.x - .5) - (uv.y - .5) * diagScaleB));
+  float dotA = 1.0 - smoothstep(.05, .12, length(uv - vec2(.5, .5 + (h1(seed + 12.0) - .5) * .28)));
+
+  diagA *= smoothstep(.08, .18, uv.y) * (1.0 - smoothstep(.82, .92, uv.y));
+  diagB *= smoothstep(.08, .18, uv.y) * (1.0 - smoothstep(.82, .92, uv.y));
+
+  g += step(.38, h1(seed + 1.0)) * box(uv, vec2(.50, .14), vec2(.24, .028));
+  g += step(.52, h1(seed + 2.0)) * box(uv, vec2(.50, .50), vec2(.22, .026));
+  g += step(.41, h1(seed + 3.0)) * box(uv, vec2(.50, .86), vec2(.24, .028));
+  g += step(.46, h1(seed + 4.0)) * box(uv, vec2(.20, .30), vec2(.032, .18));
+  g += step(.44, h1(seed + 5.0)) * box(uv, vec2(.80, .30), vec2(.032, .18));
+  g += step(.48, h1(seed + 6.0)) * box(uv, vec2(.20, .70), vec2(.032, .18));
+  g += step(.47, h1(seed + 7.0)) * box(uv, vec2(.80, .70), vec2(.032, .18));
+  g += step(.64, h1(seed + 10.0)) * diagA * .90;
+  g += step(.66, h1(seed + 11.0)) * diagB * .90;
+  g += step(.72, h1(seed + 13.0)) * dotA;
+  return clamp(g, 0.0, 1.0);
+}
+
+vec3 codeRainLayer(vec2 uv, float t, float density, float offset, float brightnessScale) {
+  float ar = u_res.x / u_res.y;
+  vec2 flowUv = uv;
+  vec2 grid = vec2(44.0 * ar * density, 44.0 * density);
+  vec2 pos;
+  vec2 cell;
+  vec2 local;
+  float colId;
+  float rowFromTop;
+  float colSeed;
+  float speed;
+  float trail;
+  float cycle;
+  float head;
+  float dist;
+  float headGlow;
+  float tail;
+  float pulse;
+  float frame;
+  float seed;
+  float cellGate;
+  float symbol;
+  float beam;
+  float glowStrength;
+  vec3 bodyCol;
+  vec3 col;
+
+  flowUv.x += sin(uv.y * (5.0 + density * 2.0) + t * .08 + offset) * (.0045 / max(density, .35));
+  pos = flowUv * grid;
+  cell = floor(pos);
+  local = fract(pos);
+  colId = cell.x;
+  rowFromTop = grid.y - 1.0 - cell.y;
+  colSeed = colId + offset * 37.13;
+  speed = mix(7.0, 15.5, h1(colSeed * 1.71 + 4.0)) * (0.82 + density * .22);
+  trail = mix(8.0, 22.0, h1(colSeed * 2.07 + 12.0));
+  cycle = grid.y + trail + 6.0;
+  head = mod(t * speed + h1(colSeed + 8.7) * cycle, cycle) - trail;
+  dist = rowFromTop - head;
+
+  if (dist < 0.0 || dist > trail) {
+    return vec3(0.0);
+  }
+
+  headGlow = exp(-abs(dist) * 2.3);
+  tail = exp(-dist * mix(.14, .24, h1(colSeed + 17.0)));
+  pulse = .82 + .18 * sin(t * (.8 + h1(colSeed + 3.0) * 1.6) + colSeed);
+  frame = floor(t * (8.0 + h1(colSeed + 22.0) * 12.0));
+  seed = frame * 13.0 + rowFromTop * 19.0 + colSeed * 71.0;
+  cellGate = step(.18, h1(seed + 2.0));
+  symbol = glyph(local, seed) * cellGate;
+  symbol = max(symbol, headGlow * (1.0 - smoothstep(.18, .42, length(local - vec2(.5)))));
+  beam = exp(-abs(local.x - .5) * 8.0) * tail * (.05 + headGlow * .04);
+  glowStrength = clamp(symbol * tail * pulse * brightnessScale, 0.0, 1.6);
+  bodyCol = mix(vec3(.04,.24,.10), vec3(.20,.90,.38), clamp(glowStrength * 1.2, 0.0, 1.0));
+  col = bodyCol * glowStrength;
+  col += vec3(.88,1.0,.92) * symbol * headGlow * .35 * brightnessScale;
+  col += vec3(.06,.32,.14) * beam * brightnessScale;
+  return col;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float t = u_time;
+  vec3 bgBot = vec3(.0008,.004,.002);
+  vec3 bgTop = vec3(.004,.020,.010);
+  vec3 col = mix(bgBot, bgTop, pow(uv.y, .8));
+  float haze = vn(vec2(uv.x * 2.4 - t * .03, uv.y * 3.0 + 7.3));
+  vec3 rain;
+  float sweep;
+  float scan;
+  vec2 vp;
+
+  haze += vn(vec2(uv.x * 5.6 + 3.1, uv.y * 8.4 - t * .06)) * .5;
+  col += vec3(.00,.10,.04) * smoothstep(.52, .95, haze) * .08;
+  col += vec3(.00,.15,.06) * exp(-length((uv - vec2(.5,.56)) * vec2(1.1,.75)) * 2.7) * .08;
+
+  rain = codeRainLayer(uv, t * .92, .92, 0.0, 1.0);
+  rain += codeRainLayer(uv * vec2(1.0, 1.02) + vec2(.02, 0.0), t * 1.08 + 4.0, 1.28, 17.0, .62);
+  rain += codeRainLayer(uv * vec2(1.0, .98) - vec2(.018, 0.0), t * .74 + 11.0, .68, 41.0, .30);
+  col += rain;
+
+  sweep = exp(-abs(fract(t * .045 + uv.y * .25) - .5) * 18.0);
+  col += vec3(.02,.14,.06) * sweep * .04;
+
+  scan = .94 + .06 * sin(gl_FragCoord.y * 1.35);
+  col *= scan;
+
+  vp = uv - .5;
+  col *= clamp(1.0 - dot(vp * vec2(1.25, 1.15), vp * vec2(1.25, 1.15)) * .58, 0.0, 1.0);
+  col = col / (col + .16);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
   const SCENES = [
     {
       id: 'night-sky',
@@ -427,6 +767,18 @@ void main() {
       label: '朝凪',
       emoji: '🌅',
       fragmentSource: DAWN_LAKE_FRAG
+    },
+    {
+      id: 'sakura-breeze',
+      label: '花霞',
+      emoji: '🌸',
+      fragmentSource: SAKURA_BREEZE_FRAG
+    },
+    {
+      id: 'emerald-console',
+      label: '翠の端末',
+      emoji: '🖥️',
+      fragmentSource: EMERALD_CONSOLE_FRAG
     }
   ];
 

@@ -235,6 +235,50 @@
         --zen-ripple-glow: rgba(255, 191, 122, 0.2);
       }
 
+      #zen-overlay[data-zen-scene="sakura-breeze"] {
+        background: #130a16;
+
+        --zen-comment-color: rgba(255, 246, 244, 0.98);
+        --zen-comment-shadow:
+          0 0 24px rgba(255, 196, 214, 0.34),
+          0 0 58px rgba(214, 113, 144, 0.18),
+          0 0 92px rgba(77, 25, 46, 0.22),
+          0 2px 12px rgba(0, 0, 0, 0.92);
+        --zen-comment-spacing: 0.13em;
+        --zen-switch-bg: rgba(26, 10, 20, 0.52);
+        --zen-switch-border: rgba(255, 220, 228, 0.14);
+        --zen-switch-text: rgba(255, 238, 242, 0.8);
+        --zen-switch-active-bg: rgba(255, 192, 212, 0.16);
+        --zen-switch-active-border: rgba(255, 224, 233, 0.26);
+        --zen-switch-active-text: rgba(255, 248, 250, 0.98);
+        --zen-aura-core: rgba(255, 214, 227, 0.22);
+        --zen-aura-mid: rgba(216, 130, 170, 0.1);
+        --zen-ripple-ring: rgba(255, 227, 235, 0.3);
+        --zen-ripple-glow: rgba(247, 171, 198, 0.24);
+      }
+
+      #zen-overlay[data-zen-scene="emerald-console"] {
+        background: #010703;
+
+        --zen-comment-color: rgba(215, 255, 229, 0.95);
+        --zen-comment-shadow:
+          0 0 18px rgba(106, 255, 172, 0.34),
+          0 0 46px rgba(37, 154, 86, 0.24),
+          0 0 88px rgba(9, 72, 38, 0.16),
+          0 2px 12px rgba(0, 0, 0, 0.96);
+        --zen-comment-spacing: 0.11em;
+        --zen-switch-bg: rgba(1, 15, 7, 0.58);
+        --zen-switch-border: rgba(127, 255, 182, 0.16);
+        --zen-switch-text: rgba(207, 255, 225, 0.76);
+        --zen-switch-active-bg: rgba(86, 229, 140, 0.14);
+        --zen-switch-active-border: rgba(161, 255, 196, 0.28);
+        --zen-switch-active-text: rgba(240, 255, 245, 0.98);
+        --zen-aura-core: rgba(89, 255, 164, 0.18);
+        --zen-aura-mid: rgba(20, 122, 70, 0.1);
+        --zen-ripple-ring: rgba(159, 255, 202, 0.22);
+        --zen-ripple-glow: rgba(38, 174, 97, 0.26);
+      }
+
       #zen-canvas {
         position: absolute;
         inset: 0;
@@ -369,6 +413,20 @@
         transform: translate3d(0, 18px, 0) scale(0.985);
         filter: blur(12px);
         will-change: opacity, transform, filter;
+      }
+
+      #zen-overlay[data-zen-scene="emerald-console"] #zen-comment {
+        font-family:
+          SFMono-Regular,
+          "Cascadia Mono",
+          "Segoe UI Mono",
+          Menlo,
+          Monaco,
+          "BIZ UDPGothic",
+          "Noto Sans JP",
+          monospace;
+        font-weight: 400;
+        line-height: 2.1;
       }
 
       #zen-ui {

@@ -137,6 +137,56 @@ class TestCommentDisplay:
         expect(like_button).to_be_visible()
 
 
+class TestZenMode:
+    """Zenモードの表示とテーマ切り替えを確認するテスト群。"""
+
+    def test_can_switch_to_sakura_breeze_scene(self, page: Page, db):
+        """
+        【確認内容】Zenモードを開いて桜テーマへ切り替えられる
+
+        新しく追加したテーマボタンが表示され、
+        クリックで data-zen-scene が更新されることを確認する。
+        """
+        _seed_basic(db, login="fan_sakura", comment_body="春の風にことばがほどける")
+
+        page.goto("/u/fan_sakura")
+
+        page.locator("#zen-mode-btn").click()
+
+        overlay = page.locator("#zen-overlay")
+        sakura_button = page.locator(".zen-theme-btn[data-scene-id='sakura-breeze']")
+
+        expect(overlay).to_be_visible()
+        expect(sakura_button).to_be_visible()
+
+        sakura_button.click()
+
+        expect(overlay).to_have_attribute("data-zen-scene", "sakura-breeze")
+
+    def test_can_switch_to_emerald_console_scene(self, page: Page, db):
+        """
+        【確認内容】Zenモードを開いて新しい翠の端末シーンへ切り替えられる
+
+        JavaScript で構築されるテーマ切り替えボタンが表示され、
+        クリックで data-zen-scene が更新されることを確認する。
+        """
+        _seed_basic(db, login="fan_zen", comment_body="静かなコードの雨が見たい")
+
+        page.goto("/u/fan_zen")
+
+        page.locator("#zen-mode-btn").click()
+
+        overlay = page.locator("#zen-overlay")
+        emerald_button = page.locator(".zen-theme-btn[data-scene-id='emerald-console']")
+
+        expect(overlay).to_be_visible()
+        expect(emerald_button).to_be_visible()
+
+        emerald_button.click()
+
+        expect(overlay).to_have_attribute("data-zen-scene", "emerald-console")
+
+
 class TestFilterForm:
     """フィルターフォームの動作を確認するテスト群。"""
 
