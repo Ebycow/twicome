@@ -115,10 +115,13 @@ def update_index_for_user(conn, login: str):
             json={"comment_ids": chunk_ids, "texts": chunk_texts},
             timeout=180,
         )
-        if not resp.ok:
-            print(f"  faiss-api エラー [{resp.status_code}]: {resp.text}")
         resp.raise_for_status()
-        result = resp.json()
+        try:
+            result = resp.json()
+        except ValueError as e:
+            raise RuntimeError(
+                f"faiss-api レスポンスのJSONパースに失敗しました [{resp.status_code}]: {resp.text[:200]}"
+            ) from e
         total_added += result["added"]
 
         chunk_num = i // CHUNK_SIZE + 1

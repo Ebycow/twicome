@@ -10,9 +10,12 @@
   window.vote = function (btn, commentId, type) {
     const url = `${rootPath}/${type === 'like' ? 'like' : 'dislike'}/${encodeURIComponent(commentId)}`;
     fetch(url, { method: 'POST' })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        if (!res.ok) { return null; }
+        return res.json().catch(function () { return null; });
+      })
       .then(function (data) {
-        if (data.error) { return; }
+        if (!data || data.error) { return; }
         const count = parseInt(btn.getAttribute('data-count') || '0', 10) + 1;
         btn.setAttribute('data-count', count);
         const icon = type === 'like' ? '<i class="fa-solid fa-thumbs-up"></i>' : '<i class="fa-solid fa-thumbs-down"></i>';

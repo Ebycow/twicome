@@ -71,7 +71,7 @@ def cluster_explorer(
         try:
             raw = faiss_search.get_clusters(login, n_clusters=n_clusters)
             clusters = _build_cluster_display(raw, db)
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             error = str(e)
 
     return templates.TemplateResponse(
@@ -134,7 +134,7 @@ def cluster_comments_page(
                 now = datetime.now(UTC)
                 raw = comment_repo.fetch_comments_by_ids(db, ids)
                 comments = [decorate_comment(c, now) for c in raw]
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             error = str(e)
 
     return templates.TemplateResponse(
@@ -176,7 +176,7 @@ def cluster_comments_page_post(
                 now = datetime.now(UTC)
                 raw = comment_repo.fetch_comments_by_ids(db, ids)
                 comments = [decorate_comment(c, now) for c in raw]
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             error = str(e)
 
     return templates.TemplateResponse(
@@ -203,5 +203,5 @@ def subcluster_api(login: str, req: SubclusterRequest):
             )
             subclusters = _build_cluster_display(raw, db)
             return JSONResponse({"subclusters": subclusters})
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             return JSONResponse({"error": str(e)}, status_code=500)

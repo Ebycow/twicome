@@ -1,13 +1,22 @@
 (function () {
-  const filters = JSON.parse(document.getElementById('filters-data').textContent);
-  const rawRootPath = JSON.parse(document.getElementById('root-path-data').textContent);
+  /**
+   * 指定IDの要素のtextContentをJSONパースして返す。失敗時はnullを返す。
+   * @param {string} id - 対象要素のID
+   * @returns {*} パース結果、または null
+   */
+  function parseJsonEl(id) {
+    try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return null; }
+  }
+  const filters = parseJsonEl('filters-data');
+  const rawRootPath = parseJsonEl('root-path-data');
+  if (filters === null || rawRootPath === null) { return; }
   const normalizedRootPath = (typeof rawRootPath === 'string') ? rawRootPath.trim() : '';
   const rootPath = (normalizedRootPath && normalizedRootPath !== '/') ? normalizedRootPath.replace(/\/+$/, '') : '';
   const voteCountsApiUrl = `${rootPath  }/api/comments/votes`;
-  const initialPage = JSON.parse(document.getElementById('page-data').textContent);
-  let totalPages = JSON.parse(document.getElementById('pages-data').textContent);
-  const userLogin = JSON.parse(document.getElementById('user-data').textContent);
-  const currentDataVersion = JSON.parse(document.getElementById('data-version-data').textContent);
+  const initialPage = parseJsonEl('page-data');
+  let totalPages = parseJsonEl('pages-data');
+  const userLogin = parseJsonEl('user-data');
+  const currentDataVersion = parseJsonEl('data-version-data');
 
   // markVisited
   if (window.TwicomeOfflineAccess) {
@@ -560,7 +569,7 @@
       const buf = new Uint8Array(totalLen);
       let offset = 0;
       for (let i = 0; i < chunks.length; i++) { buf.set(chunks[i], offset); offset += chunks[i].length; }
-      const binary = String.fromCharCode.apply(null, buf);
+      const binary = Array.from(buf, function (b) { return String.fromCharCode(b); }).join('');
       return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     } catch (e) { return null; }
   }
