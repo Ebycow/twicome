@@ -614,6 +614,147 @@ void main(){
 }
 `;
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   業火 (Inferno) — 戦場の炎シェーダー
+   ドメインワープFBM炎 + 上昇火の粉パーティクル + 煙
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+const INFERNO_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_phase;
+
+/* ── ハッシュ & スムーズノイズ ── */
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+
+/* ── 4オクターブFBM アンロール済み ── */
+float fbm4(vec2 p){
+  float v=0.;
+  v+=.500*vn(p);p=p*2.13+vec2(7.2,3.8);
+  v+=.250*vn(p);p=p*2.13+vec2(7.2,3.8);
+  v+=.125*vn(p);p=p*2.13+vec2(7.2,3.8);
+  v+=.063*vn(p);
+  return v*.941;
+}
+
+/* ── 上昇火の粉パーティクル レイヤー ──
+   【最適化】
+   - exp() → max(0,1-d²/sz²)² 二乗フォールオフ: 超越関数を排除
+   - 密度カリング if(r1>.22): ~22%の空セルを早期スキップ(HOTARUBIと同手法)
+     → grid cellはwavefront幅より大きいため分岐一致率が高く効率的
+   【動き】
+   - rise y幅 ×0.82 → ×1.6: セル境界を越えて高速上昇
+   - 2周波ゆれ: sin(速)＋cos(遅)で蝶のような有機的ゆらぎ
+   - spd 2.5〜3×高速化 */
+float emberLayer(vec2 uv,float t,float dens,float sz,float seed,float spd){
+  vec2 p=uv*dens;
+  vec2 id=floor(p);
+  vec2 st=fract(p)-.5;
+  float acc=0.;
+  float sz2=sz*sz;
+  for(int ii=-1;ii<=1;ii++){
+    for(int jj=-1;jj<=1;jj++){
+      vec2 nid=id+vec2(float(ii),float(jj));
+      float r1=h2(nid+seed);
+      /* 密度カリング: スパースセルをスキップ */
+      if(r1>.22){
+        float r2=h2(nid+seed+5.1);
+        float r3=h2(nid+seed+9.7);
+        float r4=h2(nid+seed+14.3);
+        /* 高速上昇フェーズ */
+        float rise=fract(r1*1.9+t*spd*(0.5+r2*.8));
+        /* 2周波横ゆれ: 速い揺れ＋遅いドリフト */
+        float drift=(r3-.5)*.28
+                   +sin(t*(2.8+r2*1.2)+r1*6.28)*.18
+                   +cos(t*(1.1+r4*.7) +r3*3.14)*.08;
+        /* y: セルを跨いで高速上昇 (移動幅 0.82→1.6 で約2倍) */
+        vec2 pos=vec2(drift,(rise-.5)*1.6);
+        vec2 d=st-vec2(float(ii),float(jj))-pos;
+        /* 二乗フォールオフ (exp不使用) */
+        float g=max(0.,1.-dot(d,d)/sz2);
+        float br=(1.-rise*.55)*(0.35+r1*.65)
+                *smoothstep(0.,.06,rise)*smoothstep(1.,.65,rise);
+        acc+=g*g*br;
+      }
+    }
+  }
+  return clamp(acc,0.,1.);
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float ar=u_res.x/u_res.y;
+  float t=u_time*.65;
+
+  /* ── 漆黒の空 + 地平線の紅蓮グロー ── */
+  vec3 col=mix(vec3(.006,.001,.0),vec3(0.),uv.y);
+  col+=vec3(.22,.028,.001)*pow(max(0.,1.-uv.y/.20),2.0);
+  col+=vec3(.08,.007,.0)*pow(max(0.,1.-uv.y/.54),3.0);
+
+  /* ── 熱揺らぎ歪み ── */
+  vec2 uvA=uv*vec2(ar,1.);
+  float shimX=vn(uvA*vec2(2.4,3.9)+vec2(t*.53,-t*.78))*.046
+             +vn(uvA*vec2(5.7,7.3)-vec2(t*.36,t*.50))*.017;
+  vec2 fuv=vec2(uv.x+shimX/ar,uv.y);
+  vec2 fuvA=vec2(fuv.x*ar,fuv.y);
+
+  /* ── 炎本体 ── ドメインワープFBM */
+  /* yFlame: 画面下=1, 炎最大高(flameH)=0, それ以上=負 → 炎が下から広がる */
+  float flameH=.50;
+  float yFlame=1.-uv.y/flameH;
+  vec2 fp=vec2(fuvA.x*.88,yFlame*1.72-t*.88);
+  float warp=fbm4(fp+vec2(t*.14,0.));
+  float fn=fbm4(fp+warp*.48);
+
+  float fmask=clamp(fn*.78+yFlame*.56-.24,0.,1.);
+
+  /* 温度 → カラーランプ: 暗赤 → 深紅 → 橙 → 黄橙 → 黄白 → 白 */
+  float heat=clamp(fn*.92+yFlame*.32,0.,1.);
+  vec3 fCol=vec3(.08,.0,.0);
+  fCol=mix(fCol,vec3(.64,.04,.0), smoothstep(.0,.26,heat));
+  fCol=mix(fCol,vec3(1.,.22,.01),smoothstep(.26,.46,heat));
+  fCol=mix(fCol,vec3(1.,.58,.04),smoothstep(.46,.64,heat));
+  fCol=mix(fCol,vec3(1.,.84,.12),smoothstep(.64,.79,heat));
+  fCol=mix(fCol,vec3(1.,1.,.65), smoothstep(.79,.91,heat));
+  fCol=mix(fCol,vec3(1.,1.,1.),  smoothstep(.91,1.,heat));
+  col=mix(col,fCol,clamp(fmask*2.8,0.,1.));
+
+  /* ── 火の粉パーティクル 3層 ──
+     sz: 二乗フォールオフはGaussianより急なため×1.3補正
+     spd: 2.5〜3×高速化で上昇を視覚的に明確に */
+  float e0=emberLayer(fuvA,t,5.5,.024,1.70,.50)*1.3;
+  float e1=emberLayer(fuvA,t,9.0,.016,5.30,.72)*.9;
+  float e2=emberLayer(fuvA,t,3.5,.038,11.1,.36)*1.6;
+  float emb=clamp(e0+e1+e2,0.,1.);
+  /* 炎本体底部を隠し、上部では自然に消える */
+  float embFade=smoothstep(.06,.18,uv.y)*smoothstep(.96,.75,uv.y);
+  vec3 embCol=mix(vec3(1.,.48,.03),vec3(1.,.78,.16),clamp(e0+e2*1.5,0.,1.));
+  col+=embCol*emb*embFade*2.2;
+  /* 解析的ブルーム */
+  col+=embCol*.38*emb*emb*embFade;
+
+  /* ── 煙 (炎上部の暗い揺らぎ) ── */
+  float smkF=smoothstep(.38,.70,uv.y)*smoothstep(.92,.42,uv.y);
+  vec2 sp=vec2(fuv.x*.9+t*.032,uv.y*1.1-t*.08);
+  float sn=vn(sp)*.6+vn(sp*2.1+vec2(3.1,7.4))*.4;
+  col=mix(col,col*vec3(.05,.025,.01),sn*smkF*.85);
+
+  /* ── ビネット ── */
+  vec2 vp=uv-.5;
+  col*=clamp(1.-dot(vp*vec2(1.1,.9),vp*vec2(1.1,.9))*.55,0.,1.);
+
+  /* ── ACESフィルミックトーンマッピング ── */
+  col=col*(2.51*col+.03)/(col*(2.43*col+.59)+.14);
+
+  /* ── 微細フィルムグレイン ── */
+  col+=h2(gl_FragCoord.xy+floor(t*24.)*vec2(11.3,23.7))*.016-.008;
+
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
+}
+`;
+
 export const SCENES = [
   {
     id: 'night-sky',
@@ -644,6 +785,12 @@ export const SCENES = [
     label: '蛍火',
     emoji: '✨',
     fragmentSource: HOTARUBI_FRAG
+  },
+  {
+    id: 'inferno',
+    label: '業火',
+    emoji: '🔥',
+    fragmentSource: INFERNO_FRAG
   }
 ];
 

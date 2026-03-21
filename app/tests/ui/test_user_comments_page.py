@@ -186,6 +186,29 @@ class TestZenMode:
 
         expect(overlay).to_have_attribute("data-zen-scene", "snow-day")
 
+    def test_can_switch_to_inferno_scene(self, page: Page, db):
+        """
+        【確認内容】Zenモードを開いて業火シーンへ切り替えられる
+
+        JavaScript で構築されるテーマ切り替えボタンが表示され、
+        クリックで data-zen-scene が更新されることを確認する。
+        """
+        _seed_basic(db, login="fan_inferno", comment_body="炎よ燃えろ、戦場に誇りを示せ")
+
+        page.goto("/u/fan_inferno")
+
+        page.locator("#zen-mode-btn").click()
+
+        overlay = page.locator("#zen-overlay")
+        inferno_button = page.locator(".zen-theme-btn[data-scene-id='inferno']")
+
+        expect(overlay).to_be_visible()
+        expect(inferno_button).to_be_visible()
+
+        inferno_button.click()
+
+        expect(overlay).to_have_attribute("data-zen-scene", "inferno")
+
 
 class TestFilterForm:
     """フィルターフォームの動作を確認するテスト群。"""
