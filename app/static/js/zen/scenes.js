@@ -755,6 +755,82 @@ void main(){
 }
 `;
 
+const HAKKOU_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_phase;
+
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+
+/* アスペクト補正距離 */
+float adist(vec2 a, vec2 b, float ar) {
+  vec2 d = a - b;
+  return length(vec2(d.x * ar, d.y));
+}
+
+/* 1波源からの減衰サイン波 */
+float ripple(vec2 p, vec2 src, float ar, float fq, float spd, float t) {
+  float d = adist(p, src, ar);
+  return sin(d * fq - t * spd) / (1.0 + d * 5.0);
+}
+
+/* 5波源の干渉場 — fqBase でチャンネルごとに虹色ずれ */
+float waveField(vec2 p, float ar, float t, float fqBase) {
+  float w = 0.0;
+  w += ripple(p, vec2(0.50 + cos(t*0.072        )*0.26, 0.50 + sin(t*0.055        )*0.20), ar, fqBase,      1.10, t);
+  w += ripple(p, vec2(0.50 + cos(t*0.061+1.257  )*0.24, 0.50 + sin(t*0.048+1.257  )*0.19), ar, fqBase+1.4, 1.25, t);
+  w += ripple(p, vec2(0.50 + cos(t*0.083+2.513  )*0.21, 0.50 + sin(t*0.066+2.513  )*0.18), ar, fqBase+2.9, 1.08, t);
+  w += ripple(p, vec2(0.50 + cos(t*0.057+3.770  )*0.28, 0.50 + sin(t*0.044+3.770  )*0.21), ar, fqBase+0.7, 1.18, t);
+  w += ripple(p, vec2(0.50 + cos(t*0.077+5.027  )*0.18, 0.50 + sin(t*0.060+5.027  )*0.17), ar, fqBase+2.2, 1.32, t);
+  return w * 0.20;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float ar = u_res.x / u_res.y;
+  float t = u_time * 0.36;
+
+  /* ── 樽型収差: 端ほど R 外・B 内へずれる ── */
+  vec2 ctr = uv - 0.5;
+  float barrel = dot(ctr, ctr);
+  vec2 uvR = uv + ctr * barrel * 0.050;
+  vec2 uvB = uv - ctr * barrel * 0.034;
+
+  /* ── 干渉コースティクス (チャンネル別周波数 → 虹色縞) ── */
+  float str = 0.038;
+  vec3 col = vec3(
+    0.978 + waveField(uvR, ar, t, 12.0) * str,
+    0.975 + waveField(uv,  ar, t, 13.5) * str,
+    0.970 + waveField(uvB, ar, t, 15.1) * str
+  );
+
+  /* ── 漂うパステルカラーハゼ (ローズ / スカイ / ラベンダー) ── */
+  float ts = u_time * 0.045;
+  vec2 b0 = vec2(0.50 + cos(ts        )*0.27, 0.50 + sin(ts*0.73        )*0.21);
+  vec2 b1 = vec2(0.50 + cos(ts*0.67+2.1)*0.25, 0.50 + sin(ts*0.81+1.3)*0.20);
+  vec2 b2 = vec2(0.50 + cos(ts*0.53+4.3)*0.23, 0.50 + sin(ts*0.62+2.7)*0.21);
+  vec2 e0 = uv - b0; float g0 = exp(-dot(vec2(e0.x*ar,e0.y),vec2(e0.x*ar,e0.y)) / 0.058);
+  vec2 e1 = uv - b1; float g1 = exp(-dot(vec2(e1.x*ar,e1.y),vec2(e1.x*ar,e1.y)) / 0.048);
+  vec2 e2 = uv - b2; float g2 = exp(-dot(vec2(e2.x*ar,e2.y),vec2(e2.x*ar,e2.y)) / 0.040);
+  col = mix(col, vec3(0.980, 0.920, 0.930), g0 * 0.18);
+  col = mix(col, vec3(0.920, 0.940, 0.980), g1 * 0.15);
+  col = mix(col, vec3(0.950, 0.910, 0.980), g2 * 0.14);
+
+  /* ── 紙の繊維グレイン ── */
+  col -= vn(uv * 200.0) * 0.007 + vn(uv * 480.0) * 0.003;
+
+  /* ── ビネット ── */
+  col *= 1.0 - dot(ctr * vec2(1.3, 1.0), ctr * vec2(1.3, 1.0)) * 0.65;
+
+  /* ── 時間変化フィルムグレイン ── */
+  col += (h2(gl_FragCoord.xy + floor(u_time * 24.0) * vec2(13.1, 29.7)) - 0.5) * 0.010;
+
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+`;
+
 export const SCENES = [
   {
     id: 'night-sky',
@@ -791,6 +867,12 @@ export const SCENES = [
     label: '業火',
     emoji: '🔥',
     fragmentSource: INFERNO_FRAG
+  },
+  {
+    id: 'hakkou',
+    label: '白光',
+    emoji: '🤍',
+    fragmentSource: HAKKOU_FRAG
   }
 ];
 

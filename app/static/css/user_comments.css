@@ -301,6 +301,51 @@
         --zen-ripple-glow: rgba(220, 72, 8, 0.28);
       }
 
+      #zen-overlay[data-zen-scene="hakkou"] {
+        background: #faf9f7;
+
+        --zen-comment-color: rgba(32, 28, 24, 0.84);
+        --zen-comment-shadow:
+          0 1px 8px rgba(60, 50, 38, 0.10),
+          0 0 24px rgba(100, 80, 55, 0.07);
+        --zen-comment-spacing: 0.16em;
+        --zen-switch-bg: rgba(238, 234, 226, 0.82);
+        --zen-switch-border: rgba(50, 42, 32, 0.12);
+        --zen-switch-text: rgba(52, 46, 38, 0.84);
+        --zen-switch-active-bg: rgba(208, 200, 186, 0.78);
+        --zen-switch-active-border: rgba(72, 62, 48, 0.28);
+        --zen-switch-active-text: rgba(24, 20, 14, 0.96);
+        --zen-aura-core: rgba(160, 145, 125, 0.14);
+        --zen-aura-mid: rgba(130, 150, 185, 0.07);
+        --zen-ripple-ring: rgba(120, 108, 92, 0.16);
+        --zen-ripple-glow: rgba(140, 126, 108, 0.12);
+      }
+
+      /* 白地ではオーラをスクリーンでなくマルチプライで重ねる */
+      #zen-overlay[data-zen-scene="hakkou"] #zen-comment-wrap::before {
+        mix-blend-mode: multiply;
+        opacity: 0.45;
+      }
+
+      /* ホバー・ボタンを白地向けに調整 */
+      #zen-overlay[data-zen-scene="hakkou"] #zen-ui-left button,
+      #zen-overlay[data-zen-scene="hakkou"] #zen-ui button {
+        background: rgba(38, 32, 24, 0.34);
+        border-color: rgba(38, 32, 24, 0.18);
+        color: rgba(255, 252, 248, 0.90);
+      }
+
+      #zen-overlay[data-zen-scene="hakkou"] #zen-ui-left button:hover,
+      #zen-overlay[data-zen-scene="hakkou"] #zen-ui button:hover {
+        background: rgba(38, 32, 24, 0.52);
+        color: rgba(255, 252, 248, 1.0);
+      }
+
+      #zen-overlay[data-zen-scene="hakkou"] .zen-theme-btn:hover {
+        background: rgba(38, 32, 24, 0.10);
+        color: rgba(32, 26, 18, 0.96);
+      }
+
       /* 業火シーン: コメントを太く力強く */
       #zen-overlay[data-zen-scene="inferno"] #zen-comment {
         font-weight: 500;
