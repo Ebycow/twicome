@@ -748,6 +748,123 @@ void main() {
 }
 `;
 
+  const SHIROGANE_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float h1(float n){return h2(vec2(n,n*.6271));}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1.,0.)),f.x),mix(h2(i+vec2(0.,1.)),h2(i+vec2(1.,1.)),f.x),f.y);}
+
+// 雪片：六弁輝き（cos6θをatan不要の多項式で計算）・シマー付き
+// dens:密度 spd:落下速度 sz:半径 wnd:横揺れ seed:種
+float snowFlake(vec2 uv,float t,float dens,float spd,float sz,float wnd,float seed){
+  vec2 p=vec2(uv.x+sin(uv.y*2.6+t*.38+seed*4.1)*wnd, uv.y+t*spd)*dens;
+  vec2 id=floor(p); vec2 st=fract(p)-.5;
+  vec2 jit=vec2(h2(id+seed)-.5, h2(id+seed+vec2(3.1,7.7))-.5)*.68;
+  vec2 d=st-jit; float r=length(d);
+  float gate=step(.70,h2(id+seed+vec2(11.3,5.9)));
+  // cos(6θ) = Re[(x+iy)^6]/r^6 : atan不使用・精度高・安価
+  vec2 nd=d/max(r,.001); float x2=nd.x*nd.x,y2=nd.y*nd.y;
+  float cos6=x2*x2*x2-15.*x2*x2*y2+15.*x2*y2*y2-y2*y2*y2;
+  float hex=.70+.30*cos6*smoothstep(sz*.9,sz*.1,r);
+  float shim=.78+.22*sin(t*(1.6+h1(h2(id+seed))*2.8)+h2(id+seed)*6.28);
+  return smoothstep(sz,sz*.05,r)*gate*hex*shim;
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float ar=u_res.x/u_res.y;
+  float t=u_time;
+
+  // ── 深夜藍の空 ─────────────────────────────────────────────────────────────
+  vec3 col=mix(vec3(.022,.040,.095),vec3(.006,.008,.045),uv.y*uv.y);
+
+  // ── 淡いオーロラの残光（ごく繊細な蒼帯） ────────────────────────────────
+  float aur=vn(vec2(uv.x*1.5+t*.018,uv.y*7.+2.8))
+           +vn(vec2(uv.x*3.4-t*.012,uv.y*14.+5.))*.5;
+  col+=vec3(.010,.022,.038)*smoothstep(.42,.84,aur)
+      *smoothstep(.54,.62,uv.y)*(1.-smoothstep(.76,.92,uv.y));
+
+  // ── 月（右上・満月寄り） ──────────────────────────────────────────────────
+  vec2 mv=(uv-vec2(.74,.84))*vec2(ar,1.);
+  float md=length(mv);
+  float moon=smoothstep(.028,.024,md);
+  float crat=vn(mv/.026*6.+1.8)*.036+vn(mv/.026*14.+4.2)*.018;
+  col+=vec3(.92,.91,.82)*moon*(.96-crat*moon);
+  // 月暈（内輪・外輪・霞散乱）
+  col+=vec3(.56,.66,.88)*exp(-md*10.)*.07;
+  col+=vec3(.28,.38,.68)*exp(-md*3.8)*.04;
+  col+=vec3(.14,.20,.40)*exp(-md*1.4)*.025;
+
+  // ── 星（2密度層・月明かりで自然に抑制） ─────────────────────────────────
+  vec2 ss; vec2 si; vec2 sf; float hh; vec2 jstar;
+  ss=uv*vec2(52.,30.); si=floor(ss); sf=fract(ss)-.5; hh=h2(si+10.);
+  if(hh>.882){jstar=vec2(h2(si+.3)-.5,h2(si+.7)-.5)*.6;
+    col+=vec3(.70,.82,1.)*smoothstep(.042,.0,length(sf-jstar))*(.5+.5*sin(t*(1.1+hh*2.)+hh*22.))*.44;}
+  ss=uv*vec2(106.,61.); si=floor(ss); sf=fract(ss)-.5; hh=h2(si+50.);
+  if(hh>.902){jstar=vec2(h2(si+10.3)-.5,h2(si+10.7)-.5)*.62;
+    col+=vec3(.60,.74,.96)*smoothstep(.026,.0,length(sf-jstar))*.22;}
+
+  // ── 雪雲（月をごく薄く覆う） ─────────────────────────────────────────────
+  float cld=vn(vec2(uv.x*2.2+t*.005,uv.y*5.+1.2))*.6
+           +vn(vec2(uv.x*4.8-t*.008,uv.y*10.+3.4))*.4;
+  float cldM=smoothstep(.58,.82,uv.y)*(1.-smoothstep(.88,1.,uv.y));
+  col+=vec3(.016,.022,.038)*smoothstep(.48,.78,cld)*cldM*.6;
+  col+=vec3(.04,.06,.14)*exp(-md*2.8)*smoothstep(.48,.68,cld)*cldM*.3;
+
+  // ── 雪山シルエット（雪帽付き） ────────────────────────────────────────────
+  float ridge=.38+(vn(vec2(uv.x*2.2,1.4))-.5)*.13
+             +(vn(vec2(uv.x*5.8,7.2))-.5)*.042
+             +sin(uv.x*3.3+.9)*.016;
+  float mtn=1.-smoothstep(ridge-.006,ridge+.005,uv.y);
+  vec3 mtnCol=mix(vec3(.030,.044,.076),vec3(.054,.072,.110),uv.x);
+  mtnCol+=vec3(.06,.08,.18)*exp(-abs(uv.x-.74)*5.)*.12;
+  float cap=smoothstep(ridge+.016,ridge-.002,uv.y)*mtn;
+  mtnCol=mix(mtnCol,vec3(.68,.78,.90),cap*.65);
+  col=mix(col,mtnCol,mtn*.96);
+  // 山稜境界の薄靄
+  col+=vec3(.28,.38,.62)*exp(-abs(uv.y-ridge)*28.)*(1.-mtn)*.06;
+
+  // ── 雪原（月明かりに照らされた青白い輝き） ───────────────────────────────
+  float snowY=.16+(vn(vec2(uv.x*4.8,2.7))-.5)*.022;
+  float gnd=1.-smoothstep(snowY-.006,snowY+.005,uv.y);
+  vec3 snowGnd=mix(vec3(.26,.36,.58),vec3(.46,.58,.78),uv.y/max(snowY,.001));
+  // 月光の反射筋
+  snowGnd+=vec3(.08,.12,.26)*exp(-abs(uv.x-.74)*7.)*(1.-uv.y/max(snowY,.001))*.22;
+  // 雪面凹凸テクスチャ
+  snowGnd+=(vn(vec2(uv.x*22.+t*.006,uv.y*11.))-.5)*.020;
+  col=mix(col,snowGnd,gnd*.97);
+  // 積雪縁の微光
+  col+=vec3(.42,.56,.76)*exp(-abs(uv.y-snowY)*18.)*(1.-gnd)*.06;
+
+  // ── 降雪：3深度レイヤー（遠・中・近） ────────────────────────────────────
+  // アスペクト比補正で円形な雪片を保証
+  vec2 uvA=uv*vec2(ar,1.);
+  float abv=1.-gnd; // 地面より上のみに降雪を表示
+  // 遠景：細かく・速く・多く・淡い
+  col+=vec3(.54,.66,.84)*snowFlake(uvA,t,88.,.058,.014,.005, 0.0)*abv*.26;
+  // 中景：中程度
+  col+=vec3(.70,.80,.94)*snowFlake(uvA,t,48.,.040,.022,.009,17.3)*abv*.42;
+  // 近景：大きく・ゆっくり・月明かりで僅かに暖色
+  col+=mix(vec3(.82,.88,.98),vec3(.92,.92,.86),exp(-abs(uv.x-.74)*4.)*.4)
+      *snowFlake(uvA,t,22.,.026,.036,.015,37.8)*abv*.68;
+
+  // ── フィルムグレイン（ごく微量） ─────────────────────────────────────────
+  col+=(vn(gl_FragCoord.xy*.68+t*.16)-.5)*.005;
+
+  // ── ビネット ─────────────────────────────────────────────────────────────
+  vec2 vp=uv-.5;
+  col*=clamp(1.-dot(vp*vec2(1.38,1.18),vp*vec2(1.38,1.18))*.50,0.,1.);
+
+  // ── トーンマップ（暗部の柔らかさを保持） ────────────────────────────────
+  col=col/(col+.08);
+
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
+}
+`;
+
   const SCENES = [
     {
       id: 'night-sky',
@@ -778,6 +895,12 @@ void main() {
       label: '翠の端末',
       emoji: '🖥️',
       fragmentSource: EMERALD_CONSOLE_FRAG
+    },
+    {
+      id: 'shirogane',
+      label: '白銀夜',
+      emoji: '❄️',
+      fragmentSource: SHIROGANE_FRAG
     }
   ];
 
