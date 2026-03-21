@@ -88,35 +88,41 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
       commentEl.style.filter = 'blur(0)';
     }
 
-    state.slideTimer = setTimeout(function () {
+    const minDisplayPromise = new Promise(function (r) {
+      state.slideTimer = setTimeout(function () {
+        state.slideTimer = null;
+        r();
+      }, isMatrix ? 6500 : 5200);
+    });
+
+    Promise.all([minDisplayPromise, ttsPromise]).then(function () {
       if (gen !== generation) {
         return;
       }
-      state.slideTimer = null;
 
       const stillMatrix = state.currentSceneId === 'matrix-rain';
       if (stillMatrix) {
         commentEl.style.transition = 'opacity 0.25s ease';
         commentEl.style.opacity = '0';
-        Promise.all([new Promise(function (r) { setTimeout(r, 400); }), ttsPromise]).then(function () {
+        setTimeout(function () {
           if (gen !== generation) {
             return;
           }
           showNextComment();
-        });
+        }, 400);
       } else {
         commentEl.style.transition = 'opacity 1.4s ease, transform 1.8s ease, filter 1.8s ease';
         commentEl.style.opacity = '0';
         commentEl.style.transform = 'translate3d(0, -18px, 0) scale(1.015)';
         commentEl.style.filter = 'blur(10px)';
-        Promise.all([new Promise(function (r) { setTimeout(r, 1500); }), ttsPromise]).then(function () {
+        setTimeout(function () {
           if (gen !== generation) {
             return;
           }
           showNextComment();
-        });
+        }, 1500);
       }
-    }, isMatrix ? 6500 : 5200);
+    });
   }
 
   /**

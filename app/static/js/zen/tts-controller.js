@@ -34,7 +34,6 @@ export function createTTSController() {
       return Promise.resolve();
     }
 
-    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
     return new Promise(function (resolve) {
