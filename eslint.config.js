@@ -87,7 +87,7 @@ export default [
   {
     files: ["app/static/js/zen-mode.js", "app/static/js/zen/**/*.js"],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
       sourceType: "module",
       globals: {
         ...globals.browser,

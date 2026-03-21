@@ -1,10 +1,20 @@
 /* zen-mode.js – Zenモードエントリーポイント */
 
-import { SCENES, sceneMap, VERT } from './zen/scenes.js';
-import { createRenderer } from './zen/gl-renderer.js';
-import { createCarousel } from './zen/comment-carousel.js';
-import { createUIController } from './zen/ui-controller.js';
-import { createTTSController } from './zen/tts-controller.js';
+const _q = window.__ZEN_VERSION ? `?v=${window.__ZEN_VERSION}` : '';
+
+const [
+  { SCENES, sceneMap, VERT },
+  { createRenderer },
+  { createCarousel },
+  { createUIController },
+  { createTTSController },
+] = await Promise.all([
+  import(`./zen/scenes.js${_q}`),
+  import(`./zen/gl-renderer.js${_q}`),
+  import(`./zen/comment-carousel.js${_q}`),
+  import(`./zen/ui-controller.js${_q}`),
+  import(`./zen/tts-controller.js${_q}`),
+]);
 
 const STORAGE_KEY = 'twicome-zen-scene';
 const ATTR_POSITION = 0;
