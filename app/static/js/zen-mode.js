@@ -420,201 +420,148 @@ uniform vec2 u_res;
 float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
 float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
 float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1.,0.)),f.x),mix(h2(i+vec2(0.,1.)),h2(i+vec2(1.,1.)),f.x),f.y);}
-float fbm(vec2 p){
-  float v = 0.0;
-  v += vn(p) * .5;
-  p = p * 2.02 + vec2(3.7, 1.4);
-  v += vn(p) * .25;
-  p = p * 2.01 + vec2(1.3, 6.9);
-  v += vn(p) * .125;
-  p = p * 1.99 + vec2(4.8, 3.2);
-  v += vn(p) * .0625;
-  return v;
-}
+// 2オクターブのfbm（旧4オクターブから最適化）
+float fbm(vec2 p){return vn(p)*.60+vn(p*2.03+vec2(3.7,1.4))*.40;}
 
-mat2 rot2(float a){float s=sin(a),c=cos(a);return mat2(c,-s,s,c);}
+mat2 rot2(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 
-float sdSegment(vec2 p, vec2 a, vec2 b){
-  vec2 pa=p-a, ba=b-a;
-  float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);
-  return length(pa-ba*h);
-}
+float sdSeg(vec2 p,vec2 a,vec2 b){vec2 pa=p-a,ba=b-a;return length(pa-ba*clamp(dot(pa,ba)/dot(ba,ba),0.,1.));}
 
-// ── 花びら形状（先端に切れ込みのある丸弁） ──────────────────────────────────
+// ── 花びら形状（先端が広く基部が細い逆卵形＋先端Vノッチ） ─────────────────────
+// p: 花びらローカル座標（+y=先端, -y=茎）
 float petalMask(vec2 p) {
-  float ang = atan(p.x, p.y + .22);
-  float r   = length(vec2(p.x * .86, p.y + .06));
-  // 先端広め・基部細めの輪郭
-  float boundary = .32 + .09 * cos(2.0 * ang) + .015 * cos(4.0 * ang);
-  boundary *= .86 + .14 * smoothstep(-.26, .40, p.y);
-  float mask = 1.0 - smoothstep(boundary - .008, boundary + .036, r);
-  // 先端の切れ込み（桜弁）
-  float notch = 1.0 - smoothstep(.028, .092, length((p - vec2(0.0, .24)) * vec2(1.70, .68)));
-  // 茎側のフェードアウト
-  float tail  = 1.0 - smoothstep(.38, .60, p.y);
-  return clamp(mask * (1.0 - notch * .92) * tail, 0.0, 1.0);
+  // y位置から先端までの正規化パラメータ（0=基部 1=先端）
+  float q  = clamp((p.y + .14) / .46, 0.0, 1.0);
+  // 先端ほど半幅が広がる（sqrt で二次的に広がる形）
+  float hw = mix(.050, .230, sqrt(q));
+  // 輪郭：ソフトな境界
+  float body = 1.0 - smoothstep(hw - .022, hw + .022, abs(p.x));
+  // 上下マスク：基部フェード + 先端カット
+  float yMask = smoothstep(-.18, -.06, p.y) * (1.0 - smoothstep(.28, .38, p.y));
+  // 先端のV字切れ込み（桜弁の特徴）
+  float vd = abs(p.x) * 2.4 - (p.y - .22) * .55;
+  float notch = 1.0 - smoothstep(-.01, .08, vd);
+  return clamp(body * yMask * (1.0 - notch * .90), 0.0, 1.0);
 }
 
-// ── 春の夕暮れ空 ───────────────────────────────────────────────────────────────
-vec3 springSky(vec2 uv, float t, float ar) {
-  // 水平線：温かいサーモンピンク → ミッド：深みのある藤色 → 天頂：深紫藍
-  vec3 skyHor = vec3(1.0, .76, .66);
-  vec3 skyMid = vec3(.54, .28, .50);
-  vec3 skyZen = vec3(.07, .06, .20);
-  vec3 col = mix(skyHor, skyMid, smoothstep(.0, .32, uv.y));
-  col = mix(col, skyZen, smoothstep(.30, .92, uv.y));
+// ── 夕暮れの桜空（1雲層・星なし） ────────────────────────────────────────────
+vec3 sakuraSky(vec2 uv, float t, float ar) {
+  // 水平線：珊瑚ピンク → 深藤 → 夜藍
+  vec3 col = mix(vec3(.94,.70,.60), vec3(.56,.26,.48), smoothstep(.0,.36,uv.y));
+  col = mix(col, vec3(.07,.04,.17), smoothstep(.32,.90,uv.y));
 
-  // 夕日のグロー（水平線付近）
-  vec2 sunPos = vec2(.68, .54);
-  vec2 sunVec = (uv - sunPos) * vec2(ar * 1.05, 1.20);
-  float sunDist = length(sunVec);
-  col += vec3(1.0, .92, .78) * exp(-sunDist * sunDist * 12.0) * .70;
-  col += vec3(1.0, .76, .58) * exp(-sunDist * 3.4) * .22;
-  col += vec3(.70, .22, .18) * exp(-sunDist * 1.2) * .08;
+  // 太陽グロー（低め・輝度を抑えて花びらを目立たせる）
+  float sd = length((uv - vec2(.64,.34)) * vec2(ar, 1.0));
+  col += vec3(1.0,.90,.76) * exp(-sd*sd*10.) * .48;
+  col += vec3(.86,.46,.30) * exp(-sd*2.8) * .16;
 
-  // 淡い絹雲（2層）
-  float cA = fbm(vec2(uv.x * 2.6 - t * .007, uv.y * 4.4 + 1.2));
-  float cB = fbm(vec2(uv.x * 1.8 + t * .005 + 5.3, uv.y * 3.2 + 3.0));
-  float cloudMask = smoothstep(.24, .80, uv.y) * (1.0 - smoothstep(.68, .98, uv.y));
-  vec3 cloudTint = mix(vec3(1.0, .84, .78), vec3(.90, .66, .80), smoothstep(.26, .62, uv.y));
-  col += cloudTint * smoothstep(.50, .82, cA) * cloudMask * .38;
-  col += cloudTint * smoothstep(.52, .80, cB) * cloudMask * .22;
+  // 薄雲（1層のみ・fbm1回）
+  float cn = fbm(vec2(uv.x*2.8 - t*.006, uv.y*4.2 + 1.1));
+  float cm = smoothstep(.26,.72,uv.y) * (1.0 - smoothstep(.62,.92,uv.y));
+  col += mix(vec3(1.0,.82,.78), vec3(.86,.60,.74), uv.y*.8)
+       * smoothstep(.50,.80,cn) * cm * .36;
 
   // 水平線グロー帯
-  col += vec3(.28, .10, .16) * exp(-abs(uv.y - .20) * 8.0) * .18;
-
-  // 上空の星（微かな瞬き）
-  float starMask = smoothstep(.52, .76, uv.y);
-  float starVal  = vn(uv * 260.0 + vec2(t * .018, 0.0));
-  float starDot  = step(.972, starVal);
-  float twinkle  = .4 + .6 * sin(t * (1.4 + h2(floor(uv * 260.0)) * 3.2));
-  col += vec3(.96, .94, 1.0) * starDot * starMask * twinkle * .44;
+  col += vec3(.26,.09,.15) * exp(-abs(uv.y - .18)*9.) * .16;
 
   return col;
 }
 
-// ── 山稜線 ────────────────────────────────────────────────────────────────────
-float mountainRidge(float x, float baseY, float freq, float seed) {
-  float ridge = baseY;
-  ridge += (vn(vec2(x * freq,       seed))       - .5) * .08;
-  ridge += (vn(vec2(x * freq * 2.5, seed + 3.2)) - .5) * .030;
-  ridge += sin(x * (2.4 + seed * .3) + seed) * .012;
-  return ridge;
+// ── 山稜線（1層） ─────────────────────────────────────────────────────────────
+float ridgeLine(float x) {
+  return .30 + (vn(vec2(x*2.2, 1.3)) - .5)*.09 + (vn(vec2(x*5.4, 7.8)) - .5)*.026;
 }
 
-// ── 枝 ───────────────────────────────────────────────────────────────────────
-float branchShade(vec2 uv) {
+// ── 枝のシルエット（左右対称） ───────────────────────────────────────────────
+float branchMask(vec2 uv) {
   float b = 0.0;
-  // 左側：根元から伸びる主幹・中枝・細枝
-  b += 1.0 - smoothstep(.012, .022, sdSegment(uv, vec2(-.06,.99), vec2(.22,.82)));
-  b += 1.0 - smoothstep(.009, .017, sdSegment(uv, vec2(.10,.88), vec2(.32,.76)));
-  b += 1.0 - smoothstep(.007, .014, sdSegment(uv, vec2(.20,.83), vec2(.40,.72)));
-  b += 1.0 - smoothstep(.006, .011, sdSegment(uv, vec2(.30,.78), vec2(.46,.68)));
-  b += 1.0 - smoothstep(.005, .009, sdSegment(uv, vec2(.25,.80), vec2(.34,.74)));
-  b += 1.0 - smoothstep(.004, .008, sdSegment(uv, vec2(.36,.73), vec2(.28,.68)));
-  b += 1.0 - smoothstep(.004, .008, sdSegment(uv, vec2(.40,.71), vec2(.50,.66)));
+  // 左側
+  b += 1.0 - smoothstep(.012,.022,sdSeg(uv, vec2(-.06,.99), vec2(.22,.82)));
+  b += 1.0 - smoothstep(.009,.017,sdSeg(uv, vec2(.10,.88),  vec2(.32,.75)));
+  b += 1.0 - smoothstep(.007,.013,sdSeg(uv, vec2(.20,.83),  vec2(.40,.71)));
+  b += 1.0 - smoothstep(.006,.011,sdSeg(uv, vec2(.30,.77),  vec2(.46,.67)));
+  b += 1.0 - smoothstep(.004,.009,sdSeg(uv, vec2(.26,.80),  vec2(.34,.73)));
+  b += 1.0 - smoothstep(.004,.008,sdSeg(uv, vec2(.38,.72),  vec2(.48,.65)));
   // 右側
-  b += 1.0 - smoothstep(.012, .022, sdSegment(uv, vec2(1.06,.97), vec2(.76,.80)));
-  b += 1.0 - smoothstep(.009, .017, sdSegment(uv, vec2(.90,.86), vec2(.68,.76)));
-  b += 1.0 - smoothstep(.007, .014, sdSegment(uv, vec2(.78,.82), vec2(.60,.72)));
-  b += 1.0 - smoothstep(.006, .011, sdSegment(uv, vec2(.68,.76), vec2(.52,.68)));
-  b += 1.0 - smoothstep(.005, .009, sdSegment(uv, vec2(.72,.75), vec2(.64,.69)));
-  b += 1.0 - smoothstep(.004, .008, sdSegment(uv, vec2(.58,.70), vec2(.50,.65)));
+  b += 1.0 - smoothstep(.012,.022,sdSeg(uv, vec2(1.06,.97), vec2(.76,.80)));
+  b += 1.0 - smoothstep(.009,.017,sdSeg(uv, vec2(.90,.86),  vec2(.68,.74)));
+  b += 1.0 - smoothstep(.007,.013,sdSeg(uv, vec2(.78,.82),  vec2(.58,.70)));
+  b += 1.0 - smoothstep(.006,.011,sdSeg(uv, vec2(.68,.75),  vec2(.52,.66)));
+  b += 1.0 - smoothstep(.004,.009,sdSeg(uv, vec2(.72,.75),  vec2(.64,.68)));
+  b += 1.0 - smoothstep(.004,.008,sdSeg(uv, vec2(.58,.69),  vec2(.50,.64)));
   return clamp(b, 0.0, 1.0);
 }
 
-// ── 枝上の花房グロー ─────────────────────────────────────────────────────────
+// ── 枝上の花房グロー ──────────────────────────────────────────────────────────
 vec3 blossomHalo(vec2 uv, vec2 center, float str, float seed, float ar, float t) {
-  vec2 p     = (uv - center) * vec2(ar, 1.0);
-  float r    = length(p);
-  float core  = exp(-r * r * str * 1.4);   // 輝点
-  float bloom = exp(-r * r * str * .30);   // 中間グロー
-  float aura  = exp(-r * r * str * .08);   // 外縁オーラ
-  float shimmer = .72 + .28 * sin(t * (.18 + h1(seed) * .28) + seed * 7.1);
-  vec3 hi   = mix(vec3(1.0,.92,.95), vec3(.99,.78,.88), h1(seed + 2.0));
-  vec3 deep = mix(vec3(.90,.58,.72), vec3(.72,.36,.58), h1(seed + 5.4));
-  return (hi * core + hi * bloom * .20 + deep * aura * .06) * shimmer;
+  vec2 p  = (uv - center) * vec2(ar, 1.0);
+  float r = length(p);
+  float sh = .70 + .30 * sin(t * (.18 + h1(seed) * .26) + seed * 7.1);
+  vec3 hi   = mix(vec3(1.0,.92,.96), vec3(.98,.76,.88), h1(seed + 2.0));
+  vec3 deep = mix(vec3(.90,.56,.72), vec3(.72,.34,.56), h1(seed + 5.4));
+  return (hi * exp(-r*r*str*1.4) + deep * exp(-r*r*str*.10) * .14) * sh;
 }
 
 vec3 branchBlossoms(vec2 uv, float ar, float t) {
   vec3 col = vec3(0.0);
-  // 左クラスター
-  col += blossomHalo(uv, vec2(.09,.90), 38.0, 1.0, ar, t) * .20;
-  col += blossomHalo(uv, vec2(.17,.84), 52.0, 2.0, ar, t) * .18;
-  col += blossomHalo(uv, vec2(.26,.79), 66.0, 3.0, ar, t) * .16;
-  col += blossomHalo(uv, vec2(.35,.74), 74.0, 4.0, ar, t) * .14;
-  col += blossomHalo(uv, vec2(.22,.81), 58.0, 9.0, ar, t) * .16;
-  col += blossomHalo(uv, vec2(.41,.70), 68.0,13.0, ar, t) * .14;
-  // 右クラスター
-  col += blossomHalo(uv, vec2(.92,.88), 38.0, 5.0, ar, t) * .20;
-  col += blossomHalo(uv, vec2(.83,.82), 52.0, 6.0, ar, t) * .18;
-  col += blossomHalo(uv, vec2(.74,.77), 66.0, 7.0, ar, t) * .16;
-  col += blossomHalo(uv, vec2(.64,.72), 74.0, 8.0, ar, t) * .14;
-  col += blossomHalo(uv, vec2(.78,.79), 58.0,10.0, ar, t) * .16;
-  col += blossomHalo(uv, vec2(.57,.67), 68.0,14.0, ar, t) * .14;
+  // 左右各6点
+  col += blossomHalo(uv, vec2(.10,.90), 40., 1., ar, t) * .20;
+  col += blossomHalo(uv, vec2(.19,.84), 54., 2., ar, t) * .18;
+  col += blossomHalo(uv, vec2(.28,.78), 68., 3., ar, t) * .16;
+  col += blossomHalo(uv, vec2(.37,.72), 76., 4., ar, t) * .14;
+  col += blossomHalo(uv, vec2(.23,.81), 60., 9., ar, t) * .16;
+  col += blossomHalo(uv, vec2(.41,.68), 70.,13., ar, t) * .14;
+  col += blossomHalo(uv, vec2(.90,.89), 40., 5., ar, t) * .20;
+  col += blossomHalo(uv, vec2(.81,.83), 54., 6., ar, t) * .18;
+  col += blossomHalo(uv, vec2(.72,.77), 68., 7., ar, t) * .16;
+  col += blossomHalo(uv, vec2(.62,.71), 76., 8., ar, t) * .14;
+  col += blossomHalo(uv, vec2(.77,.79), 60.,10., ar, t) * .16;
+  col += blossomHalo(uv, vec2(.56,.66), 70.,14., ar, t) * .14;
   return col;
 }
 
-// ── 舞い落ちる花びら ─────────────────────────────────────────────────────────
-vec3 driftingPetals(vec2 uv, float t, float ar) {
-  vec3 col = vec3(0.0);
+// ── 舞い落ちる花びら（アルファ合成・2層×9枚） ───────────────────────────────
+// 旧4層×14枚=56ループ → 2層×9枚=18ループ＋加算→α合成で色が鮮明に
+vec3 fallingPetals(vec3 bg, vec2 uv, float t, float ar) {
+  for (int layer = 0; layer < 2; layer++) {
+    float lf  = float(layer);
+    float amp = .028 + lf * .018;
 
-  for (int layer = 0; layer < 4; layer++) {
-    float lf    = float(layer);
-    float amp   = .026 + lf * .018;
-    float drift = .048 + lf * .032;
-    float depth = lf / 3.0;
+    for (int i = 0; i < 9; i++) {
+      float seed  = float(i) + lf * 31.7;
+      float spd   = mix(.024, .074, h1(seed*4.1+2.)) * (1.0 + lf*.40);
+      float tr    = fract(h1(seed*2.7+1.3) + t*spd);
 
-    for (int i = 0; i < 14; i++) {
-      float fi    = float(i);
-      float seed  = fi + lf * 37.9;
-      float speed = mix(.028, .082, h1(seed * 4.1 + 2.0)) * (1.0 + lf * .22);
-      float travel= fract(h1(seed * 2.7 + 1.3) + t * speed);
-      vec2 pos;
-      vec2 p;
-      float size;
-      float angle;
-      float petal;
-      float fade;
-      vec3 petalCol;
-      float inner;
-      float rim;
-      float glow;
-
-      pos.y = 1.10 - travel * 1.30;
-      pos.x = fract(
-        h1(seed * 8.3 + 5.1)
-        + sin(t * (.38 + h1(seed + 7.0) * .72) + seed * 5.7 + travel * (6.5 + lf * 1.6)) * amp
-        + (travel - .5) * drift
+      float py = 1.08 - tr * 1.22;
+      float px = fract(
+        h1(seed*8.3+5.1)
+        + sin(t*(.34 + h1(seed+7.)*.62) + seed*5.7 + tr*(5.8+lf*1.4)) * amp
+        + (tr - .5) * .040
       );
 
-      p = uv - pos;
-      p.x *= ar;
-      size = mix(.018, .044, h1(seed * 6.2 + 9.4)) * (1.0 + lf * .36);
-      p /= size;
+      vec2 p  = (uv - vec2(px, py)) * vec2(ar, 1.0);
+      float sz = mix(.028, .058, h1(seed*6.2+9.4)) * (1.0 + lf*.46);
+      p /= sz;
+      p = rot2(seed*TAU + t*mix(-1.,1.,h1(seed*5.1+3.2))*(.28+lf*.18) + tr*4.6) * p;
 
-      angle = seed * TAU
-        + t * mix(-1.0, 1.0, h1(seed * 5.1 + 3.2)) * (.30 + lf * .20)
-        + travel * 4.8;
-      p = rot2(angle) * p;
+      float pm   = petalMask(p);
+      float fade = smoothstep(.02,.13,tr) * (1.0 - smoothstep(.80,1.0,tr));
 
-      petal = petalMask(p);
-      fade  = smoothstep(.02, .14, travel) * (1.0 - smoothstep(.82, 1.0, travel));
+      // 鮮やかな桜色：深みのあるローズピンク（ラベンダー空に埋まらないよう彩度高め）
+      vec3 pc = mix(vec3(.96,.62,.78), vec3(.82,.34,.58), h1(seed*9.+4.8));
+      // 中心に深紅の陰影
+      pc = mix(pc, vec3(.60,.16,.40), exp(-length(p*.85)*1.3) * .38);
+      // 縁の輝き（明るい桜色）
+      pc += vec3(.18,.06,.10) * exp(-length(p)*1.6) * .14;
 
-      // 白→桜色グラデーション、内側に温かみのある陰影
-      petalCol = mix(vec3(1.0,.90,.94), vec3(.96,.68,.82), h1(seed * 9.1 + 4.8));
-      inner    = exp(-length(p * vec2(.76, 1.12)) * 1.6);
-      rim      = exp(-abs(p.x) * 2.2) * smoothstep(.30, -.14, p.y);
-      petalCol += vec3(.16,.05,.09) * inner * .18;   // 中心部の深み
-      petalCol += vec3(1.0,.96,.98) * rim   * .14;   // 縁の輝き
-      glow     = exp(-length(p * vec2(1.0, 1.28)) * 2.6) * .10;
-
-      col += petalCol * petal * fade * mix(.24, .72, depth);
-      col += vec3(1.0,.92,.96) * glow * fade * mix(.02, .09, depth);
+      // アルファ合成（遠層:0.60, 近層:0.88）→より不透明にして視認性向上
+      float alpha = pm * fade * mix(.60, .88, lf);
+      bg = mix(bg, pc, alpha);
+      // 柔らかいグロー（加算）
+      bg += vec3(.98,.86,.92) * exp(-length(p)*2.4) * .022 * fade * (.4 + lf*.6);
     }
   }
-
-  return col;
+  return bg;
 }
 
 void main() {
@@ -623,68 +570,46 @@ void main() {
   float t  = u_time;
 
   // ── 空 ──
-  vec3 col = springSky(uv, t, ar);
+  vec3 col = sakuraSky(uv, t, ar);
 
-  // ── 遠景の山（大気遠近で朧げな紫）──
-  float ridgeFar  = mountainRidge(uv.x, .42, 1.7, 2.3);
-  float mtnFar    = 1.0 - smoothstep(ridgeFar - .006, ridgeFar + .004, uv.y);
-  vec3 mtnFarCol  = mix(vec3(.30,.18,.32), vec3(.42,.24,.38), smoothstep(.0,1.0,uv.x));
-  float hazeF     = smoothstep(ridgeFar - .14, ridgeFar, uv.y) * .58;
-  mtnFarCol       = mix(mtnFarCol, vec3(.72,.50,.60), hazeF);
-  col = mix(col, mtnFarCol, mtnFar * .86);
-
-  // ── 近景の山（暗いシルエット）──
-  float ridgeNear = mountainRidge(uv.x, .30, 2.5, 7.1);
-  float mtnNear   = 1.0 - smoothstep(ridgeNear - .008, ridgeNear + .005, uv.y);
-  vec3 mtnNearCol = mix(vec3(.10,.06,.14), vec3(.18,.10,.16), smoothstep(.0,1.0,uv.x));
-  mtnNearCol     += vec3(.24,.09,.14) * exp(-abs(uv.x - .66) * 6.5) * .26;
-  float hazeN     = smoothstep(ridgeNear - .10, ridgeNear, uv.y) * .36;
-  mtnNearCol      = mix(mtnNearCol, vec3(.60,.38,.50), hazeN);
-  col = mix(col, mtnNearCol, mtnNear * .95);
+  // ── 山（1層・大気遠近付き） ──
+  float r   = ridgeLine(uv.x);
+  float mtn = 1.0 - smoothstep(r - .008, r + .006, uv.y);
+  vec3 mc   = mix(vec3(.10,.06,.14), vec3(.20,.11,.18), uv.x);
+  mc = mix(mc, mix(col, mc, .48), smoothstep(r - .14, r, uv.y) * .52);
+  col = mix(col, mc, mtn * .94);
 
   // ── 山裾の霞 ──
-  float mistLine  = mix(ridgeFar, ridgeNear, .55);
-  float mist      = exp(-abs(uv.y - (mistLine + .016)) * 18.0);
-  float mistNoise = fbm(vec2(uv.x * 2.4 - t * .008, uv.y * 11.0 + 1.8));
-  col += vec3(.92,.74,.82) * mist * smoothstep(.34, .86, mistNoise) * .28;
+  float mist = exp(-abs(uv.y - (r + .014)) * 18.0);
+  col += vec3(.90,.72,.80) * mist * smoothstep(.28,.76, fbm(vec2(uv.x*2.2 - t*.007, uv.y*10.+2.2))) * .22;
 
   // ── 地面 ──
-  float groundNoise = (fbm(vec2(uv.x * 3.4, 1.9)) - .5) * .04;
-  float groundMask  = 1.0 - smoothstep(.08, .18, uv.y + groundNoise);
-  vec3 groundCol    = mix(vec3(.06,.03,.06), vec3(.14,.07,.09), smoothstep(.0,1.0,uv.x));
-  // 散り積もった花びらの薄い絨毯
-  float carpet = fbm(vec2(uv.x * 5.8 + t * .003, uv.y * 2.8 + 2.0));
-  groundCol = mix(groundCol, vec3(.30,.16,.22), smoothstep(.56, .78, carpet) * .40);
-  col = mix(col, groundCol, groundMask * .97);
+  float gnd = 1.0 - smoothstep(.08,.17, uv.y + (vn(vec2(uv.x*3., 2.1)) - .5)*.03);
+  col = mix(col, mix(vec3(.05,.02,.04), vec3(.12,.05,.07), uv.x), gnd * .97);
 
-  // 地面レベルのぼんやりした光（灯籠・蛍のイメージ）
-  col += vec3(1.0,.80,.44) * exp(-length((uv - vec2(.22,.14)) * vec2(ar*1.6,2.6)) * 5.2) * .22;
-  col += vec3(1.0,.74,.38) * exp(-length((uv - vec2(.78,.18)) * vec2(ar*1.6,2.4)) * 5.6) * .18;
-  col += vec3(.96,.82,.52) * exp(-length((uv - vec2(.50,.10)) * vec2(ar*1.8,2.2)) * 6.4) * .14;
+  // 灯籠グロー
+  col += vec3(1.0,.80,.44) * exp(-length((uv - vec2(.22,.13)) * vec2(ar*1.6,2.8)) * 5.4) * .22;
+  col += vec3(1.0,.72,.36) * exp(-length((uv - vec2(.78,.15)) * vec2(ar*1.6,2.6)) * 5.8) * .18;
 
   // ── 枝 ──
-  float branches = branchShade(uv);
-  vec3 branchCol  = mix(vec3(.07,.03,.05), vec3(.14,.07,.08), uv.x);
-  col = mix(col, branchCol, branches * .94);
+  float br = branchMask(uv);
+  col = mix(col, mix(vec3(.06,.02,.04), vec3(.12,.05,.07), uv.x), br * .96);
+  col += branchBlossoms(uv, ar, t) * (1.0 - br * .12);
 
-  // ── 花房グロー ──
-  col += branchBlossoms(uv, ar, t) * (1.0 - branches * .14);
+  // ── 花びら（アルファ合成） ──
+  col = fallingPetals(col, uv, t, ar);
 
-  // ── 舞い花びら ──
-  col += driftingPetals(uv, t, ar);
-
-  // ── フィルムグレイン（微細）──
-  float grain = vn(gl_FragCoord.xy * .60 + t * .16);
-  col += vec3((grain - .5) * .010);
+  // ── フィルムグレイン ──
+  col += (vn(gl_FragCoord.xy * .58 + t * .14) - .5) * .008;
 
   // ── ビネット ──
   vec2 vp = uv - .5;
-  col *= clamp(1.0 - dot(vp * vec2(1.26,1.08), vp * vec2(1.26,1.08)) * .50, 0.0, 1.0);
+  col *= clamp(1.0 - dot(vp*vec2(1.24,1.06), vp*vec2(1.24,1.06)) * .46, 0.0, 1.0);
 
-  // ── トーンマップ ＋ 彩度微調整 ──
+  // ── トーンマップ ＋ 彩度調整 ──
   col = col / (col + .10);
   float lum = dot(col, vec3(.299,.587,.114));
-  col = mix(vec3(lum), col, 1.14);
+  col = mix(vec3(lum), col, 1.16);
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
