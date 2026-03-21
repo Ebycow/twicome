@@ -10,7 +10,7 @@ export function createTTSController() {
 
   /**
    * Web Speech API が利用可能かどうかを返す。
-   * @returns {boolean}
+   * @returns {boolean} Web Speech API が利用可能なら true
    */
   function isSupported() {
     return 'speechSynthesis' in window;
@@ -18,7 +18,7 @@ export function createTTSController() {
 
   /**
    * 現在の有効状態を返す。
-   * @returns {boolean}
+   * @returns {boolean} TTS が有効なら true
    */
   function isEnabled() {
     return enabled;
