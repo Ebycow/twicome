@@ -20,9 +20,9 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
       clone.querySelectorAll('img').forEach(function (img) {
         img.replaceWith(document.createTextNode(img.alt || ''));
       });
-      const text = clone.textContent.replace(/\s+/g, ' ').trim();
-      if (text.length >= 3 && text.length <= 120) {
-        out.push(text);
+      const tts = clone.textContent.replace(/\s+/g, ' ').trim();
+      if (tts.length >= 3 && tts.length <= 120) {
+        out.push({ html: el.innerHTML, tts });
       }
     });
 
@@ -32,7 +32,7 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
       out[i] = out[j];
       out[j] = tmp;
     }
-    return out.length ? out : ['コメントがありません'];
+    return out.length ? out : [{ html: 'コメントがありません', tts: 'コメントがありません' }];
   }
 
   /**
@@ -58,7 +58,7 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
       return;
     }
 
-    const text = state.comments[state.commentIdx % state.comments.length];
+    const comment = state.comments[state.commentIdx % state.comments.length];
     state.commentIdx += 1;
 
     const isMatrix = state.currentSceneId === 'matrix-rain';
@@ -67,9 +67,9 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
     commentEl.style.opacity = '0';
     commentEl.style.transform = isMatrix ? 'none' : 'translate3d(0, 24px, 0) scale(0.985)';
     commentEl.style.filter = isMatrix ? 'none' : 'blur(14px)';
-    commentEl.textContent = text;
+    commentEl.innerHTML = comment.html;
     if (tts) {
-      tts.speak(text);
+      tts.speak(comment.tts);
     }
     if (!isMatrix) {
       pulseCommentAura();
