@@ -398,7 +398,6 @@ precision mediump float;
 uniform float u_time;
 uniform vec2 u_res;
 
-float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
 float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
 float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
 
@@ -447,45 +446,19 @@ void main(){
   vec2 uv=gl_FragCoord.xy/u_res;
   float ar=u_res.x/u_res.y;
   float t=u_time;
-  float tc=t*.50;
+  float tc=t*.35;
 
-  float sH=.188+vn(vec2(uv.x*4.3,0.))*.040-.020;
-  float gnd=smoothstep(sH+.005,sH-.005,uv.y);
+  // 暗い曇り空グラデーション（地平線・地面なし）
+  vec3 col=mix(vec3(.08,.10,.17),vec3(.20,.23,.30),pow(1.-uv.y,.7));
 
-  vec3 col=mix(
-    vec3(.70,.70,.71),
-    mix(vec3(.52,.57,.64),mix(vec3(.24,.31,.45),vec3(.10,.13,.22),
-      smoothstep(.36,.90,uv.y)),smoothstep(.08,.40,uv.y)),
-    smoothstep(0.,.12,uv.y));
-
-  vec2 sun=vec2(.61,.095);
-  float sd=length((uv-sun)*vec2(1.,2.6));
-  col+=vec3(.93,.86,.70)*exp(-sd*5.2)*.16;
-  col+=vec3(.85,.79,.72)*exp(-sd*1.8)*.12;
-
-  float c =vn(vec2(uv.x*2.1+tc*.007,uv.y*2.9));
-  c+=vn(vec2(uv.x*5.3-tc*.005,uv.y*7.4+1.8))*.50;
-  c+=vn(vec2(uv.x*12.+tc*.003,uv.y*16.5))*.25;
+  // ゆっくり流れる雲テクスチャ
+  float c=vn(vec2(uv.x*1.8+tc*.008,uv.y*2.4));
+  c+=vn(vec2(uv.x*4.5-tc*.005,uv.y*6.8+2.0))*.50;
+  c+=vn(vec2(uv.x*10.+tc*.003,uv.y*14.))*.25;
   c/=1.75;
-  col+=vec3(.044,.048,.052)*smoothstep(.40,.77,c)*uv.y*(1.+exp(-sd*2.0)*.36);
-  col-=vec3(.009,.008,.006)*smoothstep(.70,.95,c)*uv.y;
+  col+=vec3(.010,.012,.020)*smoothstep(.38,.78,c);
 
-  float tB=sH+.048;
-  float tL=tB
-    +vn(vec2(uv.x*3.3,0.))*.068
-    +vn(vec2(uv.x*7.8,4.9))*.033
-    +vn(vec2(uv.x*18.,11.))*.015
-    +smoothstep(.44,.56,vn(vec2(uv.x*27.,2.1)))*.028;
-  float tMask=smoothstep(tL+.003,tL-.003,uv.y)*(1.-gnd);
-  col=mix(col,vec3(.032,.038,.050),tMask);
-
-  vec3 sCol=vec3(.80,.84,.91);
-  sCol+=vec3(.042,.034,.024)*smoothstep(.32,0.,abs(uv.x-.61));
-  float shd=vn(vec2(uv.x*6.8,3.2))*.046;
-  sCol-=vec3(shd*.58,shd*.54,shd*.38);
-  col=mix(col,sCol,gnd);
-  col=mix(col,vec3(.86,.88,.94),exp(-abs(uv.y-sH)*26.)*.22*(1.-tMask));
-
+  // 多層パララックス雪
   vec2 uvA=uv*vec2(ar,1.);
   float sn0=snow(uvA,t,38.,.018,.014,-.30, 0.0);
   float sn1=snow(uvA,t,24.,.030,.022,-.60,43.7);
@@ -493,17 +466,37 @@ void main(){
   float sn3=snow(uvA,t, 9.,.080,.055,-1.50,137.4);
   float sn4=bokeh(uvA,t, 4.5,.120,.090,-2.00,207.6);
 
-  float ag=1.-gnd;
-  col+=vec3(.46,.52,.67)*sn0*.24*ag*(1.-tMask);
-  col+=vec3(.64,.70,.82)*sn1*.38*ag;
-  col+=vec3(.78,.84,.92)*sn2*.60*ag;
-  col+=vec3(.86,.90,.96)*sn3*.72*ag;
-  col+=vec3(.91,.93,.98)*sn4*.44;
+  vec3 sc=vec3(0.);
+  sc+=vec3(.52,.58,.72)*sn0*.30;
+  sc+=vec3(.68,.74,.86)*sn1*.52;
+  sc+=vec3(.82,.88,.95)*sn2*.76;
+  sc+=vec3(.91,.95,.99)*sn3*.94;
+  sc+=vec3(.95,.97,1.00)*sn4*.70;
+  col+=sc;
 
+  // ポストプロセッシング
+
+  // 1. ブルーム — 明るい雪粒の周囲に発光
+  float lum=dot(sc,vec3(.299,.587,.114));
+  col+=sc*smoothstep(.26,.72,lum)*.58;
+
+  // 2. ビネット（映画的・強め）
   vec2 vp=uv-.5;
-  col*=clamp(1.-dot(vp*vec2(1.32,1.12),vp*vec2(1.32,1.12))*.56,0.,1.);
-  col=col/(col+.082);
-  gl_FragColor=vec4(col,1.);
+  col*=1.-dot(vp*vec2(1.5,1.3),vp*vec2(1.5,1.3))*.88;
+
+  // 3. フィルミックトーンマッピング（ACES近似）
+  col=col*(2.51*col+.03)/(col*(2.43*col+.59)+.14);
+
+  // 4. 冷色カラーグレーディング
+  col.r*=.87;
+  col.g*=.93;
+  col.b=min(col.b*1.08,1.);
+
+  // 5. フィルムグレイン（微細）
+  float grain=h2(gl_FragCoord.xy+vec2(floor(t*30.)*17.3,floor(t*30.)*31.7))*.030-.015;
+  col+=grain;
+
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
 }
 `;
 
