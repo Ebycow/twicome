@@ -528,6 +528,41 @@
         line-height: 2.1;
       }
 
+      #zen-ui-left {
+        position: absolute;
+        top: 18px;
+        left: 18px;
+        z-index: 1;
+      }
+
+      #zen-ui-left button {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.42);
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 1rem;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+
+      #zen-ui-left button:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: rgba(255, 255, 255, 1);
+      }
+
+      #zen-ui-left button[aria-pressed="true"] {
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.45);
+        color: rgba(255, 255, 255, 1);
+      }
+
       #zen-ui {
         position: absolute;
         top: 18px;
@@ -629,6 +664,17 @@
           max-width: 88vw;
           font-size: clamp(1.15rem, 5vw, 1.85rem);
           line-height: 2.15;
+        }
+
+        #zen-ui-left {
+          top: auto;
+          left: 14px;
+          bottom: 16px;
+        }
+
+        #zen-ui-left button {
+          width: 40px;
+          height: 40px;
         }
 
         #zen-ui {

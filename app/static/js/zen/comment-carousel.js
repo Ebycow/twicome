@@ -5,9 +5,10 @@
  * @param {object} state - 共有ミュータブル状態オブジェクト
  * @param {HTMLElement} commentEl - コメントテキスト表示要素
  * @param {HTMLElement|null} commentWrap - コメントラッパー要素（波紋演出用）
+ * @param {{speak: Function}|null} [tts] - TTS コントローラー（省略可）
  * @returns {{collectComments: Function, showNextComment: Function, pulseCommentAura: Function}} カルーセル関数群
  */
-export function createCarousel(state, commentEl, commentWrap) {
+export function createCarousel(state, commentEl, commentWrap, tts) {
   /**
    * DOM 内のコメント本文をテキストとして収集してシャッフルして返す。
    * @returns {string[]} シャッフルされたコメントテキスト配列
@@ -67,6 +68,9 @@ export function createCarousel(state, commentEl, commentWrap) {
     commentEl.style.transform = isMatrix ? 'none' : 'translate3d(0, 24px, 0) scale(0.985)';
     commentEl.style.filter = isMatrix ? 'none' : 'blur(14px)';
     commentEl.textContent = text;
+    if (tts) {
+      tts.speak(text);
+    }
     if (!isMatrix) {
       pulseCommentAura();
     }

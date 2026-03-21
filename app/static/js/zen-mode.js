@@ -4,6 +4,7 @@ import { SCENES, sceneMap, VERT } from './zen/scenes.js';
 import { createRenderer } from './zen/gl-renderer.js';
 import { createCarousel } from './zen/comment-carousel.js';
 import { createUIController } from './zen/ui-controller.js';
+import { createTTSController } from './zen/tts-controller.js';
 
 const STORAGE_KEY = 'twicome-zen-scene';
 const ATTR_POSITION = 0;
@@ -43,6 +44,7 @@ const commentEl = document.getElementById('zen-comment');
 const commentWrap = document.getElementById('zen-comment-wrap');
 const closeBtn = document.getElementById('zen-close-btn');
 const fsBtn = document.getElementById('zen-fs-btn');
+const ttsBtn = document.getElementById('zen-tts-btn');
 const triggerBtn = document.getElementById('zen-mode-btn');
 const themeSwitcher = document.getElementById('zen-theme-switcher');
 
@@ -70,9 +72,10 @@ function init() {
     lunarPhase: 0
   };
 
+  const tts = createTTSController();
   const renderer = createRenderer(state, canvas, overlay, VERT, ATTR_POSITION);
-  const carousel = createCarousel(state, commentEl, commentWrap);
-  const dom = { overlay, canvas, commentEl, commentWrap, themeSwitcher, fsBtn };
+  const carousel = createCarousel(state, commentEl, commentWrap, tts);
+  const dom = { overlay, canvas, commentEl, commentWrap, themeSwitcher, fsBtn, tts };
   const ui = createUIController(
     state, dom, { SCENES, sceneMap }, renderer, carousel, storeSceneId, ATTR_POSITION
   );
@@ -90,6 +93,21 @@ function init() {
   }
   if (fsBtn) {
     fsBtn.addEventListener('click', ui.toggleFullscreen);
+  }
+  if (ttsBtn) {
+    if (!tts.isSupported()) {
+      ttsBtn.hidden = true;
+    } else {
+      ttsBtn.addEventListener('click', function () {
+        const nowEnabled = tts.toggle();
+        ttsBtn.setAttribute('aria-pressed', nowEnabled ? 'true' : 'false');
+        ttsBtn.title = nowEnabled ? '読み上げをオフ' : '読み上げをオン';
+        ttsBtn.setAttribute('aria-label', nowEnabled ? '読み上げをオフ' : '読み上げをオン');
+        ttsBtn.innerHTML = nowEnabled
+          ? '<i class="fa-solid fa-volume-high"></i>'
+          : '<i class="fa-solid fa-volume-xmark"></i>';
+      });
+    }
   }
   if (commentWrap) {
     commentWrap.addEventListener('animationend', function (event) {

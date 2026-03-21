@@ -187,6 +187,10 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
       state.slideTimer = null;
     }
 
+    if (dom.tts) {
+      dom.tts.stop();
+    }
+
     dom.overlay.hidden = true;
     document.body.style.overflow = '';
     dom.commentEl.style.opacity = '0';
