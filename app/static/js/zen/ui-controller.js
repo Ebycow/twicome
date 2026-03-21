@@ -6,7 +6,7 @@
  * @param {{overlay: HTMLElement, canvas: HTMLCanvasElement, commentEl: HTMLElement, commentWrap: HTMLElement|null, themeSwitcher: HTMLElement|null, fsBtn: HTMLElement|null}} dom - DOM 要素群
  * @param {{SCENES: Array, sceneMap: Map}} scenesData - シーン定義データ
  * @param {{initGL: Function, resizeCanvas: Function, buildSceneProgram: Function, render: Function}} renderer - レンダラー関数群
- * @param {{collectComments: Function, showNextComment: Function}} carousel - カルーセル関数群
+ * @param {{collectComments: Function, showNextComment: Function, cancelCarousel: Function}} carousel - カルーセル関数群
  * @param {Function} storeSceneId - シーン ID 保存関数
  * @param {number} attrPosition - 位置属性のバインドインデックス
  * @returns {{renderThemeButtons: Function, updateThemeButtons: Function, selectAdjacentScene: Function, applyScene: Function, openZen: Function, closeZen: Function, toggleFullscreen: Function, updateFsIcon: Function}} UI 関数群
@@ -139,6 +139,7 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
   function openZen() {
     state.comments = carousel.collectComments();
     state.commentIdx = 0;
+    carousel.cancelCarousel();
     if (state.slideTimer) {
       clearTimeout(state.slideTimer);
       state.slideTimer = null;
@@ -182,6 +183,7 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
       cancelAnimationFrame(state.raf);
       state.raf = null;
     }
+    carousel.cancelCarousel();
     if (state.slideTimer) {
       clearTimeout(state.slideTimer);
       state.slideTimer = null;

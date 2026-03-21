@@ -25,19 +25,23 @@ export function createTTSController() {
   }
 
   /**
-   * テキストを読み上げる。無効または非対応の場合は何もしない。
+   * テキストを読み上げる。無効または非対応の場合は即時解決の Promise を返す。
    * @param {string} text - 読み上げるテキスト
-   * @returns {void}
+   * @returns {Promise<void>} 読み上げ完了（またはキャンセル）時に解決する Promise
    */
   function speak(text) {
     if (!enabled || !isSupported()) {
-      return;
+      return Promise.resolve();
     }
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
-    window.speechSynthesis.speak(utterance);
+    return new Promise(function (resolve) {
+      utterance.onend = resolve;
+      utterance.onerror = resolve;
+      window.speechSynthesis.speak(utterance);
+    });
   }
 
   /**

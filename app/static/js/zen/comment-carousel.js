@@ -6,9 +6,10 @@
  * @param {HTMLElement} commentEl - コメントテキスト表示要素
  * @param {HTMLElement|null} commentWrap - コメントラッパー要素（波紋演出用）
  * @param {{speak: Function}|null} [tts] - TTS コントローラー（省略可）
- * @returns {{collectComments: Function, showNextComment: Function, pulseCommentAura: Function}} カルーセル関数群
+ * @returns {{collectComments: Function, showNextComment: Function, pulseCommentAura: Function, cancelCarousel: Function}} カルーセル関数群
  */
 export function createCarousel(state, commentEl, commentWrap, tts) {
+  let generation = 0;
   /**
    * DOM 内のコメント本文をテキストとして収集してシャッフルして返す。
    * @returns {string[]} シャッフルされたコメントテキスト配列
@@ -50,7 +51,8 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
   }
 
   /**
-   * 次のコメントをフェードイン表示し、一定時間後にフェードアウトして次へ進める。
+   * 次のコメントをフェードイン表示し、表示時間経過後にフェードアウト、
+   * さらに TTS 読み上げ完了を待ってから次へ進める。
    * @returns {void}
    */
   function showNextComment() {
@@ -58,6 +60,7 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
       return;
     }
 
+    const gen = generation;
     const comment = state.comments[state.commentIdx % state.comments.length];
     state.commentIdx += 1;
 
@@ -68,9 +71,7 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
     commentEl.style.transform = isMatrix ? 'none' : 'translate3d(0, 24px, 0) scale(0.985)';
     commentEl.style.filter = isMatrix ? 'none' : 'blur(14px)';
     commentEl.innerHTML = comment.html;
-    if (tts) {
-      tts.speak(comment.tts);
-    }
+    const ttsPromise = tts ? tts.speak(comment.tts) : Promise.resolve();
     if (!isMatrix) {
       pulseCommentAura();
     }
@@ -88,20 +89,43 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
     }
 
     state.slideTimer = setTimeout(function () {
+      if (gen !== generation) {
+        return;
+      }
+      state.slideTimer = null;
+
       const stillMatrix = state.currentSceneId === 'matrix-rain';
       if (stillMatrix) {
         commentEl.style.transition = 'opacity 0.25s ease';
         commentEl.style.opacity = '0';
-        state.slideTimer = setTimeout(showNextComment, 400);
+        Promise.all([new Promise(function (r) { setTimeout(r, 400); }), ttsPromise]).then(function () {
+          if (gen !== generation) {
+            return;
+          }
+          showNextComment();
+        });
       } else {
         commentEl.style.transition = 'opacity 1.4s ease, transform 1.8s ease, filter 1.8s ease';
         commentEl.style.opacity = '0';
         commentEl.style.transform = 'translate3d(0, -18px, 0) scale(1.015)';
         commentEl.style.filter = 'blur(10px)';
-        state.slideTimer = setTimeout(showNextComment, 1500);
+        Promise.all([new Promise(function (r) { setTimeout(r, 1500); }), ttsPromise]).then(function () {
+          if (gen !== generation) {
+            return;
+          }
+          showNextComment();
+        });
       }
     }, isMatrix ? 6500 : 5200);
   }
 
-  return { collectComments, showNextComment, pulseCommentAura };
+  /**
+   * 進行中のカルーセルをキャンセルする。Promise チェーン経由の次コメント遷移を無効化する。
+   * @returns {void}
+   */
+  function cancelCarousel() {
+    generation += 1;
+  }
+
+  return { collectComments, showNextComment, pulseCommentAura, cancelCarousel };
 }
