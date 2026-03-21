@@ -500,6 +500,125 @@ void main(){
 }
 `;
 
+  // 蛍火: 5層の生物発光パーティクルが有機的なリサジュー軌道で漂う深森の夜
+  // 最適化: PCGハッシュ(テクスチャ不使用) / exp()SDF / 空セル枝刈り / 解析的ブルーム
+  const HOTARUBI_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+
+// 蛍1層: Lissajous軌道パーティクル
+// thr > 0 で空セルを枝刈りし exp() 呼び出しを削減
+float flyLayer(vec2 uv,float t,float dens,float sz,float seed,float thr){
+  vec2 p=uv*dens;
+  vec2 id=floor(p);
+  vec2 st=fract(p)-.5;
+  float acc=0.;
+  for(int ii=-1;ii<=1;ii++){
+    for(int jj=-1;jj<=1;jj++){
+      vec2 nid=id+vec2(float(ii),float(jj));
+      float h=h2(nid+seed);
+      if(h>thr){
+        float hx=h2(nid+seed+.31);
+        float hy=h2(nid+seed+.74);
+        float ph=h2(nid+seed+1.17)*6.28318;
+        // 黄金比・√2 の周波数比で非周期的な有機的軌跡
+        float fx=.42+hx*.78;
+        float fy=.37+hy*.72;
+        vec2 pos=(vec2(hx,hy)-.5)*.48+vec2(
+          sin(t*fx+ph)*.11+sin(t*fx*1.618+ph*1.31)*.05,
+          cos(t*fy+ph*.89)*.10+cos(t*fy*1.414+ph*.61)*.04
+        );
+        vec2 d=st-vec2(float(ii),float(jj))-pos;
+        // 生物発光の拍動: 完全消灯なし
+        float pulse=.32+.68*max(0.,sin(t*(1.2+h*2.6)+h*37.3));
+        acc+=exp(-dot(d,d)/(sz*sz))*pulse*(.28+h*.72);
+      }
+    }
+  }
+  return clamp(acc,0.,1.);
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float ar=u_res.x/u_res.y;
+  float t=u_time*.38;
+  vec2 uvA=uv*vec2(ar,1.);
+
+  // 夜の深森: 頂点=深藍, 地平=暗緑
+  vec3 col=mix(vec3(.003,.005,.018),vec3(.005,.012,.010),pow(1.-uv.y,.55));
+  // 画面外月光による地平線のかすかな蒼い光
+  col+=vec3(.018,.022,.028)*exp(-abs(uv.y-.30)*8.)*.5;
+
+  // 揺らぐ霧 (2層FBM)
+  float mist=vn(uvA*vec2(1.3,2.8)+vec2(t*.055,0.))
+           +vn(uvA*vec2(4.0,5.8)-vec2(t*.034,0.))*.50;
+  float mistMask=pow(1.-uv.y,1.5)*.70;
+  col+=vec3(.005,.011,.007)*mist*mistMask;
+
+  // 木立シルエット (上部キャノピー)
+  float treeH=vn(vec2(uv.x*3.6,0.))*.16
+             +vn(vec2(uv.x*9.2,0.))*.05
+             +vn(vec2(uv.x*21.,0.))*.02;
+  float treeTop=.75+treeH;
+  col=mix(col,vec3(.001,.003,.002),smoothstep(treeTop-.016,treeTop,uv.y)*.97);
+
+  // 地面の下草
+  float groundH=vn(vec2(uv.x*5.8,9.4))*.06
+               +vn(vec2(uv.x*15.,9.4))*.022;
+  float groundLine=.075+groundH;
+  col=mix(col,vec3(.001,.003,.002),1.-smoothstep(groundLine,groundLine+.020,uv.y));
+
+  // 5深度層の蛍 (遠=密小暗 → 近=粗大明)
+  float f0=flyLayer(uvA,t,17.,.018, 0.0,.80);
+  float f1=flyLayer(uvA,t,11.,.027,47.,.76);
+  float f2=flyLayer(uvA,t, 7.,.040,93.,.72);
+  float f3=flyLayer(uvA,t,4.5,.058,141.,.68);
+  float f4=flyLayer(uvA,t,2.8,.082,185.,.62);
+
+  // 開空マスク: キャノピーと地面の間だけ飛翔
+  float openAir=smoothstep(treeTop,treeTop-.10,uv.y)
+               *smoothstep(groundLine,groundLine+.14,uv.y);
+
+  // 生物発光カラーランプ: 遠=冷ティール → 近=暖黄緑
+  vec3 c0=vec3(.06,.70,.44);
+  vec3 c1=vec3(.16,.82,.36);
+  vec3 c2=vec3(.36,.90,.26);
+  vec3 c3=vec3(.60,.94,.16);
+  vec3 c4=vec3(.80,.97,.08);
+
+  vec3 ff=c0*f0*.11+c1*f1*.22+c2*f2*.48+c3*f3*.80+c4*f4*1.05;
+  ff*=openAir;
+  col+=ff;
+
+  // 解析的ブルーム: 2乗輝度→ソフトハロ
+  float lum=dot(ff,vec3(.299,.587,.114));
+  col+=(c2*.55+c3*.45)*lum*lum*2.8;
+  // 最前景蛍のタイトコア発光
+  col+=c4*f4*f4*openAir*.60;
+
+  // 地面霧の蓄積発光 (霧に蛍の緑光が滲む)
+  col+=vec3(.04,.09,.03)*pow(1.-uv.y,2.5)*mistMask*.40;
+
+  // ビネット
+  vec2 vp=uv-.5;
+  col*=clamp(1.-dot(vp*vec2(1.32,1.14),vp*vec2(1.32,1.14))*.78,0.,1.);
+
+  // ACESフィルミックトーンマッピング
+  col=col*(2.51*col+.03)/(col*(2.43*col+.59)+.14);
+
+  // 深森夜カラーグレード: 赤抑制・緑強調
+  col.r*=.78;col.g=min(col.g*1.08,1.);col.b*=.90;
+
+  // 微細フィルムグレイン
+  col+=h2(gl_FragCoord.xy+vec2(floor(t*19.)*11.3,floor(t*19.)*23.7))*.018-.009;
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
+}
+`;
+
   const SCENES = [
     {
       id: 'night-sky',
@@ -524,6 +643,12 @@ void main(){
       label: '雪の一日',
       emoji: '❄️',
       fragmentSource: SNOW_DAY_FRAG
+    },
+    {
+      id: 'hotarubi',
+      label: '蛍火',
+      emoji: '✨',
+      fragmentSource: HOTARUBI_FRAG
     }
   ];
 
