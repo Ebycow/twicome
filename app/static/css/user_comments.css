@@ -279,6 +279,105 @@
         --zen-ripple-glow: rgba(38, 174, 97, 0.26);
       }
 
+      #zen-overlay[data-zen-scene="matrix-rain"] {
+        background: #000802;
+
+        --zen-comment-color: rgba(0, 255, 80, 0.97);
+        --zen-comment-shadow: none;
+        --zen-comment-spacing: 0.05em;
+        --zen-switch-bg: rgba(0, 12, 4, 0.78);
+        --zen-switch-border: rgba(0, 200, 70, 0.22);
+        --zen-switch-text: rgba(100, 255, 150, 0.82);
+        --zen-switch-active-bg: rgba(0, 120, 40, 0.26);
+        --zen-switch-active-border: rgba(0, 220, 80, 0.42);
+        --zen-switch-active-text: rgba(180, 255, 210, 0.98);
+      }
+
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment-wrap::before {
+        opacity: 0;
+        animation: none;
+      }
+
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment-wrap::after,
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment-wrap.is-pulsing::after {
+        opacity: 0;
+        animation: none;
+      }
+
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment {
+        font-family:
+          SFMono-Regular,
+          "Cascadia Mono",
+          "Segoe UI Mono",
+          Menlo,
+          Monaco,
+          "BIZ UDPGothic",
+          "Noto Sans JP",
+          monospace;
+        font-weight: 400;
+        font-size: clamp(0.95rem, 1.9vw, 1.45rem);
+        color: rgba(0, 255, 80, 0.97);
+        text-align: left;
+        line-height: 1.85;
+        letter-spacing: 0.05em;
+        max-width: min(68vw, 760px);
+        padding: 52px 26px 20px;
+        background-color: rgba(0, 9, 3, 0.91);
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 3px,
+          rgba(0, 0, 0, 0.07) 3px,
+          rgba(0, 0, 0, 0.07) 4px
+        );
+        border: 1px solid rgba(0, 210, 70, 0.42);
+        border-radius: 6px;
+        box-shadow:
+          0 0 0 1px rgba(0, 255, 80, 0.07),
+          0 0 28px rgba(0, 185, 55, 0.24),
+          0 0 70px rgba(0, 100, 30, 0.12),
+          0 24px 64px rgba(0, 0, 0, 0.62),
+          inset 0 0 80px rgba(0, 12, 4, 0.55);
+        text-shadow:
+          0 0 8px rgba(0, 255, 80, 0.85),
+          0 0 18px rgba(0, 200, 60, 0.45),
+          0 0 36px rgba(0, 150, 40, 0.18);
+        backdrop-filter: none;
+      }
+
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment::before {
+        content: "[ - ][ \2610 ][ \00D7 ]  MATRIX://COMMENT_STREAM.DAT";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 34px;
+        line-height: 34px;
+        padding: 0 14px;
+        font-size: 10px;
+        font-family: SFMono-Regular, "Cascadia Mono", "Courier New", monospace;
+        font-weight: 400;
+        letter-spacing: 0.10em;
+        color: rgba(100, 255, 160, 0.88);
+        background: rgba(0, 55, 20, 0.94);
+        border-bottom: 1px solid rgba(0, 200, 70, 0.36);
+        border-radius: 5px 5px 0 0;
+        text-shadow: 0 0 6px rgba(0, 255, 100, 0.38);
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      }
+
+      #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment::after {
+        content: "\2588";
+        display: inline;
+        margin-left: 2px;
+        color: rgba(0, 255, 80, 0.95);
+        text-shadow: 0 0 8px rgba(0, 255, 80, 0.9);
+        animation: matrix-cursor-blink 1.1s step-end infinite;
+      }
+
       #zen-canvas {
         position: absolute;
         inset: 0;
@@ -460,6 +559,11 @@
         color: rgba(255, 255, 255, 1);
       }
 
+      @keyframes matrix-cursor-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
       @keyframes zen-aura-breathe {
         0%, 100% {
           opacity: 0.48;
@@ -537,5 +641,18 @@
         #zen-ui button {
           width: 40px;
           height: 40px;
+        }
+
+        #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment {
+          font-size: clamp(0.85rem, 4.5vw, 1.2rem);
+          max-width: 90vw;
+          padding: 46px 16px 16px;
+        }
+
+        #zen-overlay[data-zen-scene="matrix-rain"] #zen-comment::before {
+          font-size: 9px;
+          height: 30px;
+          line-height: 30px;
+          letter-spacing: 0.07em;
         }
       }

@@ -309,6 +309,90 @@ void main() {
 }
 `;
 
+  const MATRIX_RAIN_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+
+float glyph(vec2 uv,float seed){
+  vec2 g=floor(uv*vec2(5.,7.));
+  float px=step(.42,h2(g+seed*vec2(17.3,37.7)));
+  float ex=smoothstep(.0,.10,uv.x)*smoothstep(1.,.90,uv.x);
+  float ey=smoothstep(.0,.07,uv.y)*smoothstep(1.,.93,uv.y);
+  return px*ex*ey;
+}
+
+vec3 rain(vec2 uv,float t,float cols,float spd,float seed,float bright){
+  float ar=u_res.x/u_res.y;
+  float cw=1./cols;
+  float ch=cw*ar;
+  float rows=1./ch;
+
+  float ci=floor(uv.x*cols);
+  float ri=floor((1.-uv.y)/ch);
+  vec2 cuv=vec2(fract(uv.x*cols),fract((1.-uv.y)/ch));
+
+  float cs=h1(ci*.3714+seed);
+  float speed=(3.+cs*9.)*spd;
+  float slen=9.+h1(ci+seed+50.)*18.;
+  float per=rows+slen;
+  float ph=h1(ci*.529+seed)*per;
+  float headR=mod(t*speed+ph,per)-slen;
+  float dist=ri-headR;
+
+  float inS=step(0.,dist)*(1.-step(slen,dist));
+  float fade=pow(clamp(1.-dist/slen,0.,1.),1.7)*inS;
+  float isHead=inS*(1.-smoothstep(0.,1.5,dist));
+
+  float cT=floor(t*(2.+h1(ci*.77+ri*.013+seed)*5.));
+  float cId=h1(ci*137.3+ri*59.7+cT*19.7+seed);
+  float px=glyph(cuv,cId);
+
+  float gap=.055;
+  float brd=smoothstep(0.,gap,cuv.x)*smoothstep(1.,1.-gap,cuv.x)*
+            smoothstep(0.,gap,cuv.y)*smoothstep(1.,1.-gap,cuv.y);
+
+  vec3 headCol=vec3(.78,1.,.83);
+  vec3 hiCol  =vec3(.09,1.,.26);
+  vec3 midCol =vec3(.02,.52,.10);
+  vec3 dimCol =vec3(.0,.16,.03);
+
+  vec3 tc=mix(dimCol,mix(midCol,hiCol,fade),fade);
+  vec3 fc=mix(tc,headCol,isHead*.88);
+  vec3 col=fc*px*brd*fade*bright;
+
+  vec2 gu=cuv-.5;
+  float cg=exp(-dot(gu,gu)*7.)*fade*.20;
+  col+=vec3(.03,.55,.13)*cg*bright;
+
+  return col;
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float t=u_time;
+
+  vec3 col=vec3(0.);
+  col+=rain(uv,t,90.,.38,100.,.30);
+  col+=rain(uv,t,58.,1.0,  0.,1.0);
+  col+=rain(uv,t,34.,1.8,200.,.45);
+
+  col+=vec3(.0,.015,.004)*(1.3-uv.y*.6);
+
+  float scan=1.-.04*pow(sin(gl_FragCoord.y*3.14159),2.);
+  col*=scan;
+
+  vec2 vp=uv-.5;
+  col*=clamp(1.-dot(vp*vec2(1.5,1.3),vp*vec2(1.5,1.3))*.85,0.,1.);
+
+  col=col/(col+.05);
+  gl_FragColor=vec4(col,1.);
+}
+`;
+
   const SCENES = [
     {
       id: 'night-sky',
@@ -321,6 +405,12 @@ void main() {
       label: '雨の窓辺',
       emoji: '🌧️',
       fragmentSource: RAIN_WINDOW_FRAG
+    },
+    {
+      id: 'matrix-rain',
+      label: '電脳雨',
+      emoji: '💻',
+      fragmentSource: MATRIX_RAIN_FRAG
     }
   ];
 
@@ -432,26 +522,43 @@ void main() {
     const text = comments[commentIdx % comments.length];
     commentIdx += 1;
 
+    const isMatrix = currentSceneId === 'matrix-rain';
+
     commentEl.style.transition = 'none';
     commentEl.style.opacity = '0';
-    commentEl.style.transform = 'translate3d(0, 24px, 0) scale(0.985)';
-    commentEl.style.filter = 'blur(14px)';
+    commentEl.style.transform = isMatrix ? 'none' : 'translate3d(0, 24px, 0) scale(0.985)';
+    commentEl.style.filter = isMatrix ? 'none' : 'blur(14px)';
     commentEl.textContent = text;
-    pulseCommentAura();
+    if (!isMatrix) {
+      pulseCommentAura();
+    }
     void commentEl.offsetHeight;
-    commentEl.style.transition =
-      'opacity 1.8s ease, transform 2.3s cubic-bezier(0.22, 1, 0.36, 1), filter 2.1s ease';
-    commentEl.style.opacity = '1';
-    commentEl.style.transform = 'translate3d(0, 0, 0) scale(1)';
-    commentEl.style.filter = 'blur(0)';
+
+    if (isMatrix) {
+      commentEl.style.transition = 'opacity 0.35s ease';
+      commentEl.style.opacity = '1';
+    } else {
+      commentEl.style.transition =
+        'opacity 1.8s ease, transform 2.3s cubic-bezier(0.22, 1, 0.36, 1), filter 2.1s ease';
+      commentEl.style.opacity = '1';
+      commentEl.style.transform = 'translate3d(0, 0, 0) scale(1)';
+      commentEl.style.filter = 'blur(0)';
+    }
 
     slideTimer = setTimeout(function () {
-      commentEl.style.transition = 'opacity 1.4s ease, transform 1.8s ease, filter 1.8s ease';
-      commentEl.style.opacity = '0';
-      commentEl.style.transform = 'translate3d(0, -18px, 0) scale(1.015)';
-      commentEl.style.filter = 'blur(10px)';
-      slideTimer = setTimeout(showNextComment, 1500);
-    }, 5200);
+      const stillMatrix = currentSceneId === 'matrix-rain';
+      if (stillMatrix) {
+        commentEl.style.transition = 'opacity 0.25s ease';
+        commentEl.style.opacity = '0';
+        slideTimer = setTimeout(showNextComment, 400);
+      } else {
+        commentEl.style.transition = 'opacity 1.4s ease, transform 1.8s ease, filter 1.8s ease';
+        commentEl.style.opacity = '0';
+        commentEl.style.transform = 'translate3d(0, -18px, 0) scale(1.015)';
+        commentEl.style.filter = 'blur(10px)';
+        slideTimer = setTimeout(showNextComment, 1500);
+      }
+    }, isMatrix ? 6500 : 5200);
   }
 
   /**
