@@ -4,11 +4,89 @@ import html
 import json
 import re
 from datetime import datetime, timedelta
+from html.parser import HTMLParser
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import pytz
 
 BODY_HTML_RENDER_VERSION = 1
+
+_ALLOWED_IMG_ATTRS = frozenset(["src", "srcset", "alt", "title", "loading", "decoding"])
+_ALLOWED_SRC_PREFIX = "https://static-cdn.jtvnw.net/"
+
+
+class _BodyHtmlSanitizer(HTMLParser):
+    """body_html フィールドから安全な要素のみを抽出するサニタイザー。
+
+    許可: テキストノード、<img class="emote"> (jtvnw.net URL のみ)
+    その他のタグはすべて除去する。
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self._parts: list[str] = []
+        # 許可されていないタグの内側にいる深さ（テキストを抑制するため）
+        self._suppress_depth: int = 0
+
+    def handle_data(self, data: str) -> None:
+        if self._suppress_depth == 0:
+            self._parts.append(html.escape(data))
+
+    def handle_entityref(self, name: str) -> None:
+        if self._suppress_depth == 0:
+            self._parts.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        if self._suppress_depth == 0:
+            self._parts.append(f"&#{name};")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "img" and self._suppress_depth > 0:
+            self._suppress_depth -= 1
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag != "img":
+            # void 要素（br, hr 等）は子を持たないので深さを増やさない
+            void_elements = frozenset(
+                ["area", "base", "br", "col", "embed", "hr", "input",
+                 "link", "meta", "param", "source", "track", "wbr"]
+            )
+            if tag not in void_elements:
+                self._suppress_depth += 1
+            return
+        attr_dict = dict(attrs)
+        if attr_dict.get("class") != "emote":
+            return
+        src = attr_dict.get("src", "")
+        if not src.startswith(_ALLOWED_SRC_PREFIX):
+            return
+        srcset = attr_dict.get("srcset", "")
+        if srcset and not all(
+            s.strip().split()[0].startswith(_ALLOWED_SRC_PREFIX)
+            for s in srcset.split(",")
+            if s.strip()
+        ):
+            return
+        parts = ["<img"]
+        for attr in _ALLOWED_IMG_ATTRS:
+            if attr in attr_dict:
+                parts.append(f' {attr}="{html.escape(attr_dict[attr], quote=True)}"')
+        parts.append(" class=\"emote\">")
+        self._parts.append("".join(parts))
+
+    def get_result(self) -> str:
+        return "".join(self._parts)
+
+
+def sanitize_body_html(value: str) -> str:
+    """body_html を安全な要素のみに制限してサニタイズする。
+
+    許可される要素: テキストノード、<img class="emote"> (jtvnw.net URL のみ)
+    その他のタグはすべて除去する。
+    """
+    sanitizer = _BodyHtmlSanitizer()
+    sanitizer.feed(value)
+    return sanitizer.get_result()
 
 
 def seconds_to_hms(total: int) -> str:
@@ -179,8 +257,8 @@ def get_comment_body_html(row) -> str:
         stored_body_html is not None
         and _normalize_body_html_version(row.get("body_html_version")) == BODY_HTML_RENDER_VERSION
     ):
-        return stored_body_html
-    return render_comment_body_html(row.get("raw_json"), row.get("body"))
+        return sanitize_body_html(stored_body_html)
+    return sanitize_body_html(render_comment_body_html(row.get("raw_json"), row.get("body")))
 
 
 def build_comment_body_select_sql(alias: str = "c") -> str:

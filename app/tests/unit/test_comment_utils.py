@@ -204,13 +204,36 @@ class TestRenderCommentBodyHtml:
 
 class TestGetCommentBodyHtml:
     def test_uses_stored_html_when_version_matches(self):
+        # 正規のエモート img は sanitize 後も残る
+        emote_html = (
+            '<img src="https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0"'
+            ' srcset="https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0 2x"'
+            ' alt="Kappa" title="Kappa" loading="lazy" decoding="async" class="emote">'
+        )
         row = {
-            "body_html": "<b>cached</b>",
+            "body_html": emote_html,
             "body_html_version": 1,
             "raw_json": None,
-            "body": "cached",
+            "body": "Kappa",
         }
-        assert get_comment_body_html(row) == "<b>cached</b>"
+        result = get_comment_body_html(row)
+        assert 'src="https://static-cdn.jtvnw.net/' in result
+        assert 'class="emote"' in result
+        assert "<script" not in result
+
+    def test_stored_html_xss_is_sanitized(self):
+        # DB に悪意ある HTML が保存されていても除去される
+        row = {
+            "body_html": '<b>text</b><script>alert(1)</script><img src="x" onerror="alert(1)">',
+            "body_html_version": 1,
+            "raw_json": None,
+            "body": "text",
+        }
+        result = get_comment_body_html(row)
+        assert "<script" not in result
+        assert "onerror" not in result
+        assert "<b>" not in result
+        assert "alert" not in result
 
     def test_rerenders_when_version_mismatch(self):
         row = {

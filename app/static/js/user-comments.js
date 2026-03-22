@@ -78,13 +78,36 @@
   }
 
   /**
-   * コメントオブジェクトから本文HTMLを生成する。body_htmlがあればそのまま返し、なければテキストをエスケープする。
-   * @param comment - 描画対象のコメントオブジェクト
-   * @returns コメント本文として表示するHTML文字列
+   * body_html を安全な DOM ノードとして el に追加する。
+   * 許可: テキストノード・<img class="emote" src="https://static-cdn.jtvnw.net/...">
+   * それ以外のタグはすべて除去する。
+   * @param {HTMLElement} el - 追加先の要素
+   * @param {string} bodyHtml - サーバーから受け取った body_html
+   * @param {string} [fallbackBody] - body_html が空の場合のテキストフォールバック
    */
-  function renderBody(comment) {
-    if (comment && comment.body_html) {return comment.body_html;}
-    return escapeHtml(comment.body);
+  function appendSafeBodyHtml(el, bodyHtml, fallbackBody) {
+    if (!bodyHtml) {
+      el.textContent = fallbackBody || '';
+      return;
+    }
+    const template = document.createElement('template');
+    template.innerHTML = bodyHtml;
+    const frag = document.createDocumentFragment();
+    template.content.childNodes.forEach(function (node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        frag.appendChild(document.createTextNode(node.textContent));
+      } else if (node.nodeName === 'IMG') {
+        const src = node.getAttribute('src') || '';
+        if (!src.startsWith('https://static-cdn.jtvnw.net/')) { return; }
+        const img = document.createElement('img');
+        ['class', 'src', 'srcset', 'alt', 'title', 'loading', 'decoding'].forEach(function (attr) {
+          if (node.hasAttribute(attr)) { img.setAttribute(attr, node.getAttribute(attr)); }
+        });
+        if (img.getAttribute('class') !== 'emote') { img.removeAttribute('class'); }
+        frag.appendChild(img);
+      }
+    });
+    el.appendChild(frag);
   }
 
   /**
@@ -154,22 +177,23 @@
     commentDiv.id = comment.comment_id;
     commentDiv.innerHTML =
       `<div class="comment-head">` +
-      `<div>${ 
-      badge 
-      }<a href="${  escapeHtml(comment.vod_jump_link)  }" target="_blank" class="pill">VOD ${  escapeHtml(String(comment.vod_id))  }</a>${ 
-      comment.youtube_jump_link ? `<a href="${  escapeHtml(comment.youtube_jump_link)  }" target="_blank" class="pill">YouTube</a>` : '' 
-      }<strong>${  escapeHtml(comment.vod_title)  }</strong>${ 
-      options.showOwner ? `<span class="meta">· 配信者: ${  escapeHtml(comment.owner_login)  }${comment.owner_display_name ? `（${  escapeHtml(comment.owner_display_name)  }）` : ''  }</span>` : '' 
+      `<div>${
+      badge
+      }<a href="${  escapeHtml(comment.vod_jump_link)  }" target="_blank" class="pill">VOD ${  escapeHtml(String(comment.vod_id))  }</a>${
+      comment.youtube_jump_link ? `<a href="${  escapeHtml(comment.youtube_jump_link)  }" target="_blank" class="pill">YouTube</a>` : ''
+      }<strong>${  escapeHtml(comment.vod_title)  }</strong>${
+      options.showOwner ? `<span class="meta">· 配信者: ${  escapeHtml(comment.owner_login)  }${comment.owner_display_name ? `（${  escapeHtml(comment.owner_display_name)  }）` : ''  }</span>` : ''
       }<span class="meta">· ${  escapeHtml(comment.commenter_login_snapshot)  }${comment.commenter_display_name_snapshot ? `（${  escapeHtml(comment.commenter_display_name_snapshot)  }）` : ''  }の書き込み</span>` +
-      `<span class="meta">· ${  escapeHtml(comment.offset_hms)  }</span>${ 
-      comment.comment_created_at_jst ? `<span class="meta">· ${  escapeHtml(comment.comment_created_at_jst)  } JST</span>` : '' 
-      }${options.showRelativeTime && comment.relative_time ? `<span class="meta ${  comment.is_recent ? 'recent' : ''  }">· ${  escapeHtml(comment.relative_time)  }</span>` : '' 
-      }${options.showBits && comment.bits_spent ? `<span class="pill">bits ${  escapeHtml(comment.bits_spent)  }</span>` : '' 
+      `<span class="meta">· ${  escapeHtml(comment.offset_hms)  }</span>${
+      comment.comment_created_at_jst ? `<span class="meta">· ${  escapeHtml(comment.comment_created_at_jst)  } JST</span>` : ''
+      }${options.showRelativeTime && comment.relative_time ? `<span class="meta ${  comment.is_recent ? 'recent' : ''  }">· ${  escapeHtml(comment.relative_time)  }</span>` : ''
+      }${options.showBits && comment.bits_spent ? `<span class="pill">bits ${  escapeHtml(comment.bits_spent)  }</span>` : ''
       }</div>` +
       `<div class="meta">${  renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count)  }</div>` +
       `</div>` +
-      `<div class="body">${  renderBody(comment)  }</div>${ 
+      `<div class="body"></div>${
       renderCommunityNote(comment)}`;
+    appendSafeBodyHtml(commentDiv.querySelector('.body'), comment.body_html, comment.body);
     link.appendChild(commentDiv);
     return { link, commentDiv };
   }

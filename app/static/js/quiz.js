@@ -58,6 +58,34 @@
   }
 
   /**
+   * body_html を安全な DOM ノードとして el に追加する。
+   * 許可: テキストノード・<img class="emote" src="https://static-cdn.jtvnw.net/...">
+   * それ以外のタグはすべて除去する。
+   * @param {HTMLElement} el - 追加先の要素
+   * @param {string} bodyHtml - サーバーから受け取った body_html
+   */
+  function appendSafeBodyHtml(el, bodyHtml) {
+    const template = document.createElement('template');
+    template.innerHTML = bodyHtml;
+    const frag = document.createDocumentFragment();
+    template.content.childNodes.forEach(function (node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        frag.appendChild(document.createTextNode(node.textContent));
+      } else if (node.nodeName === 'IMG') {
+        const src = node.getAttribute('src') || '';
+        if (!src.startsWith('https://static-cdn.jtvnw.net/')) { return; }
+        const img = document.createElement('img');
+        ['class', 'src', 'srcset', 'alt', 'title', 'loading', 'decoding'].forEach(function (attr) {
+          if (node.hasAttribute(attr)) { img.setAttribute(attr, node.getAttribute(attr)); }
+        });
+        if (img.getAttribute('class') !== 'emote') { img.removeAttribute('class'); }
+        frag.appendChild(img);
+      }
+    });
+    el.appendChild(frag);
+  }
+
+  /**
    * ライフ表示のハートをリセットして初期状態（3個）に戻す。
    */
   function resetHearts() {
@@ -178,8 +206,9 @@
     questionCard.className = 'question-card';
     void questionCard.offsetWidth;
     questionCard.classList.add('slide-in');
+    commentBody.textContent = '';
     if (q.body_html) {
-      commentBody.innerHTML = q.body_html;
+      appendSafeBodyHtml(commentBody, q.body_html);
     } else {
       commentBody.textContent = q.body;
     }
