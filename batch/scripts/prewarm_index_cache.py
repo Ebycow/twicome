@@ -14,7 +14,7 @@ import requests
 APP_INTERNAL_BASE_URL = os.getenv("APP_INTERNAL_BASE_URL", "http://app:8000").strip()
 INDEX_PREWARM_URL = os.getenv("INDEX_PREWARM_URL", "").strip()
 DATA_VERSION_URL = os.getenv("DATA_VERSION_URL", "").strip()
-INDEX_PREWARM_TIMEOUT = float(os.getenv("INDEX_PREWARM_TIMEOUT", "20"))
+INDEX_PREWARM_TIMEOUT = float(os.getenv("INDEX_PREWARM_TIMEOUT", "60"))
 INDEX_PREWARM_RETRIES = max(1, int(os.getenv("INDEX_PREWARM_RETRIES", "5")))
 INDEX_PREWARM_RETRY_SLEEP = max(0.0, float(os.getenv("INDEX_PREWARM_RETRY_SLEEP", "2")))
 
