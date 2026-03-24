@@ -117,7 +117,13 @@
       }
 
       .hero-stat-card-neutral {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.02));
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .hero-stat-card-neutral {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
+        }
       }
 
       a.hero-stat-card-link {
@@ -129,8 +135,14 @@
       }
 
       a.hero-stat-card-link:hover {
-        filter: brightness(1.15);
+        filter: brightness(0.93);
         transform: translateY(-2px);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        a.hero-stat-card-link:hover {
+          filter: brightness(1.15);
+        }
       }
 
       a.hero-stat-card-link[data-tooltip] {
