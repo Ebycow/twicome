@@ -48,8 +48,7 @@ class _BodyHtmlSanitizer(HTMLParser):
         if tag != "img":
             # void 要素（br, hr 等）は子を持たないので深さを増やさない
             void_elements = frozenset(
-                ["area", "base", "br", "col", "embed", "hr", "input",
-                 "link", "meta", "param", "source", "track", "wbr"]
+                ["area", "base", "br", "col", "embed", "hr", "input", "link", "meta", "param", "source", "track", "wbr"]
             )
             if tag not in void_elements:
                 self._suppress_depth += 1
@@ -62,16 +61,14 @@ class _BodyHtmlSanitizer(HTMLParser):
             return
         srcset = attr_dict.get("srcset", "")
         if srcset and not all(
-            s.strip().split()[0].startswith(_ALLOWED_SRC_PREFIX)
-            for s in srcset.split(",")
-            if s.strip()
+            s.strip().split()[0].startswith(_ALLOWED_SRC_PREFIX) for s in srcset.split(",") if s.strip()
         ):
             return
         parts = ["<img"]
         for attr in _ALLOWED_IMG_ATTRS:
             if attr in attr_dict:
                 parts.append(f' {attr}="{html.escape(attr_dict[attr], quote=True)}"')
-        parts.append(" class=\"emote\">")
+        parts.append(' class="emote">')
         self._parts.append("".join(parts))
 
     def get_result(self) -> str:
