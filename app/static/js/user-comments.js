@@ -1218,7 +1218,22 @@
           const latestDataVersion = data.data_version || '';
           const base = latestDataVersion.split(':')[0];
           if (base && base.length >= 14) {
-            dvEl.textContent = `データ更新: ${  base.slice(0,4)  }/${  base.slice(4,6)  }/${  base.slice(6,8)  } ${  base.slice(8,10)  }:${  base.slice(10,12)  } (UTC)`;
+            const utcDate = new Date(Date.UTC(
+              parseInt(base.slice(0,4), 10),
+              parseInt(base.slice(4,6), 10) - 1,
+              parseInt(base.slice(6,8), 10),
+              parseInt(base.slice(8,10), 10),
+              parseInt(base.slice(10,12), 10)
+            ));
+            const utcStr = `${base.slice(0,4)}/${base.slice(4,6)}/${base.slice(6,8)} ${base.slice(8,10)}:${base.slice(10,12)} (UTC)`;
+            const jstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+            const jy = jstDate.getUTCFullYear();
+            const jmo = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
+            const jd = String(jstDate.getUTCDate()).padStart(2, '0');
+            const jh = String(jstDate.getUTCHours()).padStart(2, '0');
+            const jmi = String(jstDate.getUTCMinutes()).padStart(2, '0');
+            const jstStr = `${jy}/${jmo}/${jd} ${jh}:${jmi} (JST)`;
+            dvEl.textContent = `データ更新: ${utcStr} / ${jstStr}`;
           }
           if (window.TwicomeCommentsPageUpdate) {
             if (latestDataVersion && latestDataVersion !== currentDataVersion) {
