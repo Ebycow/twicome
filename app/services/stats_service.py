@@ -4,6 +4,7 @@ stats.py ルーターから統計計算を抽出したもの。
 """
 
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
 
 from scipy.stats import mannwhitneyu
 
@@ -104,6 +105,46 @@ def build_cn_scores(db, uid: int) -> dict | None:
         "note_count": cn_avg["note_count"],
         "danger_dist": danger_dist,
     }
+
+
+def build_recent_broadcaster_stats(db, uid: int) -> dict:
+    """最終書き込み日時に基づいて配信者を時間帯別に分類する。"""
+    rows = stats_repo.fetch_broadcaster_last_comment(db, uid)
+    now = datetime.now(UTC)
+
+    groups: dict = {
+        "within_1day": [],
+        "within_3days": [],
+        "within_1week": [],
+        "within_1month": [],
+        "older": [],
+    }
+
+    for row in rows:
+        last_at = row["last_comment_at"]
+        if last_at is None:
+            continue
+        if last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=UTC)
+
+        diff = now - last_at
+        entry = {
+            "login": row["login"],
+            "display_name": row["display_name"],
+        }
+
+        if diff < timedelta(days=1):
+            groups["within_1day"].append(entry)
+        elif diff < timedelta(days=3):
+            groups["within_3days"].append(entry)
+        elif diff < timedelta(days=7):
+            groups["within_1week"].append(entry)
+        elif diff < timedelta(days=30):
+            groups["within_1month"].append(entry)
+        else:
+            groups["older"].append(entry)
+
+    return groups
 
 
 def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:

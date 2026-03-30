@@ -273,6 +273,44 @@
         word-break: break-all;
       }
 
+      .recent-broadcasters {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .period-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .period-label {
+        font-size: 0.85rem;
+        font-weight: bold;
+      }
+
+      .period-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .broadcaster-chip {
+        font-size: 0.82rem;
+        padding: 3px 10px;
+        border: 1px solid;
+        border-radius: 20px;
+        background: var(--card-bg);
+        white-space: nowrap;
+      }
+
+      .period-empty {
+        font-size: 0.82rem;
+        color: var(--meta-color);
+      }
+
       @media (max-width: 960px) {
         body {
           padding: 16px;

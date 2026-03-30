@@ -177,6 +177,28 @@ def fetch_impact_buckets(db, uid: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def fetch_broadcaster_last_comment(db, uid: int) -> list[dict]:
+    """配信者ごとのユーザーの最終書き込み日時を返す。"""
+    rows = (
+        db.execute(
+            text("""
+            SELECT u.user_id AS owner_user_id, u.login, u.display_name,
+                   MAX(c.comment_created_at_utc) AS last_comment_at
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            JOIN users u ON u.user_id = v.owner_user_id
+            WHERE c.commenter_user_id = :uid AND c.comment_created_at_utc IS NOT NULL
+            GROUP BY u.user_id, u.login, u.display_name
+            ORDER BY last_comment_at DESC
+        """),
+            {"uid": uid},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
 def fetch_cn_scores(db, uid: int) -> dict | None:
     """コミュニティノートの平均スコア。ノートがなければ None。"""
     row = (

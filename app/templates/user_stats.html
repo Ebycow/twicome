@@ -125,6 +125,33 @@
           </div>
         </div>
 
+        {% if recent_broadcaster_stats %}
+        {% set period_keys = ["within_1day", "within_3days", "within_1week", "within_1month", "older"] %}
+        {% set period_labels = {"within_1day": "過去1日", "within_3days": "3日以内", "within_1week": "1週間以内", "within_1month": "1ヶ月以内", "older": "それ以降"} %}
+        {% set period_colors = {"within_1day": "#2ecc71", "within_3days": "#3498db", "within_1week": "#9b59b6", "within_1month": "#e67e22", "older": "#95a5a6"} %}
+        <div class="card">
+          <h2>配信者への最終書き込み時期</h2>
+          <p class="meta">各配信者チャンネルに最後にコメントした時期ごとに分類しています。</p>
+          <div class="recent-broadcasters">
+            {% for key in period_keys %}
+            {% set broadcasters = recent_broadcaster_stats[key] %}
+            <div class="period-group">
+              <div class="period-label" style="color: {{ period_colors[key] }};">{{ period_labels[key] }} ({{ broadcasters | length }})</div>
+              <div class="period-chips">
+                {% if broadcasters %}
+                  {% for b in broadcasters %}
+                  <span class="broadcaster-chip" style="border-color: {{ period_colors[key] }};">{{ b.login }}{% if b.display_name and b.display_name != b.login %}（{{ b.display_name }}）{% endif %}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="period-empty">なし</span>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
         {% if impact_stats %}
         <div class="card">
           <h2>コメント影響度分析</h2>

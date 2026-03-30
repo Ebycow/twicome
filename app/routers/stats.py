@@ -37,6 +37,7 @@ def user_stats_page(
                     "cn_scores": None,
                     "cn_status_dist": {},
                     "comment_clusters": None,
+                    "recent_broadcaster_stats": None,
                 },
                 status_code=404,
             )
@@ -49,6 +50,7 @@ def user_stats_page(
         cn_scores = stats_service.build_cn_scores(db, uid)
         cn_status_dist = stats_repo.fetch_cn_status_distribution(db, uid)
         impact_stats, impact_total = stats_service.build_impact_stats(db, uid)
+        recent_broadcaster_stats = stats_service.build_recent_broadcaster_stats(db, uid)
 
         # FAISSクラスタ（インデックスがない場合はNone）
         comment_clusters = None
@@ -83,5 +85,6 @@ def user_stats_page(
             "cn_status_dist": cn_status_dist,
             "platform": platform,
             "comment_clusters": comment_clusters,
+            "recent_broadcaster_stats": recent_broadcaster_stats,
         },
     )
