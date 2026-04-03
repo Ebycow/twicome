@@ -76,6 +76,13 @@
         </div>
         {% endif %}
 
+        <div class="card">
+          <h2>月別書き込み数</h2>
+          <div class="chart-box chart-box--wide">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+
         <div class="charts-grid">
           <div class="card">
             <h2>書き込み時間分布 (24時間、日本時間 JST)</h2>
@@ -252,6 +259,7 @@
     {% if cn_scores %}
     <script type="application/json" id="cn-scores-data">{{ cn_scores | tojson }}</script>
     {% endif %}
+    <script type="application/json" id="monthly-stats-data">{{ monthly_stats | tojson }}</script>
     <script type="application/json" id="stats-data">{{ stats | tojson }}</script>
     <script type="application/json" id="weekday-stats-data">{{ weekday_stats | tojson }}</script>
     <script type="application/json" id="impact-stats-data">{{ impact_stats | tojson }}</script>

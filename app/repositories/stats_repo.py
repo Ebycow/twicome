@@ -199,6 +199,26 @@ def fetch_broadcaster_last_comment(db, uid: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def fetch_monthly_activity(db, uid: int) -> list[dict]:
+    """コメント時刻の月別集計（JST）。"""
+    rows = (
+        db.execute(
+            text("""
+            SELECT DATE_FORMAT(comment_created_at_utc + INTERVAL 9 HOUR, '%Y-%m') AS month,
+                   COUNT(*) AS count
+            FROM comments
+            WHERE commenter_user_id = :uid AND comment_created_at_utc IS NOT NULL
+            GROUP BY month
+            ORDER BY month
+        """),
+            {"uid": uid},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
 def fetch_cn_scores(db, uid: int) -> dict | None:
     """コミュニティノートの平均スコア。ノートがなければ None。"""
     row = (

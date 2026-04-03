@@ -31,6 +31,15 @@ def build_hourly_stats(db, uid: int) -> list[int]:
     return stats
 
 
+def build_monthly_stats(db, uid: int) -> dict:
+    """月別コメント数。{"labels": [...], "data": [...]} 形式で返す。"""
+    rows = stats_repo.fetch_monthly_activity(db, uid)
+    return {
+        "labels": [row["month"] for row in rows],
+        "data": [row["count"] for row in rows],
+    }
+
+
 def build_weekday_stats(db, uid: int) -> list[int]:
     """0=日〜6=土の曜日別コメント数。"""
     rows = stats_repo.fetch_weekday_activity(db, uid)

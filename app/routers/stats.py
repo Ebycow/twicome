@@ -47,6 +47,7 @@ def user_stats_page(
         stats = stats_service.build_hourly_stats(db, uid)
         weekday_stats = stats_service.build_weekday_stats(db, uid)
         owners_stats = stats_service.build_owners_stats(db, uid, total_comments)
+        monthly_stats = stats_service.build_monthly_stats(db, uid)
         cn_scores = stats_service.build_cn_scores(db, uid)
         cn_status_dist = stats_repo.fetch_cn_status_distribution(db, uid)
         impact_stats, impact_total = stats_service.build_impact_stats(db, uid)
@@ -86,5 +87,6 @@ def user_stats_page(
             "platform": platform,
             "comment_clusters": comment_clusters,
             "recent_broadcaster_stats": recent_broadcaster_stats,
+            "monthly_stats": monthly_stats,
         },
     )

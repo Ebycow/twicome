@@ -101,6 +101,34 @@
     });
   }
 
+  const monthlyStats = JSON.parse(document.getElementById('monthly-stats-data').textContent);
+  if (monthlyStats.labels.length > 0) {
+    new Chart(document.getElementById('monthlyChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: monthlyStats.labels,
+        datasets: [{
+          label: 'コメント数',
+          data: monthlyStats.data,
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { color: textColor, precision: 0 }, grid: { color: gridColor } },
+          x: { ticks: { color: textColor, maxRotation: 45 }, grid: { color: gridColor } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
   const stats = JSON.parse(document.getElementById('stats-data').textContent);
   const ctx = document.getElementById('statsChart').getContext('2d');
   new Chart(ctx, {

@@ -119,6 +119,10 @@
         margin: 0;
       }
 
+      .chart-box--wide {
+        height: 260px;
+      }
+
       .chart-box canvas {
         width: 100% !important;
         height: 100% !important;
