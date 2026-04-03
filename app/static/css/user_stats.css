@@ -315,6 +315,12 @@
         color: var(--meta-color);
       }
 
+      .chip-elapsed {
+        font-size: 0.75rem;
+        color: var(--meta-color);
+        margin-left: 2px;
+      }
+
       @media (max-width: 960px) {
         body {
           padding: 16px;

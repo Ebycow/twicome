@@ -116,6 +116,14 @@ def build_cn_scores(db, uid: int) -> dict | None:
     }
 
 
+def _format_elapsed(diff: timedelta) -> str:
+    months = diff.days // 30
+    years, remaining_months = divmod(months, 12)
+    if years > 0:
+        return f"{years}年{remaining_months}ヶ月前" if remaining_months else f"{years}年前"
+    return f"{months}ヶ月前"
+
+
 def build_recent_broadcaster_stats(db, uid: int) -> dict:
     """最終書き込み日時に基づいて配信者を時間帯別に分類する。"""
     rows = stats_repo.fetch_broadcaster_last_comment(db, uid)
@@ -126,6 +134,8 @@ def build_recent_broadcaster_stats(db, uid: int) -> dict:
         "within_3days": [],
         "within_1week": [],
         "within_1month": [],
+        "within_3months": [],
+        "within_6months": [],
         "older": [],
     }
 
@@ -150,8 +160,12 @@ def build_recent_broadcaster_stats(db, uid: int) -> dict:
             groups["within_1week"].append(entry)
         elif diff < timedelta(days=30):
             groups["within_1month"].append(entry)
+        elif diff < timedelta(days=90):
+            groups["within_3months"].append(entry)
+        elif diff < timedelta(days=180):
+            groups["within_6months"].append(entry)
         else:
-            groups["older"].append(entry)
+            groups["older"].append({**entry, "elapsed": _format_elapsed(diff)})
 
     return groups
 
