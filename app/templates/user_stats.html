@@ -4,6 +4,7 @@
 
 {% block extra_head %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 {% endblock %}
 
 {% block page_css %}
@@ -37,7 +38,15 @@
       {% endif %}
 
       {% if user %}
-        {% if cn_scores %}
+          <div class="card">
+          <h2>似ているユーザー</h2>
+          <p class="meta">視聴している配信者が似ているユーザーを類似スコア順に表示しています。バッジの数字は共通配信者数。クリックでそのユーザーの統計ページへ。</p>
+          <div id="ego-graph-container" class="ego-graph-container">
+            <div class="ego-graph-loading">読み込み中…</div>
+          </div>
+        </div>
+
+      {% if cn_scores %}
         <div class="card">
           <h2>コミュニティノート分析</h2>
           <p class="meta">このユーザのコメントに付与されたコミュニティノート {{ cn_scores.note_count }} 件のスコア分析です。</p>
@@ -269,4 +278,7 @@
     {% endif %}
     <script src="{{ root_path }}/static/offline-access.js?v={{ static_version }}"></script>
     <script src="{{ root_path }}/static/js/user-stats.js?v={{ static_version }}"></script>
+    {% if user %}
+    <script src="{{ root_path }}/static/js/user-ego-graph.js?v={{ static_version }}"></script>
+    {% endif %}
 {% endblock %}

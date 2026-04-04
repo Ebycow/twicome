@@ -217,3 +217,88 @@ def fetch_user_owner_options(db, uid: int) -> list[dict]:
         .all()
     )
     return [dict(row) for row in rows]
+
+
+def fetch_similar_users(db, uid: int, limit: int = 25) -> list[dict]:
+    """共通視聴配信者数が多い順に類似ユーザーを返す。
+
+    対象ユーザーが視聴した配信者セットとの共通数で類似度を測定する。
+    共通配信者が2件以上のユーザーのみ対象。
+    """
+    rows = (
+        db.execute(
+            text("""
+            WITH target_streamers AS (
+                SELECT DISTINCT v.owner_user_id
+                FROM comments c
+                JOIN vods v ON v.vod_id = c.vod_id
+                WHERE c.commenter_user_id = :uid
+            ),
+            user_shared AS (
+                SELECT
+                    c.commenter_user_id,
+                    COUNT(DISTINCT v.owner_user_id) AS shared_count
+                FROM comments c
+                JOIN vods v ON v.vod_id = c.vod_id
+                WHERE v.owner_user_id IN (SELECT owner_user_id FROM target_streamers)
+                  AND c.commenter_user_id != :uid
+                GROUP BY c.commenter_user_id
+                HAVING COUNT(DISTINCT v.owner_user_id) >= 2
+            )
+            SELECT
+                us.commenter_user_id AS user_id,
+                u.login,
+                u.display_name,
+                u.profile_image_url,
+                us.shared_count
+            FROM user_shared us
+            JOIN users u ON u.user_id = us.commenter_user_id
+            ORDER BY us.shared_count DESC
+            LIMIT :limit
+        """),
+            {"uid": uid, "limit": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def fetch_shared_streamers(db, uid: int, other_uids: list[int]) -> dict[int, list[str]]:
+    """対象ユーザーと各候補ユーザーの共通視聴配信者名を返す。
+
+    Returns: {commenter_user_id: [streamer_display_name, ...]}
+    """
+    if not other_uids:
+        return {}
+    placeholders = ", ".join([f":other_{i}" for i in range(len(other_uids))])
+    params = {"uid": uid, **{f"other_{i}": u for i, u in enumerate(other_uids)}}
+    rows = (
+        db.execute(
+            text(f"""
+            WITH target_streamers AS (
+                SELECT DISTINCT v.owner_user_id
+                FROM comments c
+                JOIN vods v ON v.vod_id = c.vod_id
+                WHERE c.commenter_user_id = :uid
+            )
+            SELECT
+                c.commenter_user_id,
+                COALESCE(owner_u.display_name, owner_u.login) AS streamer_name
+            FROM comments c
+            JOIN vods v ON v.vod_id = c.vod_id
+            JOIN users owner_u ON owner_u.user_id = v.owner_user_id
+            WHERE v.owner_user_id IN (SELECT owner_user_id FROM target_streamers)
+              AND c.commenter_user_id IN ({placeholders})
+            GROUP BY c.commenter_user_id, v.owner_user_id, owner_u.display_name, owner_u.login
+        """),
+            params,
+        )
+        .mappings()
+        .all()
+    )
+    result: dict[int, list[str]] = {}
+    for row in rows:
+        uid_key = int(row["commenter_user_id"])
+        result.setdefault(uid_key, []).append(row["streamer_name"])
+    return result

@@ -11,6 +11,61 @@ from services import stats_service
 router = APIRouter()
 
 
+@router.get("/api/u/{login}/similar-users")
+def user_similar_users_api(
+    login: str,
+    platform: str = Query(DEFAULT_PLATFORM),
+    limit: int = Query(25, ge=5, le=50),
+):
+    """視聴配信者が似ているユーザー（エゴグラフ用）。"""
+    with SessionLocal() as db:
+        user_row = user_repo.find_user(db, login, platform)
+        if not user_row:
+            return {"nodes": [], "edges": []}
+
+        uid = user_row["user_id"]
+        similar = user_repo.fetch_similar_users(db, uid, limit=limit)
+
+        center_node = {
+            "id": login,
+            "login": login,
+            "display_name": user_row["display_name"],
+            "profile_image_url": user_row["profile_image_url"],
+            "is_center": True,
+            "shared_count": 0,
+        }
+
+        if not similar:
+            return {"nodes": [center_node], "edges": []}
+
+        other_uids = [u["user_id"] for u in similar]
+        shared_map = user_repo.fetch_shared_streamers(db, uid, other_uids)
+
+        nodes = [center_node]
+        edges = []
+        for u in similar:
+            nodes.append(
+                {
+                    "id": u["login"],
+                    "login": u["login"],
+                    "display_name": u["display_name"],
+                    "profile_image_url": u["profile_image_url"],
+                    "is_center": False,
+                    "shared_count": int(u["shared_count"]),
+                }
+            )
+            edges.append(
+                {
+                    "source": login,
+                    "target": u["login"],
+                    "weight": int(u["shared_count"]),
+                    "shared_streamers": shared_map.get(int(u["user_id"]), []),
+                }
+            )
+
+        return {"nodes": nodes, "edges": edges}
+
+
 @router.get("/u/{login}/stats", response_class=HTMLResponse)
 def user_stats_page(
     request: Request,

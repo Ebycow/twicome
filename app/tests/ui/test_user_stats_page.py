@@ -130,6 +130,29 @@ class TestPageLoad:
         expect(page.locator("table")).to_be_visible()
 
 
+class TestEgoGraph:
+    """似ているユーザーグラフセクションのテスト群。"""
+
+    def test_ego_graph_container_exists(self, page: Page, db):
+        """
+        【確認内容】ego-graph-container が DOM に存在する
+
+        ユーザーが存在すれば、グラフコンテナは常にレンダリングされる。
+        """
+        _seed_user_with_comments(db, login="egographuser")
+        page.goto("/u/egographuser/stats")
+        expect(page.locator("#ego-graph-container")).to_be_attached()
+
+    def test_ego_graph_not_rendered_on_404(self, page: Page):
+        """
+        【確認内容】404 時は ego-graph-container が存在しない
+
+        user が None の場合テンプレートの {% if user %} ブロックが描画されないことを確認。
+        """
+        page.goto("/u/nobody_ego_xyz/stats")
+        expect(page.locator("#ego-graph-container")).not_to_be_attached()
+
+
 class TestNoDataDisplay:
     """コメントデータが 0 件の場合の表示を確認するテスト群。"""
 

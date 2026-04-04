@@ -321,6 +321,64 @@
         margin-left: 2px;
       }
 
+      /* ─── Ego Graph ─── */
+      .ego-graph-container {
+        position: relative;
+        min-height: 120px;
+        margin-top: 8px;
+      }
+
+      .ego-graph-loading {
+        text-align: center;
+        padding: 48px 0;
+        color: var(--meta-color);
+        font-size: 0.9rem;
+      }
+
+      .ego-graph-container svg {
+        display: block;
+        max-width: 100%;
+      }
+
+      .ego-node {
+        transition: opacity 0.15s;
+      }
+
+      .ego-node:hover {
+        opacity: 0.85;
+      }
+
+      .ego-tooltip {
+        position: absolute;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        pointer-events: none;
+        z-index: 20;
+        max-width: 280px;
+        line-height: 1.6;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        transition: opacity 0.1s;
+      }
+
+      .ego-tooltip-label {
+        color: var(--meta-color);
+        font-size: 0.78rem;
+      }
+
+      .ego-tooltip-tag {
+        display: inline-block;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 0.78rem;
+        margin: 1px 2px;
+      }
+
       @media (max-width: 960px) {
         body {
           padding: 16px;
