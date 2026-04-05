@@ -903,6 +903,14 @@
 
       }
 
+      /* ─── タッチデバイスではツールチップ不要 ─── */
+      @media (hover: none) {
+        a.hero-stat-card-link[data-tooltip]::after,
+        a.hero-stat-card-link[data-tooltip]::before {
+          display: none;
+        }
+      }
+
       /* ─── PWA Banner (mobile only) ─── */
       .pwa-banner {
         display: none;
