@@ -93,6 +93,7 @@ def user_stats_page(
                     "cn_status_dist": {},
                     "comment_clusters": None,
                     "recent_broadcaster_stats": None,
+                    "monthly_stats": [],
                 },
                 status_code=404,
             )
