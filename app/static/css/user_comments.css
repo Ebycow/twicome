@@ -321,6 +321,28 @@
         --zen-ripple-glow: rgba(140, 126, 108, 0.12);
       }
 
+      #zen-overlay[data-zen-scene="vaporwave"] {
+        background: #060010;
+
+        --zen-comment-color: rgba(255, 245, 255, 0.97);
+        --zen-comment-shadow:
+          0 0 18px rgba(255, 0, 180, 0.62),
+          0 0 44px rgba(160, 0, 255, 0.32),
+          0 0 84px rgba(80, 0, 160, 0.18),
+          0 2px 12px rgba(0, 0, 0, 0.96);
+        --zen-comment-spacing: 0.15em;
+        --zen-switch-bg: rgba(8, 0, 20, 0.62);
+        --zen-switch-border: rgba(180, 0, 255, 0.22);
+        --zen-switch-text: rgba(210, 170, 255, 0.82);
+        --zen-switch-active-bg: rgba(140, 0, 210, 0.24);
+        --zen-switch-active-border: rgba(220, 70, 255, 0.42);
+        --zen-switch-active-text: rgba(255, 220, 255, 0.98);
+        --zen-aura-core: rgba(255, 0, 200, 0.24);
+        --zen-aura-mid: rgba(80, 0, 200, 0.12);
+        --zen-ripple-ring: rgba(0, 240, 255, 0.30);
+        --zen-ripple-glow: rgba(200, 0, 255, 0.24);
+      }
+
       /* 白地ではオーラをスクリーンでなくマルチプライで重ねる */
       #zen-overlay[data-zen-scene="hakkou"] #zen-comment-wrap::before {
         mix-blend-mode: multiply;

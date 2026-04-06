@@ -831,6 +831,142 @@ void main() {
 }
 `;
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ヴェイパーウェーブ — レトロフューチャー夢幻シェーダー
+   80年代の夢: 透遠グリッド + レトロ太陽 + ネオン山脈
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+const VAPORWAVE_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_phase;
+
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float ar=u_res.x/u_res.y;
+  float t=u_time*.75;
+  float HZ=.44; /* 地平線 y */
+
+  /* ── 深紫インディゴ空グラデーション ── */
+  float skyT=max(0.,( uv.y-HZ)/(1.-HZ));
+  vec3 col=mix(
+    vec3(.60,.03,.45),   /* 地平: ネオンマゼンタ */
+    vec3(.04,.01,.22),   /* 頂点: 深インディゴ */
+    pow(skyT,.52)
+  );
+  /* 星雲状の微細着色 */
+  float neb=vn(vec2(uv.x*ar*1.6+t*.05,uv.y*2.1))*.50
+           +vn(vec2(uv.x*ar*3.2-t*.03,uv.y*4.0+2.3))*.22;
+  col+=mix(vec3(.20,0.,.65),vec3(.55,0.,.75),neb)*.09*skyT;
+
+  /* ── 星 ── */
+  float starFade=smoothstep(0.,.28,skyT);
+  vec2 sGrid=uv*vec2(ar*75.,75.);
+  vec2 sID=floor(sGrid);
+  vec2 sST=fract(sGrid)-.5;
+  float sr1=h2(sID),sr2=h2(sID+7.31),sr3=h2(sID+13.09);
+  float hasStar=step(.81,sr1);
+  float twinkle=.52+.48*sin(t*(1.7+sr2*4.2)+sr1*6.28);
+  float sD=length(sST-vec2(sr2-.5,sr3-.5)*.52);
+  float starBr=max(0.,1.-sD*24.)*hasStar*twinkle;
+  vec3 starCol=mix(vec3(.92,.75,1.),vec3(.1,.95,1.),step(.88,sr2));
+  starCol=mix(starCol,vec3(1.,.55,1.),step(.94,sr3));
+  col+=starCol*starBr*starFade*.88;
+
+  /* ── レトロウェーブ太陽 ── */
+  float sunR=.195;
+  vec2 sVec=vec2((uv.x-.5)*ar,uv.y-HZ);
+  float sDist=length(sVec);
+  float inSun=1.-smoothstep(sunR-.004,sunR+.006,sDist);
+  float abvHz=step(HZ,uv.y);
+
+  /* グラデーション: 頂=ゴールデン → 中=オレンジ → 底=ホットピンク */
+  float sunNY=sVec.y/sunR; /* -1=底面, +1=頂面 */
+  vec3 sunG=mix(
+    vec3(.95,.03,.58),
+    mix(vec3(1.,.38,.04),vec3(1.,.90,.04),smoothstep(0.,1.,sunNY)),
+    smoothstep(-1.,0.,sunNY)
+  );
+
+  /* ヴェネチアンブラインドストライプ (下部60%に水平帯) */
+  float sunUVY=(sunNY+1.)*.5; /* 0=底, 1=頂 */
+  float stripeZone=1.-smoothstep(.57,.63,sunUVY);
+  float solidStripe=step(.42,fract(sunUVY*9.));
+  float sunMask=inSun*abvHz*mix(1.,solidStripe,stripeZone);
+  col=mix(col,sunG,sunMask);
+
+  /* 太陽外側グロー */
+  float outerD=max(0.,sDist-sunR);
+  col+=vec3(.88,.05,.68)*max(0.,1.-outerD/(sunR*.75))*(1.-inSun)*abvHz*.52;
+  col+=vec3(1.,.45,.08)*max(0.,1.-outerD/(sunR*.28))*(1.-inSun)*abvHz*.26;
+
+  /* ── ネオン山脈シルエット ── */
+  float mx=uv.x*ar*2.5;
+  float mh=.06*(.48+.30*sin(mx*2.+.6)+.20*sin(mx*5.1-1.3)
+                   +.13*sin(mx*10.7+2.)+.07*sin(mx*21.4-.5));
+  float mountTop=HZ+max(0.,mh);
+  float inMt=smoothstep(-.001,.003,mountTop-uv.y)*abvHz;
+  float ridge=(1.-smoothstep(.001,.007,abs(uv.y-mountTop)))*abvHz;
+  col=mix(col,vec3(.06,0.,.20),inMt);
+  col+=vec3(.75,0.,1.)*ridge*.75;   /* ネオンパープル稜線 */
+  col+=vec3(.90,0.,.80)*ridge*.35;  /* 外側グロー */
+
+  /* ── 透視グリッドフロア ── */
+  float belowHz=1.-abvHz;
+  float fY=max(.001,HZ-uv.y);
+  float floorT=fY/HZ; /* 0=地平, 1=手前 */
+
+  float px=(uv.x-.5)*ar/fY;
+  float pz=.42/fY+t*4.5; /* 前進スクロール */
+  float gx=abs(fract(px*.28+.5)-.5);
+  float gz=abs(fract(pz*.28+.5)-.5);
+  float lT=.023;
+  float grid=max(1.-smoothstep(0.,lT,gx),1.-smoothstep(0.,lT,gz));
+
+  /* シアン(地平)→ホットピンク(手前)グラデーション */
+  vec3 gridC=mix(vec3(.04,.85,1.),vec3(1.,.04,.78),floorT);
+  vec3 floorBase=vec3(.018,.004,.095);
+  float pulse=.80+.20*pow(sin(u_time*.35)*.5+.5,2.5);
+  vec3 floorCol=mix(floorBase,gridC*pulse,grid*.87);
+  floorCol+=gridC*grid*.28*pulse; /* ネオングロー */
+  /* ソフトグロー帯 */
+  floorCol+=gridC*(1.-smoothstep(0.,lT*3.5,min(gx,gz)))*.10;
+  /* 地平霧 */
+  floorCol=mix(floorCol,vec3(.28,.02,.28),max(0.,1.-floorT*2.3)*.72);
+  col=mix(col,floorCol,belowHz);
+
+  /* ── 地平線輝線 ── */
+  col+=vec3(1.,.25,.90)*(1.-smoothstep(0.,.004,abs(uv.y-HZ)))*.90;
+
+  /* ── CRTスキャンライン ── */
+  col*=.80+.20*sin(gl_FragCoord.y*3.14159);
+
+  /* ── 散発グリッチライン ── */
+  float gT=floor(u_time*.6);
+  float gActive=step(.91,h1(gT*1.618));
+  float gW=.004+h1(gT*2.72)*.009;
+  float isGlitch=gActive*(1.-smoothstep(gW*.4,gW,abs(uv.y-h1(gT*3.14))));
+  col+=mix(vec3(0.,.9,1.),vec3(1.,0.,.9),h1(gT))*isGlitch*.48;
+
+  /* ── フィルムグレイン ── */
+  col+=(h2(gl_FragCoord.xy+floor(u_time*22.)*vec2(14.3,28.9))-.5)*.018;
+
+  /* ── ビネット ── */
+  vec2 vp=uv-.5;
+  col*=1.-dot(vp*vec2(1.3,1.05),vp*vec2(1.3,1.05))*.78;
+
+  /* ── 彩度ブースト (ヴェイパーウェーブ鮮やかさ) ── */
+  float lum=dot(col,vec3(.299,.587,.114));
+  col=mix(vec3(lum),col,1.58);
+
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
+}
+`;
+
 export const SCENES = [
   {
     id: 'night-sky',
@@ -873,6 +1009,12 @@ export const SCENES = [
     label: '白光',
     emoji: '🤍',
     fragmentSource: HAKKOU_FRAG
+  },
+  {
+    id: 'vaporwave',
+    label: 'ヴェイパー',
+    emoji: '🌆',
+    fragmentSource: VAPORWAVE_FRAG
   }
 ];
 
