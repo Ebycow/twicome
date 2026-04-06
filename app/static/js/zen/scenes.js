@@ -942,22 +942,29 @@ void main(){
   /* ── 地平線輝線 ── */
   col+=vec3(1.,.25,.90)*(1.-smoothstep(0.,.004,abs(uv.y-HZ)))*.90;
 
-  /* ── CRTスキャンライン ── */
-  col*=.80+.20*sin(gl_FragCoord.y*3.14159);
+  /* ── CRTスキャンライン ──
+     mod()で引数を[0,8)に縮小 → mediump精度内で安全。
+     8物理px周期 = Retina(2×DPR)で4CSSピクセル → 視認可能 */
+  float scanRow=mod(gl_FragCoord.y,8.);
+  col*=.78+.22*sin(scanRow*.7853982); /* π/4: 8px周期 */
 
-  /* ── 散発グリッチライン ── */
-  float gT=floor(u_time*.6);
-  float gActive=step(.91,h1(gT*1.618));
-  float gW=.004+h1(gT*2.72)*.009;
+  /* ── 散発グリッチライン ──
+     mod()でgTを小さく保ちmediump精度を維持 */
+  float gT=mod(floor(u_time*.6),1009.);
+  float gActive=step(.88,h1(gT*1.618));
+  float gW=.005+h1(gT*2.72)*.012;
   float isGlitch=gActive*(1.-smoothstep(gW*.4,gW,abs(uv.y-h1(gT*3.14))));
-  col+=mix(vec3(0.,.9,1.),vec3(1.,0.,.9),h1(gT))*isGlitch*.48;
+  col+=mix(vec3(0.,.9,1.),vec3(1.,0.,.9),h1(gT))*isGlitch*.65;
 
-  /* ── フィルムグレイン ── */
-  col+=(h2(gl_FragCoord.xy+floor(u_time*22.)*vec2(14.3,28.9))-.5)*.018;
+  /* ── フィルムグレイン ──
+     mod(gl_FragCoord.xy,512.)で座標を精度安全範囲に収める
+     mod(time)で時間値の肥大化を防止 */
+  float grainT=mod(floor(u_time*22.),997.);
+  col+=(h2(mod(gl_FragCoord.xy,512.)+grainT*vec2(14.3,28.9))-.5)*.028;
 
   /* ── ビネット ── */
   vec2 vp=uv-.5;
-  col*=1.-dot(vp*vec2(1.3,1.05),vp*vec2(1.3,1.05))*.78;
+  col*=1.-dot(vp*vec2(1.3,1.05),vp*vec2(1.3,1.05))*.95;
 
   /* ── 彩度ブースト (ヴェイパーウェーブ鮮やかさ) ── */
   float lum=dot(col,vec3(.299,.587,.114));
