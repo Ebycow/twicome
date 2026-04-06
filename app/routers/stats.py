@@ -94,6 +94,7 @@ def user_stats_page(
                     "comment_clusters": None,
                     "recent_broadcaster_stats": None,
                     "monthly_stats": [],
+                    "hourly_by_weekday": [[] for _ in range(7)],
                 },
                 status_code=404,
             )
@@ -102,6 +103,7 @@ def user_stats_page(
         total_comments = stats_repo.count_user_comments(db, uid)
         stats = stats_service.build_hourly_stats(db, uid)
         weekday_stats = stats_service.build_weekday_stats(db, uid)
+        hourly_by_weekday = stats_service.build_hourly_by_weekday_stats(db, uid)
         owners_stats = stats_service.build_owners_stats(db, uid, total_comments)
         monthly_stats = stats_service.build_monthly_stats(db, uid)
         cn_scores = stats_service.build_cn_scores(db, uid)
@@ -144,5 +146,6 @@ def user_stats_page(
             "comment_clusters": comment_clusters,
             "recent_broadcaster_stats": recent_broadcaster_stats,
             "monthly_stats": monthly_stats,
+            "hourly_by_weekday": hourly_by_weekday,
         },
     )

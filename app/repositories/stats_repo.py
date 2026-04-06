@@ -38,6 +38,28 @@ def fetch_hourly_activity(db, uid: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def fetch_hourly_by_weekday(db, uid: int) -> list[dict]:
+    """コメント時刻の曜日×時間帯別集計（JST）。"""
+    rows = (
+        db.execute(
+            text("""
+            SELECT
+                DAYOFWEEK(comment_created_at_utc + INTERVAL 9 HOUR) AS weekday,
+                HOUR(comment_created_at_utc + INTERVAL 9 HOUR) AS hour,
+                COUNT(*) AS count
+            FROM comments
+            WHERE commenter_user_id = :uid AND comment_created_at_utc IS NOT NULL
+            GROUP BY weekday, hour
+            ORDER BY weekday, hour
+        """),
+            {"uid": uid},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
 def fetch_weekday_activity(db, uid: int) -> list[dict]:
     """コメント時刻の曜日別集計（JST）。"""
     rows = (

@@ -130,8 +130,16 @@
   }
 
   const stats = JSON.parse(document.getElementById('stats-data').textContent);
+  const hourlyByWeekday = JSON.parse(document.getElementById('hourly-by-weekday-data').textContent);
+  const weekdayLabels = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+  const weekdayColors = [
+    'rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 205, 86, 1)',
+    'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
+    'rgba(199, 199, 199, 1)'
+  ];
+
   const ctx = document.getElementById('statsChart').getContext('2d');
-  new Chart(ctx, {
+  const statsChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: Array.from({length: 24}, function (_, i) { return `${i  }:00`; }),
@@ -149,7 +157,10 @@
         y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } },
         x: { ticks: { color: textColor }, grid: { color: gridColor } }
       },
-      plugins: { legend: { labels: { color: textColor } } }
+      plugins: {
+        legend: { labels: { color: textColor } },
+        title: { display: false, text: '', color: textColor }
+      }
     }
   });
 
@@ -158,7 +169,7 @@
   new Chart(ctxWeekday, {
     type: 'doughnut',
     data: {
-      labels: ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'],
+      labels: weekdayLabels,
       datasets: [{
         label: 'コメント数',
         data: weekdayStats,
@@ -167,11 +178,7 @@
           'rgba(75, 192, 192, 0.4)', 'rgba(153, 102, 255, 0.4)', 'rgba(255, 159, 64, 0.4)',
           'rgba(199, 199, 199, 0.4)'
         ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 205, 86, 1)',
-          'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
-          'rgba(199, 199, 199, 1)'
-        ],
+        borderColor: weekdayColors,
         borderWidth: 1
       }]
     },
@@ -182,7 +189,31 @@
         legend: { position: 'top', labels: { color: textColor } },
         title: { display: true, text: '曜日ごとのコメント数', color: textColor }
       }
-    }
+    },
+    plugins: [{
+      id: 'weekdayHover',
+      afterInit(chart) {
+        chart.canvas.addEventListener('mousemove', function (e) {
+          const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+          if (points.length > 0) {
+            const idx = points[0].index;
+            statsChart.data.datasets[0].data = hourlyByWeekday[idx];
+            statsChart.data.datasets[0].backgroundColor = weekdayColors[idx].replace('1)', '0.4)');
+            statsChart.data.datasets[0].borderColor = weekdayColors[idx];
+            statsChart.options.plugins.title.display = true;
+            statsChart.options.plugins.title.text = `書き込み時間分布 — ${weekdayLabels[idx]}`;
+            statsChart.update('none');
+          }
+        });
+        chart.canvas.addEventListener('mouseleave', function () {
+          statsChart.data.datasets[0].data = stats;
+          statsChart.data.datasets[0].backgroundColor = 'rgba(54, 162, 235, 0.4)';
+          statsChart.data.datasets[0].borderColor = 'rgba(54, 162, 235, 1)';
+          statsChart.options.plugins.title.display = false;
+          statsChart.update('none');
+        });
+      }
+    }]
   });
 
   // ---- 配信者アクティブ状況テーブルのソート ----

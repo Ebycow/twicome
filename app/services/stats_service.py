@@ -40,6 +40,18 @@ def build_monthly_stats(db, uid: int) -> dict:
     }
 
 
+def build_hourly_by_weekday_stats(db, uid: int) -> list[list[int]]:
+    """曜日×時間帯別コメント数。外側インデックス=曜日(0=日〜6=土)、内側=時間(0〜23)。"""
+    rows = stats_repo.fetch_hourly_by_weekday(db, uid)
+    matrix = [[0] * 24 for _ in range(7)]
+    for row in rows:
+        wd = row["weekday"] - 1  # DAYOFWEEK: 1=Sun → 0
+        hour = row["hour"]
+        if 0 <= wd < 7 and 0 <= hour < 24:
+            matrix[wd][hour] = row["count"]
+    return matrix
+
+
 def build_weekday_stats(db, uid: int) -> list[int]:
     """0=日〜6=土の曜日別コメント数。"""
     rows = stats_repo.fetch_weekday_activity(db, uid)
