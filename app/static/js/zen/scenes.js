@@ -974,6 +974,216 @@ void main(){
 }
 `;
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Y2Kパラパラ — ユーロビートが鳴り響くミレニアムクラブ夜
+   ディスコボール反射 + ホログラフィックダンスフロア + グリッタースパークル
+   + カラースポットライト + パラパラ感情波動
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+const Y2K_PARA_FRAG = `
+precision mediump float;
+uniform float u_time;
+uniform vec2 u_res;
+
+float h1(float n){n=fract(n*.1031);n*=n+33.33;n*=n+n;return fract(n);}
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+
+/* ユーロビート BPM138 ビートパルス (2.30 Hz) */
+float beat(float t){float b=fract(t*2.30);return max(0.,1.-b*4.2);}
+
+/* HSV (S=1,V=1) → RGB: ホログラフィック虹色変換 */
+vec3 holo(float h){
+  h=fract(h);
+  return clamp(vec3(
+    abs(h*6.-3.)-1.,
+    2.-abs(h*6.-2.),
+    2.-abs(h*6.-4.)
+  ),0.,1.);
+}
+
+/* グリッタースパークル: ひし形コア + 十字光芒 */
+float glitterLayer(vec2 uv,float t,float dens,float seed){
+  vec2 p=uv*dens;
+  vec2 id=floor(p),st=fract(p)-.5;
+  float acc=0.;
+  for(int i=-1;i<=1;i++){
+    for(int j=-1;j<=1;j++){
+      vec2 nid=id+vec2(float(i),float(j));
+      float hr=h2(nid+seed);
+      if(hr>.52){
+        float hs=h2(nid+seed+.31);
+        float hd=h2(nid+seed+.74);
+        /* 重力落下 + 有機的横ゆれ */
+        float fall=fract(hd+t*(.20+hs*.32));
+        float drift=(hs-.5)*.44+sin(t*(1.1+hr*.9)+hr*9.2)*.055;
+        vec2 pos=vec2(float(i)+(hr-.5)*.68+drift,float(j)+(fall-.5)*2.0);
+        vec2 d=st-pos;
+        /* ひし形コア */
+        float dm=max(abs(d.x),abs(d.y));
+        /* 十字光芒 */
+        float pm=min(abs(d.x),abs(d.y));
+        float core=max(0.,1.-dm*40.);
+        float cross_ray=(1.-smoothstep(.0,.004,pm))*step(dm,.036);
+        float twinkle=pow(abs(sin(t*(3.8+hr*7.)+hr*43.)),2.5);
+        acc+=(core+cross_ray*.65)*twinkle*(.44+hr*.56);
+      }
+    }
+  }
+  return clamp(acc,0.,1.);
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_res;
+  float ar=u_res.x/u_res.y;
+  float t=u_time;
+  float bp=beat(t);             /* オンビートパルス */
+  float bp2=beat(t+60./138.*.5); /* 8分音符オフビート */
+
+  /* ━━ 背景: Y2Kクラブ — 深パープル〜ダークバイオレット ━━ */
+  vec3 col=mix(
+    vec3(.007,.002,.028),
+    vec3(.022,.007,.068),
+    pow(uv.y,.62)
+  );
+
+  /* ネオン霧: ゆっくり流れる2層FBM */
+  float fog=vn(vec2(uv.x*ar*1.7+t*.025,uv.y*2.3))
+           +vn(vec2(uv.x*ar*3.8-t*.017,uv.y*5.2+1.8))*.46;
+  col+=mix(vec3(.08,.01,.24),vec3(.01,.14,.30),fog)
+      *smoothstep(.32,.80,fog)*.21;
+
+  /* ホログラフィック背景シマー (ゆっくり流れる虹色ノイズ) */
+  float shim=vn(vec2(uv.x*ar*4.8+t*.06,uv.y*5.5+t*.04));
+  col+=holo(shim+t*.025+uv.x*.22)*smoothstep(.62,.92,shim)*.07;
+
+  /* ━━ スポットライトビーム 3本 (ピンク/シアン/ゴールド) ━━ */
+  for(int bi=0;bi<3;bi++){
+    float bf=float(bi);
+    float bAngle=t*(.28+bf*.10)+bf*2.094; /* 120°ずつ */
+    vec2 bTop=vec2(.50+sin(bAngle)*.36/ar,1.02);
+    /* アスペクト補正方向ベクトル */
+    vec2 d=vec2((uv.x-bTop.x)*ar,(uv.y-bTop.y));
+    float dist=length(d);
+    float ang=atan(d.x,-(bTop.y-uv.y)); /* 垂直下向き基準の角度 */
+    float spread=.125+.030*sin(t*.38+bf);
+    /* ビーム: 拡散コーン × 距離フェード × 同軸リング紋 */
+    float beamV=(1.-smoothstep(0.,spread,abs(ang)))
+               *(1.-smoothstep(.06,.90,dist))
+               *(.52+.48*sin(dist*15.-t*2.6+bf*2.1))
+               *(1.+bp*.55);
+    vec3 bCol=bf<.5?vec3(.88,.04,.54):bf<1.5?vec3(.04,.75,.96):vec3(.98,.70,.04);
+    col+=bCol*beamV*.25;
+  }
+
+  /* ━━ ダンスフロア: 透視ホログラフィックチェッカー ━━ */
+  float HZ=.43; /* 地平線 y */
+  float abvHz=step(HZ,uv.y);
+  float belowHz=1.-abvHz;
+  {
+    float fY=max(.001,HZ-uv.y);
+    float floorT=clamp(fY/HZ,0.,1.); /* 0=地平 1=手前 */
+    float px=(uv.x-.5)*ar/fY*.58;
+    float pz=.42/fY;
+    float cx=floor(px);
+    float cz=floor(pz);
+    float checker=mod(cx+cz,2.);
+    /* タイル固有ホログラフィックカラー */
+    float tH=h1(cx*7.3+cz*13.7);
+    vec3 tileOn=holo(tH+t*.05)*(.50+.50*bp);
+    vec3 tileOff=vec3(.014,.004,.052);
+    vec3 tileCol=mix(tileOff,tileOn,checker);
+    /* ネオングリッドライン (シアン+ビートパルス) */
+    vec2 gf=vec2(fract(px)-.5,fract(pz)-.5);
+    float gLine=1.-smoothstep(.016,.038,min(abs(gf.x),abs(gf.y)));
+    tileCol+=vec3(.35,.82,1.)*gLine*(.44+.40*bp2);
+    /* ビートブルーム: オンタイルが発光 */
+    tileCol+=holo(tH+.52)*checker*bp*.42;
+    /* 地平フォグ */
+    tileCol=mix(vec3(.055,.010,.200),tileCol,smoothstep(0.,.68,floorT));
+    col=mix(col,tileCol,belowHz);
+  }
+
+  /* 地平線輝線 (マゼンタ+シアン2重) */
+  float hDist=abs(uv.y-HZ);
+  col+=vec3(.92,.16,.80)*(1.-smoothstep(0.,.0030,hDist))*.90;
+  col+=vec3(.16,.80,1.0)*(1.-smoothstep(0.,.0095,hDist))*.36;
+
+  /* ━━ ディスコボール (上部中央) ━━ */
+  vec2 dbC=vec2(.50,.905);
+  float dbD=length(vec2((uv.x-dbC.x)*ar,uv.y-dbC.y));
+  float dbR=.026;
+  float inDB=smoothstep(dbR+.003,dbR-.002,dbD);
+  /* ボール表面: 角度×距離でタイル状反射 */
+  float dbAng=atan((uv.x-dbC.x)*ar,uv.y-dbC.y);
+  float dbTile=mod(floor(dbAng*7.)+floor(dbD*28.),2.);
+  col=mix(col,mix(vec3(.06,.04,.16),vec3(1.,1.,1.)*(1.+bp*.5),dbTile),inDB);
+  /* ハロ発光 */
+  col+=vec3(.78,.68,1.)*exp(-dbD*30.)*.13*(1.+bp*.9);
+
+  /* ディスコ反射スポット 12点 (ホログラフィック) */
+  for(int si=0;si<12;si++){
+    float sf=float(si);
+    float sA=sf*2.39996+t*(.42+sf*.055); /* 黄金角×速度差 */
+    float sRad=.095+.058*sin(sf*3.1+t*.44);
+    vec2 sPos=dbC+vec2(cos(sA)*sRad,sin(sA)*sRad*.62);
+    float sd=length(uv-sPos);
+    float spot=max(0.,1.-sd*65.)*(0.55+0.45*sin(t*5.2+sf*1.4));
+    col+=holo(h2(vec2(sf,0.)+3.9)+t*.10)*spot*.56*(1.+bp*.75);
+  }
+
+  /* ━━ グリッタースパークル 3層 (キラキラ降り注ぐ) ━━ */
+  vec2 uvA=vec2(uv.x*ar,uv.y);
+  float g0=glitterLayer(uvA,t,20., 0.0);
+  float g1=glitterLayer(uvA*1.38+vec2(7.2,2.4),t*1.09,28.,41.7);
+  float g2=glitterLayer(uvA*.76+vec2(3.6,8.8),t*.87,13.,83.2);
+  vec3 glCol=holo(g0*.32+uv.x*.38+t*.07)*g0
+            +holo(g1*.42+uv.y*.48+t*.09)*g1*.74
+            +vec3(.98,.95,1.)*g2*.54;
+  col+=glCol*(1.+bp*.68);
+  col+=glCol*glCol*.72; /* 解析ブルーム */
+
+  /* ━━ パラパラウェーブ: 感情的に揺れる光の波動 ━━
+     BPM138に同期した二重正弦波: 腕の軌跡を光に昇華 */
+  float wY1=.56+.16*sin(t*4.60)+.07*sin(t*2.30+.8);
+  float wY2=.63+.12*cos(t*4.60+.785)+.06*cos(t*2.30+.3);
+  float wx1=sin(uv.x*ar*8.0-t*2.2)*.5+.5;
+  float wx2=sin(uv.x*ar*5.5+t*1.7+1.57)*.5+.5;
+  /* 横断する水平光帯 (ピンク/シアン) */
+  col+=vec3(.90,.05,.52)*wx1*(1.-smoothstep(0.,.046,abs(uv.y-wY1)))*abvHz*.16;
+  col+=vec3(.05,.76,.98)*wx2*(1.-smoothstep(0.,.038,abs(uv.y-wY2)))*abvHz*.13;
+  /* ビートに乗る全体フラッシュ (パラパラの瞬間) */
+  col+=vec3(.18,.06,.40)*bp*.20;
+  col+=vec3(.30,.00,.60)*bp2*.10;
+
+  /* ━━ スキャンレーザー: 散発水平レーザーライン ━━ */
+  float lT=mod(floor(t*.88),503.);
+  float lAct=step(.76,h1(lT*1.618));
+  float lY=h1(lT*2.72);
+  float lH=h1(lT*3.14);
+  float laser=lAct*(1.-smoothstep(.0010,.0038,abs(uv.y-lY)));
+  col+=holo(lH)*laser*.78;
+  col+=holo(lH+.33)*laser*.40; /* グロー拡散 */
+
+  /* ━━ CRTスキャンライン (Y2Kブラウン管感) ━━ */
+  float scanR=mod(gl_FragCoord.y,5.);
+  col*=.85+.15*sin(scanR*1.2566); /* 2π/5: 5px周期 */
+
+  /* ━━ ビネット ━━ */
+  vec2 vp=uv-.5;
+  col*=1.-dot(vp*vec2(1.36,1.06),vp*vec2(1.36,1.06))*.80;
+
+  /* ━━ 彩度ブースト (Y2K鮮烈パレット) ━━ */
+  float lum=dot(col,vec3(.299,.587,.114));
+  col=mix(vec3(lum),col,1.62);
+
+  /* ━━ フィルムグレイン ━━ */
+  float grT=mod(floor(t*22.),997.);
+  col+=(h2(mod(gl_FragCoord.xy,512.)+grT*vec2(13.9,29.5))-.5)*.020;
+
+  gl_FragColor=vec4(clamp(col,0.,1.),1.);
+}
+`;
+
 export const SCENES = [
   {
     id: 'night-sky',
@@ -1022,6 +1232,12 @@ export const SCENES = [
     label: 'ヴェイパー',
     emoji: '🌆',
     fragmentSource: VAPORWAVE_FRAG
+  },
+  {
+    id: 'y2k-para',
+    label: 'パラパラ',
+    emoji: '🪩',
+    fragmentSource: Y2K_PARA_FRAG
   }
 ];
 
