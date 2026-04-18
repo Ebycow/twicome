@@ -1,8 +1,11 @@
 """Twitch API クライアント"""
 
 import os
+from urllib.parse import quote
 
 import requests
+
+_TWITCH_API_TIMEOUT = 10
 
 
 def get_user_id(username: str) -> str | None:
@@ -17,13 +20,14 @@ def get_user_id(username: str) -> str | None:
     if not client_id:
         raise RuntimeError("CLIENT_ID が .env に無い or 読めてないよ")
 
-    url = f"https://api.twitch.tv/helix/users?login={username}"
+    url = f"https://api.twitch.tv/helix/users?login={quote(username)}"
     headers = {
         "Client-ID": client_id,
         "Authorization": f"Bearer {access_token}",
     }
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=_TWITCH_API_TIMEOUT)
+    response.raise_for_status()
     data = response.json()
 
     # print(data)
