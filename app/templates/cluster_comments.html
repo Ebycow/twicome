@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}クラスタコメント - {{ login }}{% if user and user.display_name %}（{{ user.display_name }}）{% endif %}{% endblock %}
+{% block title %} - クラスタコメント - {{ login }}{% if user and user.display_name %}（{{ user.display_name }}）{% endif %}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/cluster_comments.css?v={{ static_version }}" />

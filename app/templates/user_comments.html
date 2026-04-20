@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ user.login }}{% if user.display_name %}（{{ user.display_name }}）{% endif %} の {{ page_title }}{% endblock %}
+{% block title %} - {{ user.login }}{% if user.display_name %}（{{ user.display_name }}）{% endif %} の {{ page_title }}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/user_comments.css?v={{ static_version }}" />
