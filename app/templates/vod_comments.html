@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{% if vod %}{{ vod.title }} - VOD コメント - ツイコメ{% else %}VOD コメント - ツイコメ{% endif %}{% endblock %}
+{% block title %} - {% if vod %}{{ vod.title }} - VOD コメント{% else %}VOD コメント{% endif %}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/vod_comments.css?v={{ static_version }}" />

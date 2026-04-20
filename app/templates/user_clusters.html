@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}発言パターン探索 - {{ user.login if user else 'Unknown' }}{% endblock %}
+{% block title %} - 発言パターン探索 - {{ user.login if user else 'Unknown' }}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/user_clusters.css?v={{ static_version }}" />

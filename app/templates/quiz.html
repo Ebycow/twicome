@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}コメント当てクイズ{% if user %} - {{ user.display_name or user.login }}{% endif %}{% endblock %}
+{% block title %} - コメント当てクイズ{% if user %} - {{ user.display_name or user.login }}{% endif %}{% endblock %}
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ root_path }}/static/css/quiz.css?v={{ static_version }}" />
