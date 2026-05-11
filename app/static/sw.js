@@ -26,17 +26,6 @@ function isCommentsPageRequest(url) {
   return Boolean(remainder) && !remainder.includes('/');
 }
 
-async function readTopPageVersion(cache) {
-  const response = await cache.match(TOP_PAGE_VERSION_CACHE_URL);
-  if (!response) return null;
-  try {
-    const data = await response.json();
-    return typeof data.dataVersion === 'string' && data.dataVersion ? data.dataVersion : null;
-  } catch {
-    return null;
-  }
-}
-
 async function writeTopPageVersion(cache, dataVersion) {
   if (!dataVersion) return;
   await cache.put(
@@ -165,13 +154,6 @@ async function refreshCommentsDocument(urlString) {
   return { dataVersion: response.headers.get('X-Twicome-Data-Version') || null };
 }
 
-async function notifyTopPageUpdated(dataVersion) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) {
-    client.postMessage({ type: 'twicome-top-page-updated', dataVersion });
-  }
-}
-
 async function offlineFallback(cache, request) {
   const cached = await cache.match(request);
   if (cached) return cached;
@@ -188,37 +170,6 @@ async function precacheTopPage(cache) {
     await fetchAndCacheTopPage(cache, TOP_PAGE_URL);
   } catch {
     // install 時の失敗は無視して次回アクセス時に構築する
-  }
-}
-
-async function revalidateTopPage(cache, request) {
-  const cachedVersion = await readTopPageVersion(cache);
-  const requestUrl = typeof request === 'string' ? request : request.url;
-  try {
-    const latestVersion = await fetchDataVersion();
-    if (latestVersion && latestVersion === cachedVersion) return;
-
-    const response = await fetchAndCacheTopPage(cache, request, latestVersion);
-    if (!response) return;
-
-    if (response.type === 'opaqueredirect') {
-      await notifyAuthRedirect(requestUrl);
-      return;
-    }
-
-    if (!response.ok) return;
-
-    const updatedVersion = response.headers.get('X-Twicome-Data-Version') || latestVersion;
-    if (updatedVersion && updatedVersion !== cachedVersion) {
-      await notifyTopPageUpdated(updatedVersion);
-    }
-  } catch (e) {
-    if (e && e.isAuthRedirect) {
-      // CF Access セッション切れ: キャッシュを削除してクライアントにリロード要求
-      await cache.delete(request);
-      await notifyAuthRedirect(requestUrl);
-    }
-    // その他のネットワークエラーはキャッシュを維持する
   }
 }
 
@@ -351,14 +302,13 @@ self.addEventListener('fetch', (event) => {
   if (isTopPageNavigation(url, request)) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(request);
-        if (cached) {
-          event.waitUntil(revalidateTopPage(cache, request));
-          return cached;
-        }
-
         try {
-          return await fetchAndCacheTopPage(cache, request);
+          const latestVersion = await fetchDataVersion().catch(() => null);
+          const response = await fetchAndCacheTopPage(cache, request, latestVersion);
+          if (response.type === 'opaqueredirect') {
+            await notifyAuthRedirect(request.url);
+          }
+          return response;
         } catch {
           return offlineFallback(cache, request);
         }
@@ -373,32 +323,11 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request);
 
         if (request.mode === 'navigate') {
-          if (cached) {
-            // キャッシュを即座に返しつつ、バックグラウンドで認証状態と新鮮度を確認
-            event.waitUntil(
-              (async () => {
-                try {
-                  const response = await fetchNavigate(request.url, request.headers, 'same-origin');
-                  if (response.type === 'opaqueredirect') {
-                    // Cloudflare Access 等の認証リダイレクト検出: キャッシュ削除 → クライアントにリロード要求
-                    await cache.delete(request);
-                    await notifyAuthRedirect(request.url);
-                  } else if (response.ok) {
-                    await cache.put(request, response.clone());
-                  }
-                } catch {
-                  // ネットワークエラーはキャッシュを維持
-                }
-              })()
-            );
-            return cached;
-          }
-
-          // キャッシュなし: redirect: 'manual' で取得（認証リダイレクトはブラウザに通す）
           try {
             const response = await fetchNavigate(request.url, request.headers, 'same-origin');
             if (response.type === 'opaqueredirect') {
-              // 認証リダイレクト: キャッシュせずそのまま返す → ブラウザが CF Access へ遷移
+              await cache.delete(request);
+              await notifyAuthRedirect(request.url);
               return response;
             }
             if (response.ok) {
@@ -406,7 +335,7 @@ self.addEventListener('fetch', (event) => {
             }
             return response;
           } catch {
-            return offlineFallback(cache, request);
+            return cached || offlineFallback(cache, request);
           }
         }
 

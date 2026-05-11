@@ -15,10 +15,8 @@
 
   const rawRootPath = JSON.parse(document.getElementById('root-path-data').textContent);
   const rootPath = (typeof rawRootPath === 'string' && rawRootPath && rawRootPath !== '/') ? rawRootPath.replace(/\/+$/, '') : '';
-  const currentDataVersion = JSON.parse(document.getElementById('data-version-data').textContent);
   const serviceWorkerCacheName = JSON.parse(document.getElementById('sw-cache-name-data').textContent);
 
-  const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
   const serviceWorkerUrl = `${rootPath  }/sw.js`;
   const offlineAccess = window.TwicomeOfflineAccess || {
     createEmpty () { return { comments: new Set(), stats: new Set(), quiz: new Set() }; },
@@ -976,21 +974,13 @@
     });
   })();
 
-  // ---- SW version update / auth redirect listener ----
+  // ---- SW auth redirect listener ----
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', function (event) {
       const data = event.data || {};
       if (data.type === 'twicome-auth-redirect') {
         window.location.reload();
-        return;
       }
-      if (data.type !== 'twicome-top-page-updated') {return;}
-      if (!data.dataVersion || data.dataVersion === currentDataVersion) {return;}
-      try {
-        if (sessionStorage.getItem(topPageReloadMarkerKey) === data.dataVersion) {return;}
-        sessionStorage.setItem(topPageReloadMarkerKey, data.dataVersion);
-      } catch (_) {}
-      window.location.reload();
     });
   }
 })();
