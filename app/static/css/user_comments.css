@@ -86,9 +86,6 @@
       }
 
       @media (max-width: 720px) {
-        .usage-toggle-btn { display: inline-block; }
-        #usage-content { display: none; }
-        #usage-content.open { display: block; }
         #mobile-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 
         #side-drawer {
@@ -121,8 +118,6 @@
       }
 
       @media (min-width: 721px) {
-        .usage-toggle-btn { display: none; }
-        #usage-content { display: block !important; }
         #mobile-header { display: none; }
         #side-drawer { display: contents; }
         #drawer-backdrop { display: none !important; }

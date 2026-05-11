@@ -42,19 +42,6 @@
           <a href="{{ root_path }}/" class="nav-link"><i class="fa-solid fa-arrow-left" style="margin-right:4px;"></i>検索に戻る</a>
         </div>
       </div>
-    <div style="margin:2rem 2rem 0;">
-      <button class="usage-toggle-btn" type="button" onclick="var c=document.getElementById('usage-content');c.classList.toggle('open');this.textContent=c.classList.contains('open')?'使い方 ▲':'使い方 ▼'" style="margin-bottom:8px;">使い方 ▼</button>
-      <div id="usage-content">
-      使い方：<br>
-      <ul>
-
-      <li><a href="" target="_blank" class="pill">VOD 123456789</a>のような部分をクリックすると、コメントが発言された時点の動画に飛ぶことができます（VODが残っている場合のみ）</li>
-      <li>コメント全体をクリックすると、コメントの個別ページに飛ぶことができ、URLで発言を共有したり、発言の前後関係を見ることができます。検索時のユーザはグレーで強調されます</li>
-        <li>各コメントにリアクションをつけることができます。好きなだけつけて問題ありません。下にある「並び」でリアクションが大きい順に並び替えができます</li>
-      </ul>
-      </div>
-      </div>
-
     {% if error %}
       <div class="card error" style="margin-top:12px;">
         {{ error }}
