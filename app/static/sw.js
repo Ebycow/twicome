@@ -8,6 +8,9 @@ const TOP_PAGE_URL = `${BASE}/`;
 const DATA_VERSION_URL = `${BASE}/api/meta/data-version`;
 const USERS_INDEX_URL = `${BASE}/api/users/index`;
 const TOP_PAGE_VERSION_CACHE_URL = `${BASE}/__sw/top-page-version`;
+const COMMENT_PREFETCH_FAST_PATH_TTL_MS = 10 * 60 * 1000;
+
+const commentFastPathHints = new Map();
 
 function normalizePath(pathname) {
   if (pathname === '/') return '/';
@@ -26,15 +29,70 @@ function isCommentsPageRequest(url) {
   return Boolean(remainder) && !remainder.includes('/');
 }
 
-async function readTopPageVersion(cache) {
-  const response = await cache.match(TOP_PAGE_VERSION_CACHE_URL);
-  if (!response) return null;
-  try {
-    const data = await response.json();
-    return typeof data.dataVersion === 'string' && data.dataVersion ? data.dataVersion : null;
-  } catch {
-    return null;
-  }
+/**
+ * キャッシュキーやヒント照合用にURLからhashを除いた絶対URLへ正規化する。
+ * @param urlString - 正規化するURL文字列
+ * @returns hashを除いた絶対URL
+ */
+function normalizeRequestUrl(urlString) {
+  const url = new URL(urlString, self.location.origin);
+  url.hash = '';
+  return url.toString();
+}
+
+/**
+ * SW内の保存時刻を付与したキャッシュ用レスポンスを生成する。
+ * @param response - 元のネットワークレスポンス
+ * @returns キャッシュ保存用レスポンス
+ */
+function responseForCache(response) {
+  const headers = new Headers(response.headers);
+  headers.set('X-Twicome-SW-Cached-At', String(Date.now()));
+  return new Response(response.clone().body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+/**
+ * トップページからの次回コメントページ遷移だけキャッシュ即返しを許可する。
+ * @param urlString - fast path対象のコメントページURL
+ * @param dataVersion - トップページが保持しているデータバージョン
+ */
+function rememberCommentsFastPathHint(urlString, dataVersion) {
+  const url = normalizeRequestUrl(urlString);
+  commentFastPathHints.set(url, {
+    dataVersion: typeof dataVersion === 'string' ? dataVersion : '',
+    expiresAt: Date.now() + 30 * 1000,
+  });
+}
+
+/**
+ * コメントページ遷移用のfast pathヒントを1回だけ取り出す。
+ * @param urlString - 照合するコメントページURL
+ * @returns 有効なヒント。存在しない、または期限切れの場合はnull
+ */
+function takeCommentsFastPathHint(urlString) {
+  const url = normalizeRequestUrl(urlString);
+  const hint = commentFastPathHints.get(url);
+  commentFastPathHints.delete(url);
+  if (!hint || hint.expiresAt < Date.now()) return null;
+  return hint;
+}
+
+/**
+ * キャッシュ済みコメントページがトップページ由来の高速表示に使えるか判定する。
+ * @param cached - キャッシュ済みレスポンス
+ * @param hint - トップページから送られたfast pathヒント
+ * @returns data versionと保存時刻が条件を満たす場合はtrue
+ */
+function canUsePrefetchedCommentsResponse(cached, hint) {
+  if (!cached || !hint || !hint.dataVersion) return false;
+  if (cached.headers.get('X-Twicome-Data-Version') !== hint.dataVersion) return false;
+
+  const cachedAt = Number(cached.headers.get('X-Twicome-SW-Cached-At') || 0);
+  return cachedAt > 0 && Date.now() - cachedAt <= COMMENT_PREFETCH_FAST_PATH_TTL_MS;
 }
 
 async function writeTopPageVersion(cache, dataVersion) {
@@ -65,7 +123,7 @@ async function fetchDataVersion() {
 
 async function cacheTopPageResponse(cache, request, response, fallbackVersion) {
   if (!response || !response.ok) return response;
-  await cache.put(request, response.clone());
+  await cache.put(request, responseForCache(response));
   const dataVersion = response.headers.get('X-Twicome-Data-Version') || fallbackVersion || null;
   await writeTopPageVersion(cache, dataVersion);
   return response;
@@ -92,7 +150,7 @@ async function fetchAndCacheUsersIndex(cache, request) {
 async function fetchAndCacheDocument(cache, request) {
   const response = await fetch(request);
   if (response.ok) {
-    await cache.put(request, response.clone());
+    await cache.put(request, responseForCache(response));
   }
   return response;
 }
@@ -131,7 +189,7 @@ async function prefetchCommentsDocument(urlString) {
   if (!response.ok) {
     throw new Error(`prefetch_failed:${response.status}`);
   }
-  await cache.put(cacheRequest, response.clone());
+  await cache.put(cacheRequest, responseForCache(response));
   return response;
 }
 
@@ -161,14 +219,28 @@ async function refreshCommentsDocument(urlString) {
   }
 
   await cache.delete(cacheRequest);
-  await cache.put(cacheRequest, response.clone());
+  await cache.put(cacheRequest, responseForCache(response));
   return { dataVersion: response.headers.get('X-Twicome-Data-Version') || null };
 }
 
-async function notifyTopPageUpdated(dataVersion) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) {
-    client.postMessage({ type: 'twicome-top-page-updated', dataVersion });
+/**
+ * キャッシュを即返ししたコメントページをバックグラウンドで最新化する。
+ * @param cache - 保存先キャッシュ
+ * @param request - 最新化するナビゲーションリクエスト
+ */
+async function revalidateCommentsNavigation(cache, request) {
+  try {
+    const response = await fetchNavigate(request.url, request.headers, 'same-origin');
+    if (response.type === 'opaqueredirect') {
+      await cache.delete(request);
+      await notifyAuthRedirect(request.url);
+      return;
+    }
+    if (response.ok) {
+      await cache.put(request, responseForCache(response));
+    }
+  } catch {
+    // ネットワークエラー時は、直前に返したキャッシュを維持する
   }
 }
 
@@ -188,37 +260,6 @@ async function precacheTopPage(cache) {
     await fetchAndCacheTopPage(cache, TOP_PAGE_URL);
   } catch {
     // install 時の失敗は無視して次回アクセス時に構築する
-  }
-}
-
-async function revalidateTopPage(cache, request) {
-  const cachedVersion = await readTopPageVersion(cache);
-  const requestUrl = typeof request === 'string' ? request : request.url;
-  try {
-    const latestVersion = await fetchDataVersion();
-    if (latestVersion && latestVersion === cachedVersion) return;
-
-    const response = await fetchAndCacheTopPage(cache, request, latestVersion);
-    if (!response) return;
-
-    if (response.type === 'opaqueredirect') {
-      await notifyAuthRedirect(requestUrl);
-      return;
-    }
-
-    if (!response.ok) return;
-
-    const updatedVersion = response.headers.get('X-Twicome-Data-Version') || latestVersion;
-    if (updatedVersion && updatedVersion !== cachedVersion) {
-      await notifyTopPageUpdated(updatedVersion);
-    }
-  } catch (e) {
-    if (e && e.isAuthRedirect) {
-      // CF Access セッション切れ: キャッシュを削除してクライアントにリロード要求
-      await cache.delete(request);
-      await notifyAuthRedirect(requestUrl);
-    }
-    // その他のネットワークエラーはキャッシュを維持する
   }
 }
 
@@ -273,6 +314,25 @@ self.addEventListener('message', (event) => {
       refreshCommentsDocument(data.url)
         .then((result) => {
           if (replyPort) replyPort.postMessage({ ok: true, ...result });
+        })
+        .catch((error) => {
+          if (replyPort) {
+            replyPort.postMessage({
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })
+    );
+    return;
+  }
+
+  if (data.type === 'twicome-use-prefetched-comments' && data.url) {
+    event.waitUntil(
+      Promise.resolve()
+        .then(() => {
+          rememberCommentsFastPathHint(data.url, data.dataVersion);
+          if (replyPort) replyPort.postMessage({ ok: true });
         })
         .catch((error) => {
           if (replyPort) {
@@ -351,14 +411,13 @@ self.addEventListener('fetch', (event) => {
   if (isTopPageNavigation(url, request)) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(request);
-        if (cached) {
-          event.waitUntil(revalidateTopPage(cache, request));
-          return cached;
-        }
-
         try {
-          return await fetchAndCacheTopPage(cache, request);
+          const latestVersion = await fetchDataVersion().catch(() => null);
+          const response = await fetchAndCacheTopPage(cache, request, latestVersion);
+          if (response.type === 'opaqueredirect') {
+            await notifyAuthRedirect(request.url);
+          }
+          return response;
         } catch {
           return offlineFallback(cache, request);
         }
@@ -373,40 +432,25 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request);
 
         if (request.mode === 'navigate') {
-          if (cached) {
-            // キャッシュを即座に返しつつ、バックグラウンドで認証状態と新鮮度を確認
-            event.waitUntil(
-              (async () => {
-                try {
-                  const response = await fetchNavigate(request.url, request.headers, 'same-origin');
-                  if (response.type === 'opaqueredirect') {
-                    // Cloudflare Access 等の認証リダイレクト検出: キャッシュ削除 → クライアントにリロード要求
-                    await cache.delete(request);
-                    await notifyAuthRedirect(request.url);
-                  } else if (response.ok) {
-                    await cache.put(request, response.clone());
-                  }
-                } catch {
-                  // ネットワークエラーはキャッシュを維持
-                }
-              })()
-            );
+          const fastPathHint = takeCommentsFastPathHint(request.url);
+          if (canUsePrefetchedCommentsResponse(cached, fastPathHint)) {
+            event.waitUntil(revalidateCommentsNavigation(cache, request));
             return cached;
           }
 
-          // キャッシュなし: redirect: 'manual' で取得（認証リダイレクトはブラウザに通す）
           try {
             const response = await fetchNavigate(request.url, request.headers, 'same-origin');
             if (response.type === 'opaqueredirect') {
-              // 認証リダイレクト: キャッシュせずそのまま返す → ブラウザが CF Access へ遷移
+              await cache.delete(request);
+              await notifyAuthRedirect(request.url);
               return response;
             }
             if (response.ok) {
-              await cache.put(request, response.clone());
+              await cache.put(request, responseForCache(response));
             }
             return response;
           } catch {
-            return offlineFallback(cache, request);
+            return cached || offlineFallback(cache, request);
           }
         }
 
@@ -431,7 +475,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         fetch(request).then((response) => {
-          if (response.ok) cache.put(request, response.clone());
+          if (response.ok) cache.put(request, responseForCache(response));
           return response;
         }).catch(() =>
           cache.match(request).then(

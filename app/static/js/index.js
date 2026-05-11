@@ -18,7 +18,6 @@
   const currentDataVersion = JSON.parse(document.getElementById('data-version-data').textContent);
   const serviceWorkerCacheName = JSON.parse(document.getElementById('sw-cache-name-data').textContent);
 
-  const topPageReloadMarkerKey = 'twicome:last-top-page-reload-version';
   const serviceWorkerUrl = `${rootPath  }/sw.js`;
   const offlineAccess = window.TwicomeOfflineAccess || {
     createEmpty () { return { comments: new Set(), stats: new Set(), quiz: new Set() }; },
@@ -179,6 +178,48 @@
         worker.postMessage({ type: 'twicome-prefetch-comments', url }, [channel.port2]);
       });
     });
+  }
+
+  /**
+   * Service WorkerへMessageChannel付きでメッセージを送り、短いタイムアウトで応答を待つ。
+   * @param message - Service Workerへ送るメッセージ
+   * @param timeoutMs - 応答待ちタイムアウト（ミリ秒）
+   * @returns Service Workerがokを返したかどうかを表すPromise
+   */
+  function sendServiceWorkerMessage(message, timeoutMs) {
+    timeoutMs = timeoutMs || 300;
+    return commentsPrefetchTransportReadyPromise.then(function (registration) {
+      const worker = navigator.serviceWorker.controller
+        || (registration && (registration.active || registration.waiting || registration.installing));
+      if (!worker) {throw new Error('service_worker_unavailable');}
+      return new Promise(function (resolve, reject) {
+        const channel = new MessageChannel();
+        const timerId = window.setTimeout(function () {
+          reject(new Error('service_worker_message_timeout'));
+        }, timeoutMs);
+        channel.port1.onmessage = function (event) {
+          window.clearTimeout(timerId);
+          const data = event.data || {};
+          if (data.ok) { resolve(true); return; }
+          reject(new Error(data.error || 'service_worker_message_failed'));
+        };
+        worker.postMessage(message, [channel.port2]);
+      });
+    });
+  }
+
+  /**
+   * トップページからのコメントページ遷移でプリフェッチキャッシュを即返しできるようSWへ通知する。
+   * @param url - 遷移先コメントページURL
+   * @returns 通知に成功したかどうかを表すPromise
+   */
+  function preparePrefetchedCommentNavigation(url) {
+    if (!('serviceWorker' in navigator)) {return Promise.resolve(false);}
+    return sendServiceWorkerMessage({
+      type: 'twicome-use-prefetched-comments',
+      url,
+      dataVersion: currentDataVersion,
+    }, 250).catch(function () { return false; });
   }
 
   /**
@@ -844,7 +885,13 @@
     }
     if (offlineMode) {refreshOfflineAccessibleRoutes();}
     const resolved = resolveLogin(loginInput.value);
-    if (resolved) { if (goBtn) { goBtn.disabled = false; } window.location.href = buildCommentsUrl(resolved); return; }
+    if (resolved) {
+      const targetUrl = buildCommentsUrl(resolved);
+      await preparePrefetchedCommentNavigation(targetUrl);
+      if (goBtn) { goBtn.disabled = false; }
+      window.location.href = targetUrl;
+      return;
+    }
     void renderCandidates(loginInput.value);
     loginInput.setCustomValidity(offlineMode
       ? 'オフライン中は閲覧済みのユーザのみ開けます'
@@ -903,6 +950,14 @@
       const triggerPrefetch = function () { queueCommentPrefetch(login, platform); };
       link.addEventListener('pointerenter', triggerPrefetch, { passive: true });
       link.addEventListener('focus', triggerPrefetch);
+      link.addEventListener('click', function (event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {return;}
+        event.preventDefault();
+        const targetUrl = link.href;
+        preparePrefetchedCommentNavigation(targetUrl).finally(function () {
+          window.location.href = targetUrl;
+        });
+      });
     })(quickLinkElements[i]);
   }
 
@@ -976,21 +1031,13 @@
     });
   })();
 
-  // ---- SW version update / auth redirect listener ----
+  // ---- SW auth redirect listener ----
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', function (event) {
       const data = event.data || {};
       if (data.type === 'twicome-auth-redirect') {
         window.location.reload();
-        return;
       }
-      if (data.type !== 'twicome-top-page-updated') {return;}
-      if (!data.dataVersion || data.dataVersion === currentDataVersion) {return;}
-      try {
-        if (sessionStorage.getItem(topPageReloadMarkerKey) === data.dataVersion) {return;}
-        sessionStorage.setItem(topPageReloadMarkerKey, data.dataVersion);
-      } catch (_) {}
-      window.location.reload();
     });
   }
 })();
