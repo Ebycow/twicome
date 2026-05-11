@@ -183,14 +183,10 @@ def build_recent_broadcaster_stats(db, uid: int) -> dict:
 
 
 def build_impact_stats(db, uid: int) -> tuple[list[dict], dict | None]:
-    """コメント影響度分析。VOD 数が多すぎる場合は空を返す。
+    """コメント影響度分析。
 
     Returns (impact_stats, impact_total)
     """
-    vod_count = stats_repo.count_user_vods(db, uid)
-    if vod_count > 500:
-        return [], None
-
     bucket_rows = stats_repo.fetch_impact_buckets(db, uid)
 
     owner_buckets: dict = defaultdict(

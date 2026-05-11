@@ -154,19 +154,6 @@ def fetch_owner_activity(db, uid: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def count_user_vods(db, uid: int) -> int:
-    """ユーザーがコメントした VOD の総数を返す。"""
-    row = (
-        db.execute(
-            text("SELECT COUNT(DISTINCT vod_id) AS cnt FROM comments WHERE commenter_user_id = :uid"),
-            {"uid": uid},
-        )
-        .mappings()
-        .first()
-    )
-    return int(row["cnt"] or 0)
-
-
 def fetch_impact_buckets(db, uid: int) -> list[dict]:
     """コメント影響度分析用のバケットデータ。"""
     rows = (

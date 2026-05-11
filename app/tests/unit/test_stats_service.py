@@ -155,13 +155,7 @@ class TestBuildCnScores:
 
 
 class TestBuildImpactStats:
-    def test_returns_empty_when_vod_count_too_large(self, monkeypatch):
-        monkeypatch.setattr(stats_service.stats_repo, "count_user_vods", lambda _db, _uid: 501)
-
-        assert stats_service.build_impact_stats(object(), 1) == ([], None)
-
     def test_builds_owner_and_total_stats_for_sufficient_buckets(self, monkeypatch):
-        monkeypatch.setattr(stats_service.stats_repo, "count_user_vods", lambda _db, _uid: 10)
         monkeypatch.setattr(
             stats_service.stats_repo,
             "fetch_impact_buckets",
