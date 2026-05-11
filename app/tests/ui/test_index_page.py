@@ -195,6 +195,33 @@ class TestSearchInput:
         page.locator("#login-search-clear").click()
         expect(page.locator("#login-search-clear")).to_be_hidden()  # 非表示を確認
 
+    def test_sort_change_clears_selected_user_search(self, page: Page, db):
+        """
+        【確認内容】並び順を変更すると検索欄と選択中ユーザがリセットされる
+        """
+        from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", display_name="ビューワー", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer")
+
+        with page.expect_response(re.compile(r"/api/users/index")):
+            page.goto("/")
+
+        search_input = page.locator("#login-search")
+        selected_panel = page.locator("#selected-user-panel")
+
+        search_input.fill("viewer")
+        expect(selected_panel).to_contain_text("ビューワー")
+
+        page.locator("#sort-select").select_option("count_desc")
+
+        expect(search_input).to_have_value("")
+        expect(search_input).to_be_focused()
+        expect(page.locator("#login-search-clear")).to_be_hidden()
+        expect(selected_panel).to_contain_text("まだ選択されていません")
+
 
 class TestFormSubmission:
     """フォーム送信によるページ遷移を確認するテスト群。"""

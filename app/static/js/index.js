@@ -843,6 +843,17 @@
     loginSearchClear.style.display = loginInput.value ? 'flex' : 'none';
   }
 
+  /**
+   * フィルタ・並び順の変更後に、ユーザ検索欄と選択状態を空に戻す。
+   */
+  function resetLoginSearch() {
+    loginInput.value = '';
+    loginInput.setCustomValidity('');
+    setActionLinkState(false);
+    syncActionLinksFromInput();
+    updateClearBtn();
+  }
+
   updateClearBtn();
   loginSearchClear.addEventListener('click', function () {
     loginInput.value = '';
@@ -911,10 +922,7 @@
         return;
       }
       const streamer = this.value;
-      loginInput.value = '';
-      loginInput.setCustomValidity('');
-      setActionLinkState(false);
-      updateClearBtn();
+      resetLoginSearch();
       if (!streamer) {
         streamerFilterSet = null;
         void renderCandidates('');
@@ -938,7 +946,9 @@
   if (sortSelect) {
     sortSelect.addEventListener('change', function () {
       currentSort = this.value;
-      void renderCandidates(loginInput.value);
+      resetLoginSearch();
+      void renderCandidates('');
+      loginInput.focus();
     });
   }
 
