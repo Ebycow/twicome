@@ -47,6 +47,7 @@ if not SYSTEM_PROMPT_PATH.is_absolute():
     SYSTEM_PROMPT_PATH = PROJECT_ROOT / SYSTEM_PROMPT_PATH
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_META_KEY = "_openrouter"
 
 PROMPT_VERSION = "v3"
 try:
@@ -62,6 +63,22 @@ if not SYSTEM_PROMPT:
 REQUEST_INTERVAL_SEC = 1
 MAX_RETRIES = 2
 BACKUP_DIR = os.getenv("COMMUNITY_NOTE_BACKUP_DIR", str(PROJECT_ROOT / "data" / "default" / "oldcommunitylog"))
+MODEL_COLUMN_MAX_LENGTH = 64
+
+
+def normalize_model_id(model_id) -> str:
+    """OpenRouter API response の model 値を保存・表示可能な文字列にする。"""
+    if isinstance(model_id, str) and model_id:
+        return model_id
+    return COMMUNITY_NOTE_MODEL
+
+
+def get_openrouter_meta(note_data: dict) -> dict:
+    """生成結果に埋め込んだ OpenRouter メタ情報を取り出す。"""
+    openrouter_meta = note_data.get(OPENROUTER_META_KEY, {})
+    if isinstance(openrouter_meta, dict):
+        return openrouter_meta
+    return {}
 
 
 def get_db_connection():
@@ -136,6 +153,7 @@ def generate_note(body: str) -> dict | None:
         resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
         data = resp.json()
+        actual_model = normalize_model_id(data.get("model"))
 
         choice = data["choices"][0]
         content = (choice["message"]["content"] or "").strip()
@@ -186,6 +204,14 @@ def generate_note(body: str) -> dict | None:
                 continue
             return None
 
+        result[OPENROUTER_META_KEY] = {
+            "requested_model": COMMUNITY_NOTE_MODEL,
+            "actual_model": actual_model,
+            "generation_id": data.get("id"),
+            "finish_reason": finish_reason,
+            "native_finish_reason": choice.get("native_finish_reason"),
+            "usage": data.get("usage"),
+        }
         return result
 
 
@@ -203,6 +229,8 @@ def save_community_note(cur, comment_id: str, note_data: dict):
     issues = note_data.get("issues", [])
     if not isinstance(issues, list):
         issues = []
+    openrouter_meta = get_openrouter_meta(note_data)
+    actual_model = normalize_model_id(openrouter_meta.get("actual_model"))
 
     cur.execute(
         """
@@ -226,7 +254,7 @@ def save_community_note(cur, comment_id: str, note_data: dict):
             json.dumps(issues[:3], ensure_ascii=False),
             note_data.get("ask", "")[:255],
             json.dumps(note_data, ensure_ascii=False),
-            COMMUNITY_NOTE_MODEL,
+            actual_model[:MODEL_COLUMN_MAX_LENGTH],
             PROMPT_VERSION,
         ),
     )
@@ -280,11 +308,14 @@ def main():
                     ) / 4
                     print(f"    -> {note_text[:60]}...")
                     subj = scores.get("subjectivity", 0)
+                    openrouter_meta = get_openrouter_meta(note_data)
+                    actual_model = normalize_model_id(openrouter_meta.get("actual_model"))
                     print(
                         f"       eligible={note_data.get('eligible')},"
                         f" status={note_data.get('status')},"
                         f" danger={danger:.0f}, subjectivity={subj}"
                     )
+                    print(f"       model={actual_model} (requested={COMMUNITY_NOTE_MODEL})")
                     success += 1
                 else:
                     print("    -> 空のレスポンスまたはパース失敗、スキップ")

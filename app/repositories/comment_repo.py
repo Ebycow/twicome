@@ -24,6 +24,7 @@ _COL_LIST = f"""
     cn.harm_risk AS cn_harm_risk, cn.exaggeration AS cn_exaggeration,
     cn.evidence_gap AS cn_evidence_gap, cn.subjectivity AS cn_subjectivity,
     cn.issues AS cn_issues, cn.ask AS cn_ask,
+    cn.model AS cn_model,
     v.title AS vod_title, v.url AS vod_url, v.youtube_url AS youtube_url,
     v.created_at_utc AS vod_created_at_utc,
     u.login AS owner_login, u.display_name AS owner_display_name

@@ -113,6 +113,7 @@ def similar_search_api(
                     cn.subjectivity AS cn_subjectivity,
                     cn.issues AS cn_issues,
                     cn.ask AS cn_ask,
+                    cn.model AS cn_model,
                     v.title AS vod_title,
                     v.url AS vod_url,
                     v.youtube_url AS youtube_url,
@@ -173,6 +174,7 @@ def _fetch_comment_details(results: list) -> list:
                     cn.subjectivity AS cn_subjectivity,
                     cn.issues AS cn_issues,
                     cn.ask AS cn_ask,
+                    cn.model AS cn_model,
                     v.title AS vod_title, v.url AS vod_url,
                     v.youtube_url AS youtube_url, v.created_at_utc AS vod_created_at_utc,
                     u.login AS owner_login, u.display_name AS owner_display_name

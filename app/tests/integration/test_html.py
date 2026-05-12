@@ -257,11 +257,11 @@ class TestCommunityNotes:
                     comment_id, note, eligible, status,
                     verifiability, harm_risk, exaggeration,
                     evidence_gap, subjectivity, issues, ask, note_json,
-                    created_at_utc
+                    model, created_at_utc
                 ) VALUES (
                     'cn_comment', 'これはノートです', 1, 'supported',
                     70, 80, 60, 50, 40, NULL, '', '{}',
-                    NOW(6)
+                    'openrouter/free-model:free', NOW(6)
                 )
             """)
         )
@@ -286,6 +286,13 @@ class TestCommunityNotes:
         self._seed_with_note(db)
         soup = _soup(client.get("/u/viewer"))
         assert soup.find(class_="cn-scores") is not None
+
+    def test_cn_model_metadata_rendered(self, client, db):
+        self._seed_with_note(db)
+        soup = _soup(client.get("/u/viewer"))
+        model_meta = soup.find(class_="cn-model-meta")
+        assert model_meta is not None
+        assert "openrouter/free-model:free が生成" in model_meta.get_text(" ", strip=True)
 
 
 # ── FAISS UI の非表示 ────────────────────────────────────────────────────────

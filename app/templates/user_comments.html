@@ -335,7 +335,8 @@
             <div class="body">{{ c.body_html | safe }}</div>
             {% if c.community_note_body %}
               <div class="community-note">
-                <div>
+                {% if c.cn_harm_risk is not none or c.cn_status or c.cn_model %}
+                <div class="cn-note-header">
                   {% if c.cn_harm_risk is not none %}
                     {% set danger = ((c.cn_harm_risk + c.cn_exaggeration + c.cn_evidence_gap + c.cn_subjectivity) / 4)|round|int %}
                     <span class="cn-danger-badge" style="background:{{ 'rgba(244,67,54,0.2);color:#d32f2f;border:1px solid #d32f2f' if danger >= 60 else ('rgba(255,152,0,0.2);color:#e65100;border:1px solid #e65100' if danger >= 30 else 'rgba(76,175,80,0.2);color:#2e7d32;border:1px solid #2e7d32') }}">
@@ -345,7 +346,14 @@
                   {% if c.cn_status %}
                     <span class="cn-status-badge">{{ {"supported": "裏付けあり", "insufficient": "情報不足", "inconsistent": "矛盾あり", "not_applicable": "該当なし"}[c.cn_status] or c.cn_status }}</span>
                   {% endif %}
-                  <i class="fa-solid fa-note-sticky"></i> {{ c.community_note_body }}
+                  {% if c.cn_model %}
+                    <span class="cn-model-meta"><i class="fa-solid fa-wand-magic-sparkles"></i><span>{{ c.cn_model }} が生成</span></span>
+                  {% endif %}
+                </div>
+                {% endif %}
+                <div class="cn-note-text">
+                  <i class="fa-solid fa-note-sticky"></i>
+                  <span>{{ c.community_note_body }}</span>
                 </div>
                 {% if c.cn_harm_risk is not none %}
                 <div class="cn-scores">

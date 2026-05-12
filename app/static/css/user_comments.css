@@ -50,13 +50,19 @@
         background: var(--button-bg);
         color: var(--button-text);
       }
-      .community-note { margin-top: 8px; padding: 8px 12px; background: var(--cn-bg); border: 1px solid var(--cn-border); border-radius: 8px; color: var(--cn-text); font-size: 0.95rem; }
-      .cn-scores { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-      .cn-score-item { display:flex; align-items:center; gap:4px; font-size:0.8rem; }
-      .cn-score-bar { width:48px; height:8px; border-radius:4px; background:var(--input-border); overflow:hidden; }
+      .community-note { margin-top: 10px; padding: 10px 14px; background: var(--cn-bg); border: 1px solid var(--cn-border); border-radius: 8px; color: var(--cn-text); font-size: 0.95rem; line-height:1.5; }
+      .cn-note-header { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+      .cn-note-text { display:flex; align-items:flex-start; gap:8px; min-width:0; overflow-wrap:anywhere; }
+      .cn-note-text i { margin-top:0.25em; flex:0 0 auto; }
+      .cn-note-text span { min-width:0; }
+      .cn-scores { display:flex; gap:8px 14px; flex-wrap:wrap; margin-top:10px; padding-top:8px; border-top:1px solid rgba(128,128,128,0.22); }
+      .cn-score-item { display:grid; grid-template-columns:max-content 72px 3ch; align-items:center; gap:6px; font-size:0.8rem; }
+      .cn-score-bar { width:72px; height:8px; border-radius:4px; background:var(--input-border); overflow:hidden; }
       .cn-score-fill { height:100%; border-radius:4px; }
-      .cn-danger-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.8rem; font-weight:bold; margin-right:4px; }
-      .cn-status-badge { display:inline-block; padding:1px 6px; border-radius:999px; font-size:0.75rem; border:1px solid var(--pill-border); margin-left:4px; }
+      .cn-danger-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:0.8rem; font-weight:bold; white-space:nowrap; }
+      .cn-status-badge { display:inline-flex; align-items:center; padding:1px 7px; border-radius:999px; font-size:0.75rem; border:1px solid var(--pill-border); color:var(--meta-color); white-space:nowrap; }
+      .cn-model-meta { display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:1px 7px; border-radius:999px; font-size:0.75rem; border:1px solid var(--pill-border); color:var(--meta-color); overflow-wrap:anywhere; }
+      .cn-model-meta span { min-width:0; }
       .similarity-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e8f5e9; border:1px solid #4caf50; color:#2e7d32; }
 
       @media (prefers-color-scheme: dark) {

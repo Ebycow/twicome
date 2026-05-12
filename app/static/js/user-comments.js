@@ -117,20 +117,27 @@
    */
   function renderCommunityNote(comment) {
     if (!comment.community_note_body) {return '';}
-    let html = '<div class="community-note"><div>';
-    if (comment.cn_harm_risk != null) {
-      const danger = Math.round((comment.cn_harm_risk + comment.cn_exaggeration + comment.cn_evidence_gap + (comment.cn_subjectivity || 0)) / 4);
-      let badgeStyle;
-      if (danger >= 60) {badgeStyle = 'background:rgba(244,67,54,0.2);color:#d32f2f;border:1px solid #d32f2f';}
-      else if (danger >= 30) {badgeStyle = 'background:rgba(255,152,0,0.2);color:#e65100;border:1px solid #e65100';}
-      else {badgeStyle = 'background:rgba(76,175,80,0.2);color:#2e7d32;border:1px solid #2e7d32';}
-      html += `<span class="cn-danger-badge" style="${  badgeStyle  }">危険度 ${  danger  }</span>`;
+    let html = '<div class="community-note">';
+    if (comment.cn_harm_risk != null || comment.cn_status || comment.cn_model) {
+      html += '<div class="cn-note-header">';
+      if (comment.cn_harm_risk != null) {
+        const danger = Math.round((comment.cn_harm_risk + comment.cn_exaggeration + comment.cn_evidence_gap + (comment.cn_subjectivity || 0)) / 4);
+        let badgeStyle;
+        if (danger >= 60) {badgeStyle = 'background:rgba(244,67,54,0.2);color:#d32f2f;border:1px solid #d32f2f';}
+        else if (danger >= 30) {badgeStyle = 'background:rgba(255,152,0,0.2);color:#e65100;border:1px solid #e65100';}
+        else {badgeStyle = 'background:rgba(76,175,80,0.2);color:#2e7d32;border:1px solid #2e7d32';}
+        html += `<span class="cn-danger-badge" style="${  badgeStyle  }">危険度 ${  danger  }</span>`;
+      }
+      if (comment.cn_status) {
+        const statusJa = {supported: '裏付けあり', insufficient: '情報不足', inconsistent: '矛盾あり', not_applicable: '該当なし'};
+        html += `<span class="cn-status-badge">${  escapeHtml(statusJa[comment.cn_status] || comment.cn_status)  }</span>`;
+      }
+      if (comment.cn_model) {
+        html += `<span class="cn-model-meta"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${  escapeHtml(comment.cn_model)  } が生成</span></span>`;
+      }
+      html += '</div>';
     }
-    if (comment.cn_status) {
-      const statusJa = {supported: '裏付けあり', insufficient: '情報不足', inconsistent: '矛盾あり', not_applicable: '該当なし'};
-      html += `<span class="cn-status-badge">${  escapeHtml(statusJa[comment.cn_status] || comment.cn_status)  }</span>`;
-    }
-    html += ` <i class="fa-solid fa-note-sticky"></i> ${  escapeHtml(comment.community_note_body)  }</div>`;
+    html += `<div class="cn-note-text"><i class="fa-solid fa-note-sticky"></i><span>${  escapeHtml(comment.community_note_body)  }</span></div>`;
     if (comment.cn_harm_risk != null) {
       html += '<div class="cn-scores">';
       const scores = [
