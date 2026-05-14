@@ -255,24 +255,13 @@ async function offlineFallback(cache, request) {
   );
 }
 
-async function precacheTopPage(cache) {
-  try {
-    await fetchAndCacheTopPage(cache, TOP_PAGE_URL);
-  } catch {
-    // install 時の失敗は無視して次回アクセス時に構築する
-  }
-}
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) =>
-        // offline.html とメインページを事前キャッシュ。失敗しても install は続行
-        Promise.all([
-          cache.add(OFFLINE_URL).catch(() => {}),
-          precacheTopPage(cache),
-          cache.add(USERS_INDEX_URL).catch(() => {}),
-        ])
+        // 初回表示直後の install では軽量なオフラインページだけを事前キャッシュする。
+        // トップページとユーザー index は通常アクセス時かバッチ prewarm で温める。
+        cache.add(OFFLINE_URL).catch(() => {})
       )
       .then(() => self.skipWaiting())
   );

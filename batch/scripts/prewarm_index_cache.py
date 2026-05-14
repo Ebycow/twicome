@@ -1,7 +1,7 @@
-"""トップページ HTML キャッシュの事前生成スクリプト。
+"""トップページ関連キャッシュの事前生成スクリプト。
 
 invalidate_cache.py による data_version 更新直後に app へ内部 GET を送り、
-/ の SSR と Redis HTML キャッシュを先に構築する。
+/ の SSR と検索用ユーザー index の Redis キャッシュを先に構築する。
 """
 
 import os
@@ -13,6 +13,7 @@ import requests
 
 APP_INTERNAL_BASE_URL = os.getenv("APP_INTERNAL_BASE_URL", "http://app:8000").strip()
 INDEX_PREWARM_URL = os.getenv("INDEX_PREWARM_URL", "").strip()
+USERS_INDEX_PREWARM_URL = os.getenv("USERS_INDEX_PREWARM_URL", "").strip()
 DATA_VERSION_URL = os.getenv("DATA_VERSION_URL", "").strip()
 INDEX_PREWARM_TIMEOUT = float(os.getenv("INDEX_PREWARM_TIMEOUT", "60"))
 INDEX_PREWARM_RETRIES = max(1, int(os.getenv("INDEX_PREWARM_RETRIES", "5")))
@@ -36,31 +37,7 @@ def _fetch_expected_version(session: requests.Session, url: str) -> str | None:
     return version if isinstance(version, str) and version else None
 
 
-def main() -> int:
-    """トップページ HTML キャッシュを事前生成するエントリーポイント。"""
-    if not os.getenv("REDIS_URL", "").strip():
-        print("REDIS_URL が設定されていません。トップHTML prewarm をスキップします。")
-        return 0
-
-    prewarm_url = INDEX_PREWARM_URL or _build_default_url("/")
-    data_version_url = DATA_VERSION_URL or _build_default_url("/api/meta/data-version")
-
-    session = requests.Session()
-    session.headers.update(
-        {
-            "Accept": "text/html",
-            "Cache-Control": "no-cache",
-            "User-Agent": "twicome-batch-prewarm/1.0",
-        }
-    )
-
-    expected_version = None
-    try:
-        expected_version = _fetch_expected_version(session, data_version_url)
-        print(f"prewarm 対象バージョン: {expected_version}")
-    except Exception as exc:
-        print(f"Warning: data-version 取得失敗 ({data_version_url}): {exc}")
-
+def _prewarm_index_html(session: requests.Session, prewarm_url: str, expected_version: str | None) -> bool:
     last_error = None
     for attempt in range(1, INDEX_PREWARM_RETRIES + 1):
         try:
@@ -83,15 +60,79 @@ def main() -> int:
                 f"status={response.status_code} version={response_version} "
                 f"bytes={len(response.content)} url={response.url}"
             )
-            return 0
+            return True
         except Exception as exc:
             last_error = exc
-            print(f"prewarm 試行 {attempt}/{INDEX_PREWARM_RETRIES} 失敗: {exc}")
+            print(f"トップHTML prewarm 試行 {attempt}/{INDEX_PREWARM_RETRIES} 失敗: {exc}")
             if attempt < INDEX_PREWARM_RETRIES:
                 time.sleep(INDEX_PREWARM_RETRY_SLEEP)
 
     print(f"トップHTML prewarm 失敗: {last_error}")
-    return 1
+    return False
+
+
+def _prewarm_users_index(session: requests.Session, users_index_url: str) -> bool:
+    last_error = None
+    headers = {"Accept": "application/json", "Cache-Control": "no-cache"}
+    for attempt in range(1, INDEX_PREWARM_RETRIES + 1):
+        try:
+            response = session.get(users_index_url, headers=headers, timeout=INDEX_PREWARM_TIMEOUT)
+            response.raise_for_status()
+
+            content_type = response.headers.get("Content-Type", "")
+            if "application/json" not in content_type:
+                raise RuntimeError(f"unexpected content-type: {content_type}")
+
+            payload = response.json()
+            users = payload.get("users")
+            if not isinstance(users, list):
+                raise RuntimeError("unexpected users index payload")
+
+            print(
+                "ユーザーindex prewarm 完了: "
+                f"status={response.status_code} users={len(users)} "
+                f"bytes={len(response.content)} url={response.url}"
+            )
+            return True
+        except Exception as exc:
+            last_error = exc
+            print(f"ユーザーindex prewarm 試行 {attempt}/{INDEX_PREWARM_RETRIES} 失敗: {exc}")
+            if attempt < INDEX_PREWARM_RETRIES:
+                time.sleep(INDEX_PREWARM_RETRY_SLEEP)
+
+    print(f"ユーザーindex prewarm 失敗: {last_error}")
+    return False
+
+
+def main() -> int:
+    """トップページ HTML キャッシュを事前生成するエントリーポイント。"""
+    if not os.getenv("REDIS_URL", "").strip():
+        print("REDIS_URL が設定されていません。トップHTML prewarm をスキップします。")
+        return 0
+
+    prewarm_url = INDEX_PREWARM_URL or _build_default_url("/")
+    users_index_url = USERS_INDEX_PREWARM_URL or _build_default_url("/api/users/index")
+    data_version_url = DATA_VERSION_URL or _build_default_url("/api/meta/data-version")
+
+    session = requests.Session()
+    session.headers.update(
+        {
+            "Accept": "text/html",
+            "Cache-Control": "no-cache",
+            "User-Agent": "twicome-batch-prewarm/1.0",
+        }
+    )
+
+    expected_version = None
+    try:
+        expected_version = _fetch_expected_version(session, data_version_url)
+        print(f"prewarm 対象バージョン: {expected_version}")
+    except Exception as exc:
+        print(f"Warning: data-version 取得失敗 ({data_version_url}): {exc}")
+
+    html_ok = _prewarm_index_html(session, prewarm_url, expected_version)
+    users_ok = _prewarm_users_index(session, users_index_url)
+    return 0 if html_ok and users_ok else 1
 
 
 if __name__ == "__main__":
