@@ -64,7 +64,7 @@ class TestIndex:
     def test_index_embeds_service_worker_cache_name(self, client):
         resp = client.get("/")
         assert resp.status_code == 200
-        assert '<script type="application/json" id="sw-cache-name-data">"twicome-v14"</script>' in resp.text
+        assert '<script type="application/json" id="sw-cache-name-data">"twicome-v15"</script>' in resp.text
 
     def test_index_form_uses_get_for_non_js_fallback(self, client):
         resp = client.get("/")
@@ -95,7 +95,19 @@ class TestIndex:
         assert resp.status_code == 200
         assert "application/javascript" in resp.headers["content-type"]
         assert "__TWICOME_CACHE_NAME__" not in resp.text
-        assert 'const CACHE_NAME = "twicome-v14";' in resp.text
+        assert 'const CACHE_NAME = "twicome-v15";' in resp.text
+
+    def test_service_worker_does_not_force_auth_redirect_reload(self, client):
+        resp = client.get("/sw.js")
+        assert resp.status_code == 200
+        assert "twicome-auth-redirect" not in resp.text
+        assert "notifyAuthRedirect" not in resp.text
+
+    def test_page_scripts_ignore_legacy_auth_redirect_messages(self, client):
+        for path in ("/static/js/index.js", "/static/js/user-comments.js"):
+            resp = client.get(path)
+            assert resp.status_code == 200
+            assert "twicome-auth-redirect" not in resp.text
 
     def test_go_get_redirects_to_user_page(self, client):
         resp = client.get("/go", params={"login": " Viewer ", "platform": "youtube"}, follow_redirects=False)

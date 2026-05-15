@@ -243,7 +243,9 @@
         const response = await fetch(url, {
           credentials: 'same-origin',
           headers: { Accept: 'text/html', 'X-Twicome-Prefetch': '1' },
+          redirect: 'manual',
         });
+        if (response.type === 'opaqueredirect') {throw new Error('prefetch_auth_redirect');}
         if (!response.ok) {throw new Error(`prefetch_failed:${  response.status}`);}
         const responseForCache = response.clone();
         await response.text();
@@ -1041,15 +1043,6 @@
     });
   })();
 
-  // ---- SW auth redirect listener ----
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      const data = event.data || {};
-      if (data.type === 'twicome-auth-redirect') {
-        window.location.reload();
-      }
-    });
-  }
 })();
 
 (function () {

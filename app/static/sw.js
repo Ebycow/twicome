@@ -5,9 +5,7 @@ const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
 
 const OFFLINE_URL = `${BASE}/static/offline.html`;
 const TOP_PAGE_URL = `${BASE}/`;
-const DATA_VERSION_URL = `${BASE}/api/meta/data-version`;
 const USERS_INDEX_URL = `${BASE}/api/users/index`;
-const TOP_PAGE_VERSION_CACHE_URL = `${BASE}/__sw/top-page-version`;
 const COMMENT_PREFETCH_FAST_PATH_TTL_MS = 10 * 60 * 1000;
 
 const commentFastPathHints = new Map();
@@ -95,52 +93,34 @@ function canUsePrefetchedCommentsResponse(cached, hint) {
   return cachedAt > 0 && Date.now() - cachedAt <= COMMENT_PREFETCH_FAST_PATH_TTL_MS;
 }
 
-async function writeTopPageVersion(cache, dataVersion) {
-  if (!dataVersion) return;
-  await cache.put(
-    TOP_PAGE_VERSION_CACHE_URL,
-    new Response(JSON.stringify({ dataVersion }), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-    })
-  );
-}
-
-async function fetchDataVersion() {
-  const response = await fetch(DATA_VERSION_URL, {
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-    redirect: 'manual',
-  });
-  if (response.type === 'opaqueredirect') {
-    const err = new Error('auth-redirect');
-    err.isAuthRedirect = true;
-    throw err;
-  }
-  if (!response.ok) throw new Error(`data-version:${response.status}`);
-  const data = await response.json();
-  return typeof data.data_version === 'string' && data.data_version ? data.data_version : null;
-}
-
-async function cacheTopPageResponse(cache, request, response, fallbackVersion) {
+async function cacheTopPageResponse(cache, request, response) {
   if (!response || !response.ok) return response;
   await cache.put(request, responseForCache(response));
-  const dataVersion = response.headers.get('X-Twicome-Data-Version') || fallbackVersion || null;
-  await writeTopPageVersion(cache, dataVersion);
   return response;
 }
 
-async function fetchAndCacheTopPage(cache, request, fallbackVersion) {
+async function fetchAndCacheTopPage(cache, request) {
   const url = typeof request === 'string' ? request : request.url;
   const response = await fetchNavigate(url, {}, 'same-origin');
   if (response.type === 'opaqueredirect') {
     await cache.delete(request);
     return response;
   }
-  return cacheTopPageResponse(cache, request, response, fallbackVersion);
+  return cacheTopPageResponse(cache, request, response);
 }
 
 async function fetchAndCacheUsersIndex(cache, request) {
-  const response = await fetch(request);
+  const response = await fetch(request, { redirect: 'manual' });
+  if (response.type === 'opaqueredirect') {
+    await cache.delete(USERS_INDEX_URL);
+    return new Response(JSON.stringify({ error: 'auth_redirect' }), {
+      status: 401,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+    });
+  }
   if (response.ok) {
     await cache.put(USERS_INDEX_URL, response.clone());
   }
@@ -148,7 +128,11 @@ async function fetchAndCacheUsersIndex(cache, request) {
 }
 
 async function fetchAndCacheDocument(cache, request) {
-  const response = await fetch(request);
+  const response = await fetch(request, { redirect: 'manual' });
+  if (response.type === 'opaqueredirect') {
+    await cache.delete(request);
+    throw new Error('auth_redirect');
+  }
   if (response.ok) {
     await cache.put(request, responseForCache(response));
   }
@@ -162,13 +146,6 @@ async function fetchNavigate(url, headers, credentials) {
     credentials: credentials || 'same-origin',
     redirect: 'manual',
   });
-}
-
-async function notifyAuthRedirect(requestUrl) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) {
-    client.postMessage({ type: 'twicome-auth-redirect', url: requestUrl });
-  }
 }
 
 async function prefetchCommentsDocument(urlString) {
@@ -185,7 +162,11 @@ async function prefetchCommentsDocument(urlString) {
     },
   });
   const cacheRequest = new Request(url.toString());
-  const response = await fetch(fetchRequest);
+  const response = await fetch(fetchRequest, { redirect: 'manual' });
+  if (response.type === 'opaqueredirect') {
+    await cache.delete(cacheRequest);
+    throw new Error('auth_redirect');
+  }
   if (!response.ok) {
     throw new Error(`prefetch_failed:${response.status}`);
   }
@@ -211,7 +192,6 @@ async function refreshCommentsDocument(urlString) {
 
   if (response.type === 'opaqueredirect') {
     await cache.delete(cacheRequest);
-    await notifyAuthRedirect(url.toString());
     return { authRedirect: true };
   }
   if (!response.ok) {
@@ -233,7 +213,6 @@ async function revalidateCommentsNavigation(cache, request) {
     const response = await fetchNavigate(request.url, request.headers, 'same-origin');
     if (response.type === 'opaqueredirect') {
       await cache.delete(request);
-      await notifyAuthRedirect(request.url);
       return;
     }
     if (response.ok) {
@@ -401,11 +380,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         try {
-          const latestVersion = await fetchDataVersion().catch(() => null);
-          const response = await fetchAndCacheTopPage(cache, request, latestVersion);
-          if (response.type === 'opaqueredirect') {
-            await notifyAuthRedirect(request.url);
-          }
+          const response = await fetchAndCacheTopPage(cache, request);
           return response;
         } catch {
           return offlineFallback(cache, request);
@@ -431,7 +406,6 @@ self.addEventListener('fetch', (event) => {
             const response = await fetchNavigate(request.url, request.headers, 'same-origin');
             if (response.type === 'opaqueredirect') {
               await cache.delete(request);
-              await notifyAuthRedirect(request.url);
               return response;
             }
             if (response.ok) {

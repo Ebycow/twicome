@@ -28,11 +28,6 @@
     window.addEventListener('load', function () {
       navigator.serviceWorker.register(`${rootPath  }/sw.js`, { scope: `${rootPath  }/` }).catch(function () {});
     });
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'twicome-auth-redirect') {
-        window.location.reload();
-      }
-    });
   }
 
   let currentMinPage = initialPage;
