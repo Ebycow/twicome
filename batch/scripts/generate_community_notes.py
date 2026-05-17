@@ -11,7 +11,6 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-import mysql.connector
 import requests
 from dotenv import load_dotenv
 
@@ -49,7 +48,7 @@ if not SYSTEM_PROMPT_PATH.is_absolute():
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_META_KEY = "_openrouter"
 
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"
 try:
     SYSTEM_PROMPT = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
 except FileNotFoundError as e:
@@ -64,6 +63,31 @@ REQUEST_INTERVAL_SEC = 1
 MAX_RETRIES = 2
 BACKUP_DIR = os.getenv("COMMUNITY_NOTE_BACKUP_DIR", str(PROJECT_ROOT / "data" / "default" / "oldcommunitylog"))
 MODEL_COLUMN_MAX_LENGTH = 64
+MAX_TOKENS = int(os.getenv("COMMUNITY_NOTE_MAX_TOKENS", "2048"))
+MAX_TOKENS_CAP = int(os.getenv("COMMUNITY_NOTE_MAX_TOKENS_CAP", "4096"))
+NOTE_MAX_LENGTH = int(os.getenv("COMMUNITY_NOTE_MAX_NOTE_CHARS", "140"))
+ASK_MAX_LENGTH = int(os.getenv("COMMUNITY_NOTE_MAX_ASK_CHARS", "80"))
+ALLOWED_STATUSES = {"supported", "insufficient", "inconsistent", "not_applicable"}
+STATUS_ALIASES = {
+    "not applicable": "not_applicable",
+    "not-applicable": "not_applicable",
+    "notapplicable": "not_applicable",
+    "none": "not_applicable",
+    "irrelevant": "not_applicable",
+    "unsupported": "insufficient",
+    "unknown": "insufficient",
+    "uncertain": "insufficient",
+    "lack_of_evidence": "insufficient",
+    "contradictory": "inconsistent",
+    "contradiction": "inconsistent",
+}
+OUTPUT_CONSTRAINTS = """
+追加制約:
+- 必ず1行のJSONオブジェクトのみを返す。Markdownコードフェンス、前置き、末尾説明は禁止。
+- "note" は140字以内、"issues" は最大3件、"ask" は80字以内。
+- "status" は supported / insufficient / inconsistent / not_applicable のいずれかだけ。
+- 雑談、感想、体調報告、予定、質問、相づち、配信音量などの主観的な観測だけなら eligible=false, status="not_applicable"。
+""".strip()
 
 
 def normalize_model_id(model_id) -> str:
@@ -81,8 +105,103 @@ def get_openrouter_meta(note_data: dict) -> dict:
     return {}
 
 
+def max_tokens_for_attempt(attempt: int) -> int:
+    """途中切れ時の再試行では出力トークン上限を広げる。"""
+    return min(MAX_TOKENS_CAP, MAX_TOKENS * attempt)
+
+
+def coerce_bool(value) -> bool | None:
+    """LLMが文字列で返した boolean を吸収する。"""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "yes", "1"}:
+            return True
+        if lowered in {"false", "no", "0"}:
+            return False
+    return None
+
+
+def normalize_status(status, eligible: bool) -> str:
+    """DB enum に入る status へ正規化する。"""
+    if isinstance(status, str):
+        cleaned = status.strip().lower().replace("-", "_")
+        if cleaned in ALLOWED_STATUSES:
+            return cleaned
+        alias = STATUS_ALIASES.get(status.strip().lower()) or STATUS_ALIASES.get(cleaned)
+        if alias:
+            return alias
+    return "insufficient" if eligible else "not_applicable"
+
+
+def extract_json_object(content: str) -> dict:
+    """余計な前後テキストやコードフェンスを含む応答から先頭のJSON objectを取り出す。"""
+    cleaned = content.strip()
+    brace = cleaned.find("{")
+    if brace < 0:
+        raise json.JSONDecodeError("JSON object not found", cleaned, 0)
+
+    decoder = json.JSONDecoder()
+    result, _ = decoder.raw_decode(cleaned[brace:])
+    if not isinstance(result, dict):
+        raise json.JSONDecodeError("JSON root is not an object", cleaned, brace)
+    return result
+
+
+def normalize_note_data(note_data: dict) -> dict | None:
+    """LLM応答を保存可能なコミュニティノート形式へ整える。"""
+    eligible = coerce_bool(note_data.get("eligible"))
+    if eligible is None:
+        return None
+
+    scores = note_data.get("scores", {})
+    if not isinstance(scores, dict):
+        scores = {}
+    normalized_scores = {
+        "verifiability": clamp_score(scores.get("verifiability", 0)),
+        "harm_risk": clamp_score(scores.get("harm_risk", 0)),
+        "exaggeration": clamp_score(scores.get("exaggeration", 0)),
+        "evidence_gap": clamp_score(scores.get("evidence_gap", 0)),
+        "subjectivity": clamp_score(scores.get("subjectivity", 0)),
+    }
+
+    issues = note_data.get("issues", [])
+    if not isinstance(issues, list):
+        issues = []
+    issues = [str(issue).strip() for issue in issues if str(issue).strip()][:3]
+
+    note = note_data.get("note", "")
+    if not isinstance(note, str):
+        note = str(note) if note is not None else ""
+    note = note.strip()
+    if not note:
+        note = "事実確認の対象となる具体的な主張ではありません。" if not eligible else "根拠や具体性が不足しています。"
+    note = note[:NOTE_MAX_LENGTH]
+
+    ask = note_data.get("ask", "")
+    if not isinstance(ask, str):
+        ask = str(ask) if ask is not None else ""
+    ask = ask.strip()[:ASK_MAX_LENGTH]
+
+    normalized = dict(note_data)
+    normalized["eligible"] = eligible
+    normalized["status"] = normalize_status(note_data.get("status"), eligible)
+    if not eligible:
+        normalized["status"] = "not_applicable"
+    normalized["note"] = note
+    normalized["scores"] = normalized_scores
+    normalized["issues"] = issues
+    normalized["ask"] = ask
+    return normalized
+
+
 def get_db_connection():
     """MySQL データベース接続を返す。"""
+    import mysql.connector
+
     return mysql.connector.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
@@ -139,17 +258,17 @@ def generate_note(body: str) -> dict | None:
         "Content-Type": "application/json",
     }
     user_content = json.dumps({"statement": body}, ensure_ascii=False)
-    payload = {
+    base_payload = {
         "model": COMMUNITY_NOTE_MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{OUTPUT_CONSTRAINTS}"},
             {"role": "user", "content": user_content},
         ],
-        "max_tokens": 1024,
         "temperature": 0.3,
     }
 
     for attempt in range(1, MAX_RETRIES + 1):
+        payload = {**base_payload, "max_tokens": max_tokens_for_attempt(attempt)}
         resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
         data = resp.json()
@@ -172,22 +291,8 @@ def generate_note(body: str) -> dict | None:
                 time.sleep(REQUEST_INTERVAL_SEC)
                 continue
 
-        # JSON パース（余計なテキストや ```json ... ``` を除去）
-        cleaned = content
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines)
-        # 先頭の余計なテキストを除去（"only.{..." → "{..."）
-        brace = cleaned.find("{")
-        if brace > 0:
-            cleaned = cleaned[brace:]
-
         try:
-            result = json.loads(cleaned)
+            result = extract_json_object(content)
         except json.JSONDecodeError as e:
             print(f"      (試行 {attempt}/{MAX_RETRIES}: JSONパース失敗: {e})")
             print(f"      --- raw content ---\n{content}\n      --- end ---")
@@ -196,15 +301,15 @@ def generate_note(body: str) -> dict | None:
                 continue
             return None
 
-        # 必須フィールド検証
-        if not isinstance(result.get("eligible"), bool):
+        normalized = normalize_note_data(result)
+        if normalized is None:
             print(f"      (試行 {attempt}/{MAX_RETRIES}: eligible フィールドが不正)")
             if attempt < MAX_RETRIES:
                 time.sleep(REQUEST_INTERVAL_SEC)
                 continue
             return None
 
-        result[OPENROUTER_META_KEY] = {
+        normalized[OPENROUTER_META_KEY] = {
             "requested_model": COMMUNITY_NOTE_MODEL,
             "actual_model": actual_model,
             "generation_id": data.get("id"),
@@ -212,7 +317,7 @@ def generate_note(body: str) -> dict | None:
             "native_finish_reason": choice.get("native_finish_reason"),
             "usage": data.get("usage"),
         }
-        return result
+        return normalized
 
 
 def clamp_score(val, min_val=0, max_val=100) -> int:
@@ -225,6 +330,10 @@ def clamp_score(val, min_val=0, max_val=100) -> int:
 
 def save_community_note(cur, comment_id: str, note_data: dict):
     """コミュニティノートを community_notes テーブルに保存（REPLACE INTO で冪等）"""
+    normalized = normalize_note_data(note_data)
+    if normalized is None:
+        raise ValueError("eligible フィールドが不正です")
+    note_data = normalized
     scores = note_data.get("scores", {})
     issues = note_data.get("issues", [])
     if not isinstance(issues, list):
