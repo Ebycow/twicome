@@ -191,7 +191,7 @@
       }${options.showRelativeTime && comment.relative_time ? `<span class="meta ${  comment.is_recent ? 'recent' : ''  }">· ${  escapeHtml(comment.relative_time)  }</span>` : ''
       }${options.showBits && comment.bits_spent ? `<span class="pill">bits ${  escapeHtml(comment.bits_spent)  }</span>` : ''
       }</div>` +
-      `<div class="meta">${  renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count)  }</div>` +
+      `<div class="meta"><span class="vote-controls">${  renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count)  }</span></div>` +
       `</div>` +
       `<div class="body"></div>${
       renderCommunityNote(comment)}`;
