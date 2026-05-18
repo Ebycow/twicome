@@ -16,11 +16,15 @@ from core.cache import (
     get_index_landing_cache,
     get_index_users_cache,
     get_user_meta_cache,
+    release_index_html_build_lock,
+    release_index_users_build_lock,
     set_comments_html_cache,
     set_index_html_cache,
     set_index_landing_cache,
     set_index_users_cache,
     set_user_meta_cache,
+    try_acquire_index_html_build_lock,
+    try_acquire_index_users_build_lock,
 )
 from core.config import DEFAULT_PLATFORM, QUICK_LINK_LOGINS
 from core.db import SessionLocal
@@ -69,9 +73,25 @@ def _load_index_users() -> list[dict]:
     cached = get_index_users_cache()
     if cached is not None:
         return cached
-    with SessionLocal() as db:
-        users = user_repo.fetch_index_users(db)
-    set_index_users_cache(users)
+
+    lock_acquired = try_acquire_index_users_build_lock()
+    if not lock_acquired:
+        # 別リクエストが構築中: キャッシュが埋まるまで最大 90 秒ポーリング
+        import time
+        for _ in range(45):
+            time.sleep(2)
+            cached = get_index_users_cache()
+            if cached is not None:
+                return cached
+        # タイムアウト: ロックなしで続行（フォールバック）
+
+    try:
+        with SessionLocal() as db:
+            users = user_repo.fetch_index_users(db)
+        set_index_users_cache(users)
+    finally:
+        if lock_acquired:
+            release_index_users_build_lock()
     return users
 
 
@@ -190,15 +210,33 @@ def _build_user_comments_context(
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    import time
+
     data_version = get_data_version()
     headers = {"X-Twicome-Data-Version": data_version, "Cache-Control": "no-store"}
+
     cached_html = get_index_html_cache(data_version)
     if cached_html is not None:
         return HTMLResponse(cached_html, headers=headers)
-    with SessionLocal() as db:
-        context = build_index_context(db, data_version)
-    html = _render_index_html(context)
-    set_index_html_cache(data_version, html)
+
+    lock_acquired = try_acquire_index_html_build_lock(data_version)
+    if not lock_acquired:
+        # 別リクエストが構築中: キャッシュが埋まるまで最大 90 秒ポーリング
+        for _ in range(45):
+            time.sleep(2)
+            cached_html = get_index_html_cache(data_version)
+            if cached_html is not None:
+                return HTMLResponse(cached_html, headers=headers)
+        # タイムアウト: ロックなしで続行（フォールバック）
+
+    try:
+        with SessionLocal() as db:
+            context = build_index_context(db, data_version)
+        html = _render_index_html(context)
+        set_index_html_cache(data_version, html)
+    finally:
+        if lock_acquired:
+            release_index_html_build_lock(data_version)
     return HTMLResponse(html, headers=headers)
 
 

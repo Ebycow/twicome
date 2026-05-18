@@ -261,3 +261,61 @@ def invalidate_index_cache() -> None:
         r.delete(*keys)
     except Exception as e:
         print(f"[cache] invalidate_index_cache error: {e}")
+
+
+# キャッシュ構築ロック TTL（秒）。クエリが完了するまでの最大見積もり時間より長く設定
+_BUILD_LOCK_TTL = int(os.getenv("INDEX_BUILD_LOCK_TTL", "300"))
+_INDEX_HTML_BUILD_LOCK_KEY_PREFIX = "twicome:lock:index_html_build"
+_INDEX_USERS_BUILD_LOCK_KEY_PREFIX = "twicome:lock:index_users_build"
+
+
+def try_acquire_index_html_build_lock(version: str) -> bool:
+    """トップページHTMLキャッシュ構築の排他ロックを取得する。
+
+    prewarm リトライや実ユーザーリクエストが同時に build_index_context を
+    実行するサンダーリングハードを防ぐ。取得できた場合は True。
+    Redis 未使用時は常に True（ロックなし）。
+    """
+    r = _get_redis()
+    if not r:
+        return True
+    key = f"{_INDEX_HTML_BUILD_LOCK_KEY_PREFIX}:{version}"
+    try:
+        return bool(r.set(key, "1", nx=True, ex=_BUILD_LOCK_TTL))
+    except Exception as e:
+        print(f"[cache] try_acquire_index_html_build_lock error: {e}")
+        return True
+
+
+def release_index_html_build_lock(version: str) -> None:
+    """トップページHTMLキャッシュ構築ロックを解放する。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.delete(f"{_INDEX_HTML_BUILD_LOCK_KEY_PREFIX}:{version}")
+    except Exception as e:
+        print(f"[cache] release_index_html_build_lock error: {e}")
+
+
+def try_acquire_index_users_build_lock() -> bool:
+    """ユーザーインデックスキャッシュ構築の排他ロックを取得する。"""
+    r = _get_redis()
+    if not r:
+        return True
+    try:
+        return bool(r.set(_INDEX_USERS_BUILD_LOCK_KEY_PREFIX, "1", nx=True, ex=_BUILD_LOCK_TTL))
+    except Exception as e:
+        print(f"[cache] try_acquire_index_users_build_lock error: {e}")
+        return True
+
+
+def release_index_users_build_lock() -> None:
+    """ユーザーインデックスキャッシュ構築ロックを解放する。"""
+    r = _get_redis()
+    if not r:
+        return
+    try:
+        r.delete(_INDEX_USERS_BUILD_LOCK_KEY_PREFIX)
+    except Exception as e:
+        print(f"[cache] release_index_users_build_lock error: {e}")

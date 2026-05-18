@@ -107,21 +107,13 @@ def fetch_app_stats(db) -> dict:
             SELECT
                 (SELECT COUNT(*) FROM users WHERE platform = 'twitch') AS total_users,
                 (
-                    SELECT COUNT(*)
-                    FROM users u
-                    WHERE u.platform = 'twitch'
-                      AND EXISTS (
-                          SELECT 1
-                          FROM comments c
-                          WHERE c.commenter_login_snapshot = u.login
-                      )
+                    SELECT COUNT(DISTINCT commenter_user_id)
+                    FROM comments
+                    WHERE commenter_user_id IS NOT NULL
                 ) AS active_commenters,
                 (SELECT COUNT(*) FROM vods) AS total_vods,
                 (SELECT COUNT(*) FROM comments) AS total_comments,
-                (
-                    SELECT COUNT(DISTINCT v.owner_user_id)
-                    FROM vods v
-                ) AS tracked_streamers
+                (SELECT COUNT(DISTINCT owner_user_id) FROM vods) AS tracked_streamers
         """)
         )
         .mappings()
