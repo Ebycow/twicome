@@ -310,6 +310,8 @@ def parse_args() -> argparse.Namespace:
 
 def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -> tuple[int, int]:
     """1 つの VOD JSON ファイルを DB に取り込む。(vod_id, comment_count) を返す。"""
+    if os.path.getsize(json_path) == 0:
+        raise ValueError("ファイルが空です（ダウンロード中断の可能性）。削除して再ダウンロードしてください。")
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 

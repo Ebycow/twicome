@@ -37,7 +37,7 @@ with CSV_FILE.open("r", encoding="utf-8") as f:
         url = row["url"]
         vod_id = url.split("/")[-1]
         output_file = COMMENTS_DIR / f"{vod_id}.json"
-        if output_file.exists():
+        if output_file.exists() and output_file.stat().st_size > 0:
             print(f"Skipping {vod_id}, already exists")
             continue
 
