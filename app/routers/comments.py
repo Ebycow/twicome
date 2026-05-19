@@ -69,7 +69,9 @@ def _load_index_landing() -> dict:
     return data
 
 
-def _load_index_users() -> list[dict]:
+async def _load_index_users() -> list[dict]:
+    import asyncio
+
     cached = get_index_users_cache()
     if cached is not None:
         return cached
@@ -77,17 +79,19 @@ def _load_index_users() -> list[dict]:
     lock_acquired = try_acquire_index_users_build_lock()
     if not lock_acquired:
         # 別リクエストが構築中: キャッシュが埋まるまで最大 90 秒ポーリング
-        import time
         for _ in range(45):
-            time.sleep(2)
+            await asyncio.sleep(2)
             cached = get_index_users_cache()
             if cached is not None:
                 return cached
         # タイムアウト: ロックなしで続行（フォールバック）
 
     try:
-        with SessionLocal() as db:
-            users = user_repo.fetch_index_users(db)
+        def _build():
+            with SessionLocal() as db:
+                return user_repo.fetch_index_users(db)
+
+        users = await asyncio.to_thread(_build)
         set_index_users_cache(users)
     finally:
         if lock_acquired:
@@ -209,8 +213,8 @@ def _build_user_comments_context(
 
 
 @router.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    import time
+async def index(request: Request):
+    import asyncio
 
     data_version = get_data_version()
     headers = {"X-Twicome-Data-Version": data_version, "Cache-Control": "no-store"}
@@ -223,16 +227,19 @@ def index(request: Request):
     if not lock_acquired:
         # 別リクエストが構築中: キャッシュが埋まるまで最大 90 秒ポーリング
         for _ in range(45):
-            time.sleep(2)
+            await asyncio.sleep(2)
             cached_html = get_index_html_cache(data_version)
             if cached_html is not None:
                 return HTMLResponse(cached_html, headers=headers)
         # タイムアウト: ロックなしで続行（フォールバック）
 
     try:
-        with SessionLocal() as db:
-            context = build_index_context(db, data_version)
-        html = _render_index_html(context)
+        def _build():
+            with SessionLocal() as db:
+                context = build_index_context(db, data_version)
+            return _render_index_html(context)
+
+        html = await asyncio.to_thread(_build)
         set_index_html_cache(data_version, html)
     finally:
         if lock_acquired:
@@ -266,8 +273,8 @@ def api_data_version():
 
 
 @router.get("/api/users/index", response_class=JSONResponse)
-def api_users_index():
-    return {"users": _load_index_users()}
+async def api_users_index():
+    return {"users": await _load_index_users()}
 
 
 @router.get("/api/users/commenters", response_class=JSONResponse)
