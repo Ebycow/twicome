@@ -87,6 +87,7 @@ async def _load_index_users() -> list[dict]:
         # タイムアウト: ロックなしで続行（フォールバック）
 
     try:
+
         def _build():
             with SessionLocal() as db:
                 return user_repo.fetch_index_users(db)
@@ -234,6 +235,7 @@ async def index(request: Request):
         # タイムアウト: ロックなしで続行（フォールバック）
 
     try:
+
         def _build():
             with SessionLocal() as db:
                 context = build_index_context(db, data_version)
