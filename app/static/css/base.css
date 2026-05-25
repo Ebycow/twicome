@@ -98,7 +98,10 @@ button:active { transform: translateY(0); box-shadow: none; }
 /* ─── Comment Components ─── */
 .list { display: flex; flex-direction: column; gap: 10px; }
 .comment { padding: 12px; border: 1px solid var(--comment-border); border-radius: 12px; background: var(--comment-bg); }
-.comment-head { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline; font-size: 0.9rem; }
+.comment-head { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 0.9rem; }
+.comment-head > .comment-title { grid-column: 1; grid-row: 1; }
+.comment-head > .vote-controls { grid-column: 2; grid-row: 1; align-self: start; }
+.comment-head > .comment-meta { grid-column: 1 / -1; grid-row: 2; }
 .body { white-space: pre-wrap; overflow-wrap: break-word; margin-top: 8px; font-size: 1.2rem; font-weight: 600; }
 .emote { height: 1.35em; vertical-align: -0.2em; }
 .recent { color: #c00000; }
@@ -155,4 +158,10 @@ button:active { transform: translateY(0); box-shadow: none; }
 /* ─── Responsive ─── */
 @media (max-width: 720px) {
   body { margin: 12px; }
+}
+
+@media (max-width: 640px) {
+  .comment-head { grid-template-columns: 1fr; }
+  .comment-head > .vote-controls { grid-column: 1; grid-row: 2; justify-self: end; }
+  .comment-head > .comment-meta { grid-column: 1; grid-row: 3; }
 }

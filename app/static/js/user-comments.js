@@ -179,11 +179,13 @@
     commentDiv.id = comment.comment_id;
     commentDiv.innerHTML =
       `<div class="comment-head">` +
-      `<div>${
+      `<div class="comment-title">${
       badge
       }<a href="${  escapeHtml(comment.vod_jump_link)  }" target="_blank" class="pill">VOD ${  escapeHtml(String(comment.vod_id))  }</a>${
       comment.youtube_jump_link ? `<a href="${  escapeHtml(comment.youtube_jump_link)  }" target="_blank" class="pill">YouTube</a>` : ''
-      }<strong>${  escapeHtml(comment.vod_title)  }</strong>${
+      }<strong>${  escapeHtml(comment.vod_title)  }</strong></div>` +
+      `<span class="vote-controls">${  renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count)  }</span>` +
+      `<div class="comment-meta">${
       options.showOwner ? `<span class="meta">· 配信者: ${  escapeHtml(comment.owner_login)  }${comment.owner_display_name ? `（${  escapeHtml(comment.owner_display_name)  }）` : ''  }</span>` : ''
       }<span class="meta">· ${  escapeHtml(comment.commenter_login_snapshot)  }${comment.commenter_display_name_snapshot ? `（${  escapeHtml(comment.commenter_display_name_snapshot)  }）` : ''  }の書き込み</span>` +
       `<span class="meta">· ${  escapeHtml(comment.offset_hms)  }</span>${
@@ -191,7 +193,6 @@
       }${options.showRelativeTime && comment.relative_time ? `<span class="meta ${  comment.is_recent ? 'recent' : ''  }">· ${  escapeHtml(comment.relative_time)  }</span>` : ''
       }${options.showBits && comment.bits_spent ? `<span class="pill">bits ${  escapeHtml(comment.bits_spent)  }</span>` : ''
       }</div>` +
-      `<div class="meta"><span class="vote-controls">${  renderVoteButtonsMarkup(comment.comment_id, comment.twicome_likes_count, comment.twicome_dislikes_count)  }</span></div>` +
       `</div>` +
       `<div class="body"></div>${
       renderCommunityNote(comment)}`;
@@ -520,7 +521,7 @@
       e.stopPropagation();
       toggleBest9(commentId, btn, commentDiv);
     });
-    const metaDiv = commentDiv.querySelector('.comment-head > div.meta');
+    const metaDiv = commentDiv.querySelector('.comment-head > .comment-meta');
     if (metaDiv) {metaDiv.appendChild(btn);}
   }
 

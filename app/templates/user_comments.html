@@ -297,12 +297,22 @@
           {% endif %}
           <div class="{{ comment_class }}" id="{{ c.comment_id }}" onclick="if (!event.target.closest('button, a')) window.location.href='?cursor={{ c.comment_id }}';" style="cursor:pointer;">
             <div class="comment-head">
-              <div>
+              <div class="comment-title">
                 <a href="{{ c.vod_jump_link }}" target="_blank" class="pill">VOD {{ c.vod_id }}</a>
                 {% if c.youtube_jump_link %}
                   <a href="{{ c.youtube_jump_link }}" target="_blank" class="pill">YouTube</a>
                 {% endif %}
                 <strong>{{ c.vod_title }}</strong>
+              </div>
+              <span
+                class="vote-controls"
+                data-vote-controls="deferred"
+                data-comment-id="{{ c.comment_id }}"
+              >
+                <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-up"></i> 0</button>
+                <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-down"></i> 0</button>
+              </span>
+              <div class="comment-meta">
                 <span class="meta">· 配信者: {{ c.owner_login }}{% if c.owner_display_name %}（{{ c.owner_display_name }}）{% endif %}</span>
                 <span class="meta">· {{ c.commenter_login_snapshot }}{% if c.commenter_display_name_snapshot %}（{{ c.commenter_display_name_snapshot }}）の書き込み{% endif %}</span>
                 <span class="meta">· {{ c.offset_hms }}</span>
@@ -315,16 +325,6 @@
                 {% if c.bits_spent %}
                   <span class="pill">bits {{ c.bits_spent }}</span>
                 {% endif %}
-              </div>
-              <div class="meta">
-                <span
-                  class="vote-controls"
-                  data-vote-controls="deferred"
-                  data-comment-id="{{ c.comment_id }}"
-                >
-                  <button onclick="vote(this, '{{ c.comment_id }}', 'like')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-up"></i> 0</button>
-                  <button onclick="vote(this, '{{ c.comment_id }}', 'dislike')" class="vote-btn" data-count="0"><i class="fa-solid fa-thumbs-down"></i> 0</button>
-                </span>
                 {% if c.vod_link %}
                   <a href="{{ c.vod_link }}" target="_blank" rel="noopener">VODで開く</a>
                 {% elif c.vod_url %}
