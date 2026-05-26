@@ -27,6 +27,9 @@ logs
 comments
 data/
 
+# morpheme 分析
+morpheme-sample/exports
+
 .coverage
 .coverage.*
 .ci-artifacts/
