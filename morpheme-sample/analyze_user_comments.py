@@ -143,8 +143,7 @@ def main() -> None:
 
     total = time.perf_counter() - t_start
     print(
-        f"完了: {len(comments)} 件 / {total:.2f}s"
-        f" ({len(comments) / total:.1f} 件/s)",
+        f"完了: {len(comments)} 件 / {total:.2f}s ({len(comments) / total:.1f} 件/s)",
         file=sys.stderr,
     )
 
