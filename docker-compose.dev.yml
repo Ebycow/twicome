@@ -282,6 +282,14 @@ services:
     networks:
       - backend
 
+  # ── Playwright MCP 用 Chrome（CDP リモートデバッグ）───────────────────────
+  # 使い方:  docker compose -f docker-compose.dev.yml up -d chrome
+  # MCP は --cdp-endpoint http://localhost:9222 で接続する
+  chrome:
+    image: mcr.microsoft.com/playwright:v1.50.0-noble
+    network_mode: host
+    command: ["/ms-playwright/chromium-1155/chrome-linux/chrome", "--headless", "--remote-debugging-port=9222", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--disable-setuid-sandbox"]
+
 volumes:
   hf-cache:
   mysql8_dev_data:
