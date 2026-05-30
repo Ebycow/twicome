@@ -45,7 +45,7 @@ CLIENT_ID=
 CLIENT_SECRET=
 ACCESS_TOKEN=
 
-# OpenRouter（コミュニティノート生成）
+# OpenRouter（コミュニティノート生成が必要なとき）
 OPENROUTER_API_KEY=
 
 # クイックアクセス対象ユーザー
@@ -55,19 +55,13 @@ DEFAULT_LOGIN=userid
 
 DB・Redisの接続先はDocker Compose使用時はデフォルト値のままでよい。
 
-### 2. アプリ起動（開発環境）
+### 2. アプリ起動
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.yml up --build
 ```
 
 アプリは `http://localhost:8011` で起動する。
-
-### 3. DBマイグレーション
-
-```bash
-docker compose -f docker-compose.dev.yml run --rm migrate
-```
 
 ## 開発
 
