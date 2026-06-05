@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sqlalchemy import bindparam, text
 
-from services.comment_utils import BODY_HTML_RENDER_VERSION, build_comment_body_select_sql
+from services.comment_utils import BODY_HTML_RENDER_VERSION, build_comment_body_select_sql, escape_like_pattern
 
 _BODY_SELECT = build_comment_body_select_sql("c")
 _BODY_SUBQUERY_SELECT = build_comment_body_select_sql("c0")
@@ -53,13 +53,13 @@ def _build_where(
         params["owner_user_id"] = owner_user_id
 
     if q:
-        where.append("c.body LIKE :q_like")
-        params["q_like"] = f"%{q}%"
+        where.append(r"c.body LIKE :q_like ESCAPE '\\'")
+        params["q_like"] = f"%{escape_like_pattern(q)}%"
 
     for idx, term in enumerate(exclude_terms):
         key = f"exclude_q_like_{idx}"
-        where.append(f"c.body NOT LIKE :{key}")
-        params[key] = f"%{term}%"
+        where.append(rf"c.body NOT LIKE :{key} ESCAPE '\\'")
+        params[key] = f"%{escape_like_pattern(term)}%"
 
     if date_from_utc is not None:
         where.append("c.comment_created_at_utc >= :date_from_utc")
@@ -278,13 +278,13 @@ def _build_vod_comment_where(
     params: dict = {"vod_id": vod_id}
 
     if q:
-        where.append("c.body LIKE :q_like")
-        params["q_like"] = f"%{q}%"
+        where.append(r"c.body LIKE :q_like ESCAPE '\\'")
+        params["q_like"] = f"%{escape_like_pattern(q)}%"
 
     for idx, term in enumerate(exclude_terms):
         key = f"exclude_q_like_{idx}"
-        where.append(f"c.body NOT LIKE :{key}")
-        params[key] = f"%{term}%"
+        where.append(rf"c.body NOT LIKE :{key} ESCAPE '\\'")
+        params[key] = f"%{escape_like_pattern(term)}%"
 
     return " AND ".join(where), params
 

@@ -9,6 +9,7 @@ from services.comment_utils import (
     build_vod_link,
     build_youtube_link,
     decorate_comment,
+    escape_like_pattern,
     get_comment_body_html,
     normalize_emote_id,
     render_comment_body_html,
@@ -17,6 +18,29 @@ from services.comment_utils import (
     split_filter_terms,
     utc_to_jst,
 )
+
+
+class TestEscapeLikePattern:
+    """LIKE ワイルドカードのエスケープ。"""
+
+    def test_underscore_escaped(self):
+        # _ は任意 1 文字ワイルドカード → エスケープされること
+        assert escape_like_pattern("_") == r"\_"
+
+    def test_percent_escaped(self):
+        # % は任意文字列ワイルドカード → エスケープされること
+        assert escape_like_pattern("100%") == r"100\%"
+
+    def test_backslash_escaped_first(self):
+        # \ 自身を二重化してからでないと、後続のエスケープが壊れる
+        assert escape_like_pattern("a\\b") == r"a\\b"
+
+    def test_backslash_before_wildcard(self):
+        # 入力の "\_" は「リテラルの \ と _」→ 両方エスケープされる
+        assert escape_like_pattern("\\_") == r"\\\_"
+
+    def test_plain_text_unchanged(self):
+        assert escape_like_pattern("hello") == "hello"
 
 # ── seconds_to_hms ──────────────────────────────────────────────────────────
 

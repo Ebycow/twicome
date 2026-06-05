@@ -150,6 +150,16 @@ def split_filter_terms(raw: str | None):
     return [term for term in re.split(r"[\s,、]+", raw.strip()) if term]
 
 
+def escape_like_pattern(value: str) -> str:
+    r"""LIKE パターン用に特殊文字 \ % _ をエスケープする。
+
+    エスケープ文字はバックスラッシュ。SQL 側で ``LIKE :param ESCAPE '\\'`` と併用すること。
+    これをしないと検索語中の % が任意文字列、_ が任意 1 文字のワイルドカードとして解釈され、
+    意図しない結果になる（例: "_" 検索で全件ヒット）。
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 EMOTE_URL_TEMPLATE = "https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/default/dark/{scale}"
 EMOTE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 

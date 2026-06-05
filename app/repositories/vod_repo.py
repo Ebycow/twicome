@@ -2,6 +2,8 @@
 
 from sqlalchemy import text
 
+from services.comment_utils import escape_like_pattern
+
 
 def fetch_vod_by_id(db, vod_id: int) -> dict | None:
     """VOD ID で VOD を1件取得。存在しなければ None。"""
@@ -97,8 +99,8 @@ def _build_vod_where(*, q: str | None, owner_login: str | None) -> tuple[str, di
     params: dict = {}
 
     if q:
-        where.append("v.title LIKE :q_like")
-        params["q_like"] = f"%{q}%"
+        where.append(r"v.title LIKE :q_like ESCAPE '\\'")
+        params["q_like"] = f"%{escape_like_pattern(q)}%"
 
     if owner_login:
         where.append("u.login = :owner_login")
