@@ -55,6 +55,28 @@ class TestFetchComments:
         rows = comment_repo.fetch_comments(db, uid=2, limit=2, offset=0)
         assert len(rows) == 2
 
+    def test_default_sort_is_created_at_desc(self, db):
+        """デフォルト（sort=created_at・フィルタなし）のサブクエリ最適化パスでも
+        投稿日時降順が保証されること。外側 ORDER BY 欠落の回帰防止。"""
+        from datetime import UTC, datetime
+
+        seed_vod(db, vod_id=101, owner_user_id=1)
+        # 挿入順を時系列とずらし、複数 VOD をまたいで投入する
+        seed_comment(
+            db, comment_id="mid", vod_id=101, commenter_user_id=2,
+            created_at=datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC),
+        )
+        seed_comment(
+            db, comment_id="newest", vod_id=100, commenter_user_id=2,
+            created_at=datetime(2024, 6, 3, 9, 0, 0, tzinfo=UTC),
+        )
+        seed_comment(
+            db, comment_id="oldest", vod_id=101, commenter_user_id=2,
+            created_at=datetime(2024, 6, 1, 8, 0, 0, tzinfo=UTC),
+        )
+        rows = comment_repo.fetch_comments(db, uid=2)
+        assert [r["comment_id"] for r in rows] == ["newest", "mid", "oldest"]
+
     def test_sort_by_likes(self, db):
         seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, body="low", likes=1)
         seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, body="high", likes=10)

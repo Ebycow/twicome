@@ -211,6 +211,7 @@ def fetch_comments(
                 JOIN vods v ON v.vod_id = c.vod_id
                 JOIN users u ON u.user_id = v.owner_user_id
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
+                ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC
             """),
                 params,
             )
