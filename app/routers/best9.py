@@ -13,12 +13,25 @@ from services.comment_utils import BODY_HTML_RENDER_VERSION, _build_comment_body
 router = APIRouter()
 _COMMENT_BODY_SELECT_SQL = _build_comment_body_select_sql("c")
 
+# best9 は最大 9 件の comment_id（数十文字）しか扱わないため、
+# 圧縮データ・展開後データの双方に十分余裕を持たせた上限を設けて
+# 解凍爆弾（小さな z が巨大データに展開される DoS）を防ぐ。
+_MAX_Z_LEN = 4096
+_MAX_DECOMPRESSED_BYTES = 8192
+
 
 def _decompress_ids(z: str) -> list[str]:
     """deflate-raw + base64url で圧縮された ID リストを復元"""
+    if len(z) > _MAX_Z_LEN:
+        raise ValueError("compressed payload too large")
     pad = (4 - len(z) % 4) % 4
     data = base64.urlsafe_b64decode(z + "=" * pad)
-    decompressed = zlib.decompress(data, wbits=-15)
+    # 上限付きで逐次展開し、超過分が残ったら（= 展開後が大きすぎる）拒否する
+    decompressor = zlib.decompressobj(wbits=-15)
+    decompressed = decompressor.decompress(data, _MAX_DECOMPRESSED_BYTES)
+    if decompressor.unconsumed_tail:
+        raise ValueError("decompressed payload too large")
+    decompressed += decompressor.flush()
     return [i.strip() for i in decompressed.decode("utf-8").split(",") if i.strip()][:9]
 
 
