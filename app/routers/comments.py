@@ -495,11 +495,23 @@ _RE_TAGS = re.compile(r"<[^>]+>")
 _RE_IMG_ALT = re.compile(r'<img\b[^>]*\balt="([^"]*)"[^>]*>', re.IGNORECASE)
 _EXPORT_CSV_HEADERS = ["投稿日時(JST)", "配信者", "VODタイトル", "VOD内時刻", "コメント本文", "bits消費"]
 
+# 表計算ソフト（Excel/LibreOffice/Google Sheets）がセルを数式として解釈してしまう先頭文字。
+# コメント本文等はユーザー入力なので、これらで始まるセルは CSV 数式インジェクションを防ぐため無害化する。
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
 
 def _strip_html(text: str) -> str:
     # <img alt="Kappa"> をエモート名に置換してからタグ除去
     text = _RE_IMG_ALT.sub(r"\1", text or "")
     return _RE_TAGS.sub("", text).strip()
+
+
+def _csv_safe(value) -> str:
+    """CSV 数式インジェクション対策: 危険な先頭文字を持つセルにアポストロフィを前置する。"""
+    text = "" if value is None else str(value)
+    if text and text[0] in _CSV_FORMULA_PREFIXES:
+        return "'" + text
+    return text
 
 
 def _comments_to_csv(comments: list[dict]) -> str:
@@ -509,12 +521,12 @@ def _comments_to_csv(comments: list[dict]) -> str:
     for c in comments:
         writer.writerow(
             [
-                c.get("comment_created_at_jst", ""),
-                c.get("owner_login", ""),
-                c.get("vod_title", ""),
-                c.get("offset_hms", ""),
-                _strip_html(c.get("body_html", "")),
-                c.get("bits_spent") or "",
+                _csv_safe(c.get("comment_created_at_jst", "")),
+                _csv_safe(c.get("owner_login", "")),
+                _csv_safe(c.get("vod_title", "")),
+                _csv_safe(c.get("offset_hms", "")),
+                _csv_safe(_strip_html(c.get("body_html", ""))),
+                _csv_safe(c.get("bits_spent") or ""),
             ]
         )
     return buf.getvalue()
