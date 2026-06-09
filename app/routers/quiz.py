@@ -1,9 +1,9 @@
 import base64
 import hashlib
-import hmac
 import json
 import random
 
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -29,26 +29,29 @@ _CANDIDATES_PER_QUESTION = _OTHER_USER_COUNT + 1  # 100
 # ---------------------------------------------------------------------------
 
 
+# QUIZ_SECRET_KEY から決定的に 32byte の Fernet 鍵を導出する。
+# Fernet は AES-CBC + HMAC の認証付き暗号で、機密性（正解の秘匿）と完全性（改ざん検知）の双方を提供する。
+_FERNET = Fernet(base64.urlsafe_b64encode(hashlib.sha256(QUIZ_SECRET_KEY.encode()).digest()))
+
+
 def _make_task_token(login: str, correct_candidate_ids: list[int]) -> str:
-    """テスト正解候補 ID リストを HMAC-SHA256 で署名したトークンを生成する。"""
+    """テスト正解候補 ID リストを暗号化したトークンを生成する。
+
+    正解をトークンに含めるが Fernet で暗号化するため、署名鍵を持たないクライアントからは
+    復号も読み取りもできない。サーバ側に状態を持たない（DB・キャッシュ不要）ステートレス方式。
+    """
     payload = json.dumps({"login": login, "answers": correct_candidate_ids}, separators=(",", ":")).encode()
-    payload_b64 = base64.urlsafe_b64encode(payload).decode()
-    sig = hmac.new(QUIZ_SECRET_KEY.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
-    return f"{payload_b64}.{sig}"
+    return _FERNET.encrypt(payload).decode()
 
 
 def _verify_task_token(token: str, login: str) -> list[int] | None:
-    """トークンを検証し、正解候補 ID リストを返す。不正なら None。"""
+    """トークンを復号・検証し、正解候補 ID リストを返す。不正なら None。"""
     try:
-        payload_b64, sig = token.rsplit(".", 1)
-        expected_sig = hmac.new(QUIZ_SECRET_KEY.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected_sig):
-            return None
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        payload = json.loads(_FERNET.decrypt(token.encode()))
         if payload.get("login") != login:
             return None
         return [int(a) for a in payload["answers"]]
-    except Exception:
+    except (InvalidToken, ValueError, TypeError, KeyError):
         return None
 
 
