@@ -339,6 +339,8 @@
     if (filters.owner_user_id) {params.set('owner_user_id', filters.owner_user_id);}
     if (filters.q) {params.set('q', filters.q);}
     if (filters.exclude_q) {params.set('exclude_q', filters.exclude_q);}
+    if (filters.date_from) {params.set('date_from', filters.date_from);}
+    if (filters.date_to) {params.set('date_to', filters.date_to);}
 
     try {
       const response = await fetch(`${rootPath  }/api/u/${  userLogin  }?${  params}`);

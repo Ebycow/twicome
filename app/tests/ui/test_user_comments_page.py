@@ -292,6 +292,79 @@ class TestFilterForm:
         expect(page.locator(".body").first).to_contain_text("hello world")
 
 
+class TestDateFilterInfiniteScroll:
+    """日付フィルタが無限スクロールの追加読み込みでも維持されることを確認するテスト群。
+
+    回帰テスト: loadComments() が組み立てる API リクエストに date_from/date_to が
+    含まれず、2ページ目以降に期間外のコメントが混入するバグがあった。
+    """
+
+    def _seed_ranged_comments(self, db, *, login: str) -> None:
+        """期間内 15 件（2024-06-01〜06-15）+ 期間外 10 件（2024-05-01〜05-10）を投入する。
+
+        日付フィルタは JST 基準なので、UTC 03:00（= JST 12:00）で日付の曖昧さを避ける。
+        期間外を古い日付にすることで、フィルタが落ちた場合に 2 ページ目へ確実に混入する。
+        """
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login=login, platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(15):
+            seed_comment(
+                db,
+                comment_id=f"in_{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot=login,
+                body=f"期間内コメント{i}",
+                offset_seconds=i * 10,
+                created_at=datetime(2024, 6, 1 + i, 3, 0, 0, tzinfo=UTC),
+            )
+        for i in range(10):
+            seed_comment(
+                db,
+                comment_id=f"out_{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot=login,
+                body=f"範囲外コメント{i}",
+                offset_seconds=i * 10,
+                created_at=datetime(2024, 5, 1 + i, 3, 0, 0, tzinfo=UTC),
+            )
+
+    def test_scroll_request_keeps_date_filter(self, page: Page, db):
+        """
+        【確認内容】無限スクロールの 2 ページ目リクエストに date_from/date_to が引き継がれる
+
+        page_size=10 + 期間内 15 件なので、スクロールで 2 ページ目の API コールが発生する。
+        そのリクエスト URL に日付パラメータが含まれることを確認する。
+        """
+        self._seed_ranged_comments(db, login="fan_dates")
+
+        with page.expect_response(re.compile(r"/api/u/fan_dates\?.*page=2")) as response_info:
+            page.goto("/u/fan_dates?date_from=2024-06-01&date_to=2024-06-30&page_size=10")
+            page.locator("#scroll-sentinel").scroll_into_view_if_needed()
+
+        request_url = response_info.value.request.url
+        assert "date_from=2024-06-01" in request_url
+        assert "date_to=2024-06-30" in request_url
+
+    def test_scrolled_pages_exclude_out_of_range_comments(self, page: Page, db):
+        """
+        【確認内容】スクロールで追加されたコメントに期間外のものが混入しない
+
+        フィルタが引き継がれていれば、全ページ読み込み後の表示は期間内の 15 件のみになる。
+        フィルタが落ちると未フィルタの 2 ページ目（範囲外コメントを含む）が追加される。
+        """
+        self._seed_ranged_comments(db, login="fan_dates2")
+
+        with page.expect_response(re.compile(r"/api/u/fan_dates2\?.*page=2")):
+            page.goto("/u/fan_dates2?date_from=2024-06-01&date_to=2024-06-30&page_size=10")
+            page.locator("#scroll-sentinel").scroll_into_view_if_needed()
+
+        expect(page.locator(".comment")).to_have_count(15)
+        expect(page.locator(".list")).not_to_contain_text("範囲外コメント")
+
+
 class TestNetworkRequests:
     """ネットワークリクエストを監視するテスト群。"""
 
