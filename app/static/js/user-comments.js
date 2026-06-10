@@ -439,6 +439,8 @@
 
   const votePending = new Map();
   const VOTE_DEBOUNCE_MS = 500;
+  // サーバーの count 上限 (le=100) に合わせる。これを超える分は次バッチに繰り越す。
+  const MAX_VOTE_BATCH = 100;
 
   /**
    * 投票ボタンのクリック時にカウントを即時更新しデバウンス付きでAPIへ送信する。
@@ -472,8 +474,17 @@
   async function flushVote(key) {
     const pending = votePending.get(key);
     if (!pending) {return;}
-    votePending.delete(key);
-    const url = `${rootPath  }/${  pending.type  }/${  pending.commentId  }?count=${  pending.count}`;
+    // サーバーの上限 (MAX_VOTE_BATCH) を超える分は次バッチに繰り越す
+    const sendCount = Math.min(pending.count, MAX_VOTE_BATCH);
+    const remainder = pending.count - sendCount;
+    if (remainder > 0) {
+      pending.count = remainder;
+      clearTimeout(pending.timer);
+      pending.timer = setTimeout(function () { flushVote(key); }, VOTE_DEBOUNCE_MS);
+    } else {
+      votePending.delete(key);
+    }
+    const url = `${rootPath  }/${  pending.type  }/${  pending.commentId  }?count=${  sendCount}`;
     try {
       const response = await fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       if (!response.ok) {console.error('Vote failed:', await response.text());}
