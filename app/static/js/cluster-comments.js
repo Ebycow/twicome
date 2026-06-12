@@ -51,6 +51,9 @@
   const VOTE_DEBOUNCE_MS = 500;
   // サーバーの count 上限 (le=100) に合わせる。これを超える分は次バッチに繰り越す。
   const MAX_VOTE_BATCH = 100;
+  // サーバーの一括取得上限 (MAX_VOTE_BULK_IDS=200) に合わせる。
+  // これを超えると 400 が返るため、ID をこの件数ごとに分割して取得する。
+  const MAX_VOTE_COUNTS_PER_REQUEST = 200;
 
   /**
    * 投票ボタンのクリック時にUIを即時更新し、デバウンス送信をスケジュールする。
@@ -132,19 +135,23 @@
   async function hydrateDeferredVoteControls(containers) {
     const targets = (containers || []).filter(function (c) { return c && c.dataset.commentId; });
     if (!targets.length) {return;}
-    let items = {};
-    try {
-      const response = await fetch(voteCountsApiUrl, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment_ids: targets.map(function (c) { return c.dataset.commentId; }) }),
-      });
-      if (!response.ok) {throw new Error(`vote_counts_failed:${  response.status}`);}
-      const data = await response.json();
-      items = (data && data.items) || {};
-    } catch (error) {
-      console.warn('Deferred vote hydration failed:', error);
-      return;
+    // サーバーの一括取得上限を超えると 400 が返るため、ID をチャンク分割して取得しマージする。
+    const items = {};
+    for (let start = 0; start < targets.length; start += MAX_VOTE_COUNTS_PER_REQUEST) {
+      const chunk = targets.slice(start, start + MAX_VOTE_COUNTS_PER_REQUEST);
+      try {
+        const response = await fetch(voteCountsApiUrl, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment_ids: chunk.map(function (c) { return c.dataset.commentId; }) }),
+        });
+        if (!response.ok) {throw new Error(`vote_counts_failed:${  response.status}`);}
+        const data = await response.json();
+        Object.assign(items, (data && data.items) || {});
+      } catch (error) {
+        console.warn('Deferred vote hydration failed:', error);
+        // このチャンクは失敗してもスキップし、残りのチャンクのハイドレーションは続行する。
+      }
     }
     targets.forEach(function (container) {
       const commentId = container.dataset.commentId;
