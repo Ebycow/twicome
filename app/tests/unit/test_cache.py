@@ -71,6 +71,7 @@ def _reset_cache_globals(monkeypatch):
     monkeypatch.setattr(cache_module, "COMMENTS_CACHE_TTL", 321)
     monkeypatch.setattr(cache_module, "_startup_data_version", "startup-version")
     monkeypatch.setattr(cache_module, "_render_version", "render-version")
+    monkeypatch.setattr(cache_module, "STATIC_VERSION", "static-version")
 
 
 class TestComputeRenderVersion:
@@ -167,7 +168,7 @@ class TestPublicCacheApis:
 
         assert cache_module.get_user_meta_cache("viewer") is None
         cache_module.set_user_meta_cache("viewer", {"a": 1})
-        assert cache_module.get_data_version() == "startup-version:render-version"
+        assert cache_module.get_data_version() == "startup-version:render-version:static-version"
         assert cache_module.set_data_version("version-1") == "version-1"
         assert cache_module.get_index_html_cache("v1") is None
         cache_module.set_index_html_cache("v1", "<html></html>")
@@ -194,7 +195,7 @@ class TestPublicCacheApis:
         assert cache_module.get_comments_html_cache("v1", "youtube", "viewer") == "<html>comments</html>"
         assert cache_module.get_index_landing_cache() == {"quick_links": [1]}
         assert cache_module.get_index_users_cache() == [{"login": "viewer"}]
-        assert cache_module.get_data_version() == "data-v2:render-version"
+        assert cache_module.get_data_version() == "data-v2:render-version:static-version"
 
         comments_key = "twicome:comments:html:v1:youtube:viewer"
         assert fake.data[comments_key] == "<html>comments</html>"
@@ -204,18 +205,18 @@ class TestPublicCacheApis:
         fake = _FakeRedis()
         monkeypatch.setattr(cache_module, "_get_redis", lambda: fake)
 
-        assert cache_module.get_data_version() == "startup-version:render-version"
+        assert cache_module.get_data_version() == "startup-version:render-version:static-version"
         assert fake.set_calls == [(cache_module.DATA_VERSION_KEY, "startup-version")]
 
     def test_get_data_version_falls_back_when_redis_errors(self, monkeypatch, capsys):
         fake = _FakeRedis(get_error=RuntimeError("boom"))
         monkeypatch.setattr(cache_module, "_get_redis", lambda: fake)
 
-        assert cache_module.get_data_version() == "startup-version:render-version"
+        assert cache_module.get_data_version() == "startup-version:render-version:static-version"
         assert "get_data_version error" in capsys.readouterr().out
 
     def test_get_data_version_returns_combined_versions_without_redis(self):
-        assert cache_module.get_data_version() == "startup-version:render-version"
+        assert cache_module.get_data_version() == "startup-version:render-version:static-version"
 
     def test_set_data_version_uses_fallback_when_value_blank(self, monkeypatch):
         assert cache_module.set_data_version("   ") == "startup-version"

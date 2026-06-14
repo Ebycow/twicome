@@ -9,6 +9,8 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from core.config import STATIC_VERSION
+
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
 
 # コメント全件キャッシュの TTL（秒）。バッチ間隔 4 時間に合わせる
@@ -101,11 +103,16 @@ def set_user_meta_cache(login: str, meta: dict) -> None:
 
 
 def get_data_version() -> str:
-    """現在の有効バージョンを返す。データ更新または描画コード更新で変わる。"""
+    """現在の有効バージョンを返す。データ更新・描画コード更新・静的資産更新で変わる。
+
+    レンダリング済み HTML キャッシュは CSS/JS を ``?v={STATIC_VERSION}`` で参照するため、
+    STATIC_VERSION（git hash 等）をキーに含めないと、静的ファイルのみのデプロイで
+    古い ``?v=`` を指したままの HTML が TTL の間配信され続ける。
+    """
     r = _get_redis()
     base_version = _startup_data_version
     if not r:
-        return f"{base_version}:{_render_version}"
+        return f"{base_version}:{_render_version}:{STATIC_VERSION}"
     try:
         version = r.get(DATA_VERSION_KEY)
         if version:
@@ -114,7 +121,7 @@ def get_data_version() -> str:
             r.set(DATA_VERSION_KEY, _startup_data_version)
     except Exception as e:
         print(f"[cache] get_data_version error: {e}")
-    return f"{base_version}:{_render_version}"
+    return f"{base_version}:{_render_version}:{STATIC_VERSION}"
 
 
 def set_data_version(version: str) -> str:
