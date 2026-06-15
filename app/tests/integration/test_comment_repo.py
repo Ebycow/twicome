@@ -63,15 +63,24 @@ class TestFetchComments:
         seed_vod(db, vod_id=101, owner_user_id=1)
         # 挿入順を時系列とずらし、複数 VOD をまたいで投入する
         seed_comment(
-            db, comment_id="mid", vod_id=101, commenter_user_id=2,
+            db,
+            comment_id="mid",
+            vod_id=101,
+            commenter_user_id=2,
             created_at=datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC),
         )
         seed_comment(
-            db, comment_id="newest", vod_id=100, commenter_user_id=2,
+            db,
+            comment_id="newest",
+            vod_id=100,
+            commenter_user_id=2,
             created_at=datetime(2024, 6, 3, 9, 0, 0, tzinfo=UTC),
         )
         seed_comment(
-            db, comment_id="oldest", vod_id=101, commenter_user_id=2,
+            db,
+            comment_id="oldest",
+            vod_id=101,
+            commenter_user_id=2,
             created_at=datetime(2024, 6, 1, 8, 0, 0, tzinfo=UTC),
         )
         rows = comment_repo.fetch_comments(db, uid=2)

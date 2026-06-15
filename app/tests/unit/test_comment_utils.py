@@ -42,6 +42,7 @@ class TestEscapeLikePattern:
     def test_plain_text_unchanged(self):
         assert escape_like_pattern("hello") == "hello"
 
+
 # ── seconds_to_hms ──────────────────────────────────────────────────────────
 
 
