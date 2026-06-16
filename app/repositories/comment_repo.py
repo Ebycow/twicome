@@ -72,10 +72,12 @@ def _build_where(
     return " AND ".join(where), params
 
 
-def _build_user_comment_order(sort: str) -> str:
+def _build_user_comment_order(sort: str, seed: int | None = None) -> str:
     """ORDER BY 句の SQL 文字列を返す（ユーザーコメント一覧用）。
 
     コミュニティノート・危険度・ランダムを含む全ソート種別に対応する。
+    sort="random" かつ seed 指定時は ``RAND(:seed)`` を使い、ページネーション間で順序を固定する
+    （シードなしの ``RAND()`` はクエリ毎に再シャッフルされ、OFFSET ページ送りで重複・欠落が起きる）。
     """
     if sort == "created_at":
         return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
@@ -91,7 +93,7 @@ def _build_user_comment_order(sort: str) -> str:
             " c.vod_id DESC, c.offset_seconds DESC"
         )
     if sort == "random":
-        return "ORDER BY RAND()"
+        return "ORDER BY RAND(:seed)" if seed is not None else "ORDER BY RAND()"
     return "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
 
 
@@ -165,10 +167,12 @@ def fetch_comments(
     offset: int = 0,
     date_from_utc: datetime | None = None,
     date_to_utc: datetime | None = None,
+    seed: int | None = None,
 ) -> list[dict]:
     """フィルタ・ソート・ページネーションを適用してコメントを取得する。
 
     sort=created_at かつフィルタなしの場合、サブクエリ最適化を使用する。
+    sort=random のときは seed を渡すと ``RAND(:seed)`` でページ間の順序を固定する。
     """
     where_sql, params = _build_where(
         uid,
@@ -179,8 +183,10 @@ def fetch_comments(
         date_from_utc=date_from_utc,
         date_to_utc=date_to_utc,
     )
-    order_sql = _build_user_comment_order(sort)
+    order_sql = _build_user_comment_order(sort, seed)
     params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
+    if sort == "random" and seed is not None:
+        params["seed"] = seed
 
     use_subquery = (
         sort == "created_at"

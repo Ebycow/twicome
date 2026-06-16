@@ -217,6 +217,29 @@ class TestUserCommentsPage:
         assert 'id="data-version-data"' in saved["html"]
         assert "20260311000001" in saved["html"]
 
+    def test_random_sort_without_seed_redirects_with_seed(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer")
+
+        resp = client.get("/u/viewer?sort=random", follow_redirects=False)
+        assert resp.status_code == 303
+        location = resp.headers["location"]
+        assert "sort=random" in location
+        assert "seed=" in location
+
+    def test_random_sort_with_seed_does_not_redirect_and_embeds_seed(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, commenter_login_snapshot="viewer")
+
+        resp = client.get("/u/viewer?sort=random&seed=12345", follow_redirects=False)
+        assert resp.status_code == 200
+        # filters-data（無限スクロールが引き継ぐシード）に seed が埋め込まれる
+        assert "12345" in resp.text
+
     def test_user_comments_page_embeds_data_version_for_stale_cache_notice(self, client, db, monkeypatch):
         import routers.comments as comments_router
 
@@ -279,6 +302,54 @@ class TestUserCommentsApi:
         assert resp.status_code == 200
         assert len(resp.json()["items"]) == 10
         assert resp.json()["total"] == 15
+
+    def test_random_sort_seeded_pagination_has_no_overlap_or_gaps(self, client, db):
+        """シード固定のランダムソートでは、ページ間でコメントが重複・欠落しないことを確認。
+
+        シードなしの RAND() では各ページが再シャッフルされ重複・欠落が起きていた回帰を防ぐ。
+        """
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(20):
+            seed_comment(
+                db,
+                comment_id=f"c{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot="viewer",
+                offset_seconds=i * 10,
+            )
+
+        page1 = client.get("/api/u/viewer?sort=random&seed=42&page_size=10&page=1")
+        page2 = client.get("/api/u/viewer?sort=random&seed=42&page_size=10&page=2")
+        assert page1.status_code == 200
+        assert page2.status_code == 200
+        ids1 = {item["comment_id"] for item in page1.json()["items"]}
+        ids2 = {item["comment_id"] for item in page2.json()["items"]}
+        assert len(ids1) == 10
+        assert len(ids2) == 10
+        assert ids1.isdisjoint(ids2)  # ページ間で重複なし
+        assert ids1 | ids2 == {f"c{i}" for i in range(20)}  # 全件をユニークに網羅
+
+    def test_random_sort_same_seed_yields_same_order(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(10):
+            seed_comment(
+                db,
+                comment_id=f"c{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot="viewer",
+                offset_seconds=i * 10,
+            )
+
+        url = "/api/u/viewer?sort=random&seed=7&page_size=10"
+        order1 = [it["comment_id"] for it in client.get(url).json()["items"]]
+        order2 = [it["comment_id"] for it in client.get(url).json()["items"]]
+        assert order1 == order2
 
     def test_keyword_filter(self, client, db):
         seed_user(db, user_id=1, login="streamer", platform="twitch")

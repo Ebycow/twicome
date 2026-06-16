@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import random
 import re
 from urllib.parse import urlencode
 
@@ -314,7 +315,15 @@ def user_comments_page(
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
     cursor: str | None = Query(None),
+    seed: int | None = Query(None),
 ):
+    # ランダムソートはシードを URL に固定する。シードなしだと無限スクロールの
+    # 各ページが RAND() で再シャッフルされ、コメントの重複・欠落が起きるため、
+    # 初回アクセス時に生成したシードへ 303 リダイレクトしてページ送り全体で引き回す。
+    if sort == "random" and not cursor and seed is None:
+        redirect_url = request.url.include_query_params(seed=random.randint(1, 2_147_483_647))
+        return RedirectResponse(url=str(redirect_url), status_code=303)
+
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
     data_version = get_data_version()
@@ -360,6 +369,7 @@ def user_comments_page(
                 page_size=page_size,
                 sort=sort,
                 cursor=cursor,
+                seed=seed,
                 load_meta=should_load_meta,
             )
         except ValueError as e:
@@ -432,9 +442,14 @@ def user_comments_api(
     page_size: int = Query(50, ge=10, le=200),
     sort: str = Query("created_at"),
     cursor: str | None = Query(None),
+    seed: int | None = Query(None),
 ):
     vod_id_int = _parse_int(vod_id)
     owner_user_id_int = _parse_int(owner_user_id)
+    # 無限スクロールは初回ページのシードを引き継いで送ってくる。万一欠落しても
+    # 単一レスポンス内で順序が一貫するようフォールバックのシードを生成する。
+    if sort == "random" and not cursor and seed is None:
+        seed = random.randint(1, 2_147_483_647)
 
     with SessionLocal() as db:
         try:
@@ -452,6 +467,7 @@ def user_comments_api(
                 page_size=page_size,
                 sort=sort,
                 cursor=cursor,
+                seed=seed,
             )
         except ValueError:
             return JSONResponse({"error": "user_not_found"}, status_code=404)

@@ -335,6 +335,8 @@
       sort: filters.sort,
     });
     if (filters.cursor) {params.set('cursor', filters.cursor);}
+    // ランダムソートのシード。これがないと各ページが RAND() で再シャッフルされ重複・欠落する
+    if (filters.seed != null && filters.seed !== '') {params.set('seed', filters.seed);}
     if (filters.vod_id) {params.set('vod_id', filters.vod_id);}
     if (filters.owner_user_id) {params.set('owner_user_id', filters.owner_user_id);}
     if (filters.q) {params.set('q', filters.q);}

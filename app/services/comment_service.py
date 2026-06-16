@@ -71,6 +71,7 @@ def fetch_user_comment_page(
     page_size: int = 50,
     sort: str = "created_at",
     cursor: str | None = None,
+    seed: int | None = None,
     load_meta: bool = False,
 ) -> CommentPage:
     """ユーザーのコメント一覧ページデータを返す。
@@ -136,6 +137,7 @@ def fetch_user_comment_page(
                 offset=offset,
                 date_from_utc=date_from_utc,
                 date_to_utc=date_to_utc,
+                seed=seed,
             )
     else:
         # ── 通常ページネーション ─────────────────────────────────────────────
@@ -164,6 +166,7 @@ def fetch_user_comment_page(
             offset=offset,
             date_from_utc=date_from_utc,
             date_to_utc=date_to_utc,
+            seed=seed,
         )
 
     now = datetime.now(UTC)
@@ -189,6 +192,7 @@ def fetch_user_comment_page(
             "page_size": page_size,
             "sort": sort,
             "cursor": cursor,
+            "seed": seed,
         },
     )
 
