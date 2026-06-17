@@ -1,9 +1,10 @@
 """VOD 検索・VOD コメント一覧ルーター。"""
 
 import math
+import random
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from core.db import SessionLocal
 from core.templates import templates
@@ -93,7 +94,15 @@ def vod_comments_page(
     sort: str = Query("offset"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=10, le=200),
+    seed: int | None = Query(None),
 ):
+    # ランダムソートはシードを URL に固定する。シードなしだとページ送りの各ページが
+    # RAND() で再シャッフルされ、OFFSET ページネーションでコメントの重複・欠落が起きるため、
+    # 初回アクセス時に生成したシードへ 303 リダイレクトしてページ送り全体で引き回す。
+    if sort == "random" and seed is None:
+        redirect_url = request.url.include_query_params(seed=random.randint(1, 2_147_483_647))
+        return RedirectResponse(url=str(redirect_url), status_code=303)
+
     with SessionLocal() as db:
         try:
             page_data = fetch_vod_comment_page(
@@ -104,6 +113,7 @@ def vod_comments_page(
                 sort=sort,
                 page=page,
                 page_size=page_size,
+                seed=seed,
             )
         except ValueError as e:
             return templates.TemplateResponse(
@@ -115,7 +125,13 @@ def vod_comments_page(
                     "page": 1,
                     "pages": 0,
                     "total": 0,
-                    "filters": {"q": q, "exclude_q": exclude_q, "sort": sort, "page_size": page_size},
+                    "filters": {
+                        "q": q,
+                        "exclude_q": exclude_q,
+                        "sort": sort,
+                        "page_size": page_size,
+                        "seed": seed,
+                    },
                     "error": str(e),
                 },
                 status_code=404,

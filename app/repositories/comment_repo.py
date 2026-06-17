@@ -296,8 +296,12 @@ def _build_vod_comment_where(
     return " AND ".join(where), params
 
 
-def _build_vod_comment_order(sort: str) -> str:
-    """VOD コメント一覧用 ORDER BY 句を返す。"""
+def _build_vod_comment_order(sort: str, seed: int | None = None) -> str:
+    """VOD コメント一覧用 ORDER BY 句を返す。
+
+    sort="random" かつ seed 指定時は ``RAND(:seed)`` を使い、ページネーション間で順序を固定する
+    （シードなしの ``RAND()`` はページ送り毎に再シャッフルされ、OFFSET ページ送りで重複・欠落が起きる）。
+    """
     if sort == "offset_desc":
         return "ORDER BY c.offset_seconds DESC, c.comment_created_at_utc DESC"
     if sort == "likes":
@@ -305,7 +309,7 @@ def _build_vod_comment_order(sort: str) -> str:
     if sort == "dislikes":
         return "ORDER BY c.twicome_dislikes_count DESC, c.offset_seconds ASC"
     if sort == "random":
-        return "ORDER BY RAND()"
+        return "ORDER BY RAND(:seed)" if seed is not None else "ORDER BY RAND()"
     # default: offset ascending (VOD 再生順)
     return "ORDER BY c.offset_seconds ASC, c.comment_created_at_utc ASC"
 
@@ -339,11 +343,17 @@ def fetch_vod_comments_filtered(
     sort: str = "offset",
     limit: int = 50,
     offset: int = 0,
+    seed: int | None = None,
 ) -> list[dict]:
-    """VOD 内のコメントをフィルタ・ソート・ページネーションして取得する。"""
+    """VOD 内のコメントをフィルタ・ソート・ページネーションして取得する。
+
+    sort=random のときは seed を渡すと ``RAND(:seed)`` でページ間の順序を固定する。
+    """
     where_sql, params = _build_vod_comment_where(vod_id, q, exclude_terms or [])
-    order_sql = _build_vod_comment_order(sort)
+    order_sql = _build_vod_comment_order(sort, seed)
     params.update({"limit": limit, "offset": offset, "body_html_version": BODY_HTML_RENDER_VERSION})
+    if sort == "random" and seed is not None:
+        params["seed"] = seed
     rows = (
         db.execute(
             text(f"""

@@ -509,6 +509,45 @@ class TestQuizStartApi:
         assert data["total"] == 20
 
 
+class TestVodCommentsPage:
+    def test_random_sort_without_seed_redirects_with_seed(self, client, db):
+        """VOD コメントページのランダムソートは、シードなしだと seed 付き URL へ 303 する。
+
+        シードを固定しないとページ送り毎に RAND() が再シャッフルされ、コメントが重複・欠落する。
+        """
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        resp = client.get("/vods/100?sort=random", follow_redirects=False)
+        assert resp.status_code == 303
+        location = resp.headers["location"]
+        assert "sort=random" in location
+        assert "seed=" in location
+
+    def test_random_sort_with_seed_does_not_redirect(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        resp = client.get("/vods/100?sort=random&seed=12345", follow_redirects=False)
+        assert resp.status_code == 200
+
+    def test_random_sort_seed_is_carried_in_pagination_links(self, client, db):
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(15):
+            seed_comment(
+                db,
+                comment_id=f"c{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot="viewer",
+                offset_seconds=i * 10,
+            )
+        resp = client.get("/vods/100?sort=random&seed=999&page_size=10&page=1")
+        assert resp.status_code == 200
+        # 2ページ目以降のリンクが同じシードを引き継いでいること
+        assert "seed=999" in resp.text
+
+
 class TestVoting:
     def test_like_increments_count(self, client, db):
         seed_user(db, user_id=1, login="streamer", platform="twitch")

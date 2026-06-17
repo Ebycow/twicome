@@ -240,3 +240,31 @@ class TestGetCursorPosition:
         cursor_row = comment_repo.find_comment_by_id(db, "c3")
         pos = comment_repo.get_cursor_position(db, vod_id=100, sort="likes", cursor_row=cursor_row)
         assert pos == 2
+
+
+class TestFetchVodCommentsFilteredRandom:
+    def test_seeded_random_pagination_has_no_overlap_or_gaps(self, db):
+        """シード固定のランダムソートでは、VOD コメントのページ間で重複・欠落が起きないこと。
+
+        シードなしの RAND() では各ページが再シャッフルされ重複・欠落が起きていた回帰を防ぐ。
+        """
+        for i in range(20):
+            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, offset_seconds=i * 10)
+
+        page1 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="random", limit=10, offset=0, seed=42)
+        page2 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="random", limit=10, offset=10, seed=42)
+        ids1 = {r["comment_id"] for r in page1}
+        ids2 = {r["comment_id"] for r in page2}
+        assert len(ids1) == 10
+        assert len(ids2) == 10
+        assert ids1.isdisjoint(ids2)  # ページ間で重複なし
+        assert ids1 | ids2 == {f"c{i}" for i in range(20)}  # 全件をユニークに網羅
+
+    def test_same_seed_yields_same_order(self, db):
+        for i in range(10):
+            seed_comment(db, comment_id=f"c{i}", vod_id=100, commenter_user_id=2, offset_seconds=i * 10)
+        page_a = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="random", limit=10, offset=0, seed=7)
+        page_b = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="random", limit=10, offset=0, seed=7)
+        order1 = [r["comment_id"] for r in page_a]
+        order2 = [r["comment_id"] for r in page_b]
+        assert order1 == order2

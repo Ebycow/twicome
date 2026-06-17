@@ -45,6 +45,7 @@ def fetch_vod_comment_page(
     sort: str = "offset",
     page: int = 1,
     page_size: int = 50,
+    seed: int | None = None,
 ) -> VodCommentPage:
     """VOD のコメント一覧ページデータを返す。
 
@@ -70,6 +71,7 @@ def fetch_vod_comment_page(
         sort=sort,
         limit=page_size,
         offset=offset,
+        seed=seed,
     )
 
     now = datetime.now(UTC)
@@ -86,5 +88,6 @@ def fetch_vod_comment_page(
             "exclude_q": exclude_q,
             "sort": sort,
             "page_size": page_size,
+            "seed": seed,
         },
     )
