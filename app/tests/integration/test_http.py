@@ -547,6 +547,32 @@ class TestVodCommentsPage:
         # 2ページ目以降のリンクが同じシードを引き継いでいること
         assert "seed=999" in resp.text
 
+    def test_pagination_links_url_encode_special_chars_in_query(self, client, db):
+        """検索語に & # 空白等が含まれてもページネーションリンクが壊れないこと。
+
+        生のまま連結すると ?q=A&B&page=2 のように & が区切り文字に化けて、
+        次ページで検索条件が欠落・破損する。urlencode 済みの ?q=A%26B でなければならない。
+        """
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        for i in range(15):
+            seed_comment(
+                db,
+                comment_id=f"c{i}",
+                vod_id=100,
+                commenter_user_id=2,
+                commenter_login_snapshot="viewer",
+                body=f"A&B test {i}",
+                offset_seconds=i * 10,
+            )
+        resp = client.get("/vods/100", params={"q": "A&B", "page_size": 10, "page": 1})
+        assert resp.status_code == 200
+        # ページネーションリンク内で & が %26 にエンコードされていること
+        assert "q=A%26B" in resp.text
+        # 区切り文字に化ける生の "?q=A&B" がリンクに出ていないこと
+        assert "?q=A&B&" not in resp.text
+
 
 class TestVoting:
     def test_like_increments_count(self, client, db):

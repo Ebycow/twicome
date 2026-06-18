@@ -94,14 +94,24 @@
     </div>
   </form>
 
+  {#- ページネーションリンク用クエリ。filters.q 等の検索語に & # 半角スペース等が
+      含まれてもページ送りで壊れないよう、urlencode 済みのクエリ文字列を1度だけ構築して再利用する。 -#}
+  {%- set page_query_params = [] -%}
+  {%- if filters.q -%}{{- page_query_params.append(('q', filters.q)) or '' -}}{%- endif -%}
+  {%- if filters.exclude_q -%}{{- page_query_params.append(('exclude_q', filters.exclude_q)) or '' -}}{%- endif -%}
+  {{- page_query_params.append(('sort', filters.sort or 'offset')) or '' -}}
+  {%- if filters.seed is not none -%}{{- page_query_params.append(('seed', filters.seed)) or '' -}}{%- endif -%}
+  {{- page_query_params.append(('page_size', filters.page_size)) or '' -}}
+  {%- set page_query = page_query_params | urlencode -%}
+
   {% if pages > 1 %}
   <div class="pagination">
     {% if page > 1 %}
-      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&{%- if filters.seed is not none -%}seed={{ filters.seed }}&{%- endif -%}page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
+      <a href="?{{ page_query }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&{%- if filters.seed is not none -%}seed={{ filters.seed }}&{%- endif -%}page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="?{{ page_query }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}
@@ -169,11 +179,11 @@
   {% if pages > 1 %}
   <div class="pagination" style="margin-top:16px;">
     {% if page > 1 %}
-      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&{%- if filters.seed is not none -%}seed={{ filters.seed }}&{%- endif -%}page_size={{ filters.page_size }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
+      <a href="?{{ page_query }}&page={{ page - 1 }}" class="page-btn"><i class="fa-solid fa-arrow-left"></i> 前</a>
     {% endif %}
     <span class="page-info">{{ page }} / {{ pages }} ページ（{{ total }} 件）</span>
     {% if page < pages %}
-      <a href="?{%- if filters.q -%}q={{ filters.q }}&{%- endif -%}{%- if filters.exclude_q -%}exclude_q={{ filters.exclude_q }}&{%- endif -%}sort={{ filters.sort or 'offset' }}&{%- if filters.seed is not none -%}seed={{ filters.seed }}&{%- endif -%}page_size={{ filters.page_size }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="?{{ page_query }}&page={{ page + 1 }}" class="page-btn">次 <i class="fa-solid fa-arrow-right"></i></a>
     {% endif %}
   </div>
   {% endif %}
