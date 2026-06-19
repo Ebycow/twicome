@@ -293,11 +293,17 @@ def decorate_comment(row, now):
     created_at = _normalize_utc_datetime(r.get("comment_created_at_utc"))
     now_utc = _normalize_utc_datetime(now) or pytz.UTC.localize(datetime.utcnow())
     comment_created_at_jst = None
+    # クライアント側で相対時刻を計算するための絶対時刻（UTC ISO 8601）。
+    # relative_time/is_recent をサーバで焼き込むと、HTML キャッシュ（TTL 数時間）に固定化され
+    # 「○分前」が陳腐化する。絶対時刻はキャッシュされても正しいままなので、こちらを描画して
+    # JS が閲覧時に相対時刻へ変換する。relative_time/is_recent はノーJS環境向けのフォールバック。
+    comment_created_at_iso = None
     relative_time = None
     is_recent = False
     if created_at:
         jst_dt = utc_to_jst(created_at)
         comment_created_at_jst = jst_dt.strftime("%Y-%m-%d %H:%M:%S")
+        comment_created_at_iso = created_at.isoformat()
         delta = now_utc - created_at
         if delta.days == 0:
             hours = delta.seconds // 3600
@@ -317,6 +323,7 @@ def decorate_comment(row, now):
             "vod_jump_link": f"https://www.twitch.tv/videos/{r.get('vod_id')}?t={seconds_to_twitch_t(offset_sec)}",
             "youtube_jump_link": build_youtube_link(r.get("youtube_url"), offset_sec),
             "comment_created_at_jst": comment_created_at_jst,
+            "comment_created_at_iso": comment_created_at_iso,
             "relative_time": relative_time,
             "is_recent": is_recent,
         }

@@ -371,3 +371,19 @@ class TestDecorateComment:
         now = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
         result = decorate_comment(row, now)
         assert result["relative_time"] is not None
+
+    def test_created_at_iso_is_cache_stable_utc(self):
+        """相対時刻のクライアント計算用に、now に依存しない UTC ISO 絶対時刻を出力する。
+
+        relative_time/is_recent は now 依存でキャッシュすると陳腐化するが、
+        comment_created_at_iso は now を変えても不変であることを保証する。
+        """
+        row = self._base_row(comment_created_at_utc=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC))
+        iso_a = decorate_comment(row, datetime(2024, 6, 1, 10, 5, 0, tzinfo=UTC))["comment_created_at_iso"]
+        iso_b = decorate_comment(row, datetime(2024, 6, 5, 10, 0, 0, tzinfo=UTC))["comment_created_at_iso"]
+        assert iso_a == iso_b == "2024-06-01T10:00:00+00:00"
+
+    def test_created_at_iso_none_when_no_timestamp(self):
+        row = self._base_row(comment_created_at_utc=None)
+        result = decorate_comment(row, datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC))
+        assert result["comment_created_at_iso"] is None

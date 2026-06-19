@@ -3,6 +3,8 @@ HTTP 統合テスト（FastAPI TestClient 経由）。
 エンドポイントの振る舞いをエンドツーエンドで確認する。
 """
 
+from datetime import UTC, datetime
+
 from tests.integration.helpers import seed_comment, seed_user, seed_vod
 
 
@@ -160,6 +162,24 @@ class TestUserCommentsPage:
         )
         resp = client.get("/u/viewer")
         assert "ユニークなコメント内容12345" in resp.text
+
+    def test_comment_emits_absolute_timestamp_for_client_relative_time(self, client, db):
+        """相対時刻はキャッシュ陳腐化を避けるため、絶対時刻 data-created-utc を出力して
+        クライアント側で計算する。サーバ描画HTMLに絶対時刻属性が含まれること。"""
+        seed_user(db, user_id=1, login="streamer", platform="twitch")
+        seed_user(db, user_id=2, login="viewer", platform="twitch")
+        seed_vod(db, vod_id=100, owner_user_id=1)
+        seed_comment(
+            db,
+            comment_id="c1",
+            vod_id=100,
+            commenter_user_id=2,
+            commenter_login_snapshot="viewer",
+            created_at=datetime(2024, 6, 1, 10, 0, 0, tzinfo=UTC),
+        )
+        resp = client.get("/u/viewer")
+        assert 'class="meta relative-time' in resp.text
+        assert 'data-created-utc="2024-06-01T10:00:00+00:00"' in resp.text
 
     def test_initial_comments_page_can_return_cached_html(self, client, monkeypatch):
         import routers.comments as comments_router

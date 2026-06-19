@@ -319,8 +319,11 @@
                 {% if c.comment_created_at_jst %}
                   <span class="meta">· {{ c.comment_created_at_jst }} JST</span>
                 {% endif %}
-                {% if c.relative_time %}
-                  <span class="meta {% if c.is_recent %}recent{% endif %}">· {{ c.relative_time }}</span>
+                {% if c.comment_created_at_iso %}
+                  {#- 相対時刻はキャッシュ陳腐化を避けるためクライアント側で計算する。
+                      data-created-utc が JS の計算元、表示文字列はノーJS環境向けフォールバック。 -#}
+                  <span class="meta relative-time {% if c.is_recent %}recent{% endif %}"
+                        data-created-utc="{{ c.comment_created_at_iso }}">· {{ c.relative_time }}</span>
                 {% endif %}
                 {% if c.bits_spent %}
                   <span class="pill">bits {{ c.bits_spent }}</span>

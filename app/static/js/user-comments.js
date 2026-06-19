@@ -72,6 +72,60 @@
       .replace(/'/g, '&#039;');
   }
 
+  // ── 相対時刻（クライアント側計算）──────────────────────────────────────────
+  // サーバが relative_time を焼き込むと初期ページの HTML キャッシュ（TTL 数時間）で
+  // 「○分前」が固定化されるため、絶対時刻(data-created-utc)から閲覧時に計算する。
+  // 表示ロジックは comment_utils.decorate_comment と一致させる。
+
+  /**
+   * UTC ISO 文字列から「○分前 / ○時間○分前 / ○日前」を返す。パース不能なら null。
+   * @param iso - UTC ISO 8601 文字列
+   * @returns 相対時刻の表示文字列、または null
+   */
+  function formatRelativeTime(iso) {
+    if (!iso) {return null;}
+    const created = new Date(iso);
+    if (Number.isNaN(created.getTime())) {return null;}
+    let totalSec = Math.floor((Date.now() - created.getTime()) / 1000);
+    if (totalSec < 0) {totalSec = 0;}  // 未来日時（時計ずれ）は「0分前」に丸める
+    const days = Math.floor(totalSec / 86400);
+    if (days === 0) {
+      const rem = totalSec % 86400;
+      const hours = Math.floor(rem / 3600);
+      const minutes = Math.floor((rem % 3600) / 60);
+      return hours > 0 ? `${hours}時間${minutes}分前` : `${minutes}分前`;
+    }
+    return `${days}日前`;
+  }
+
+  /**
+   * コメントが直近24時間以内か（NEWバッジ用）。
+   * @param iso - UTC ISO 8601 文字列
+   * @returns 24時間以内なら true
+   */
+  function isRecentTime(iso) {
+    if (!iso) {return false;}
+    const created = new Date(iso);
+    if (Number.isNaN(created.getTime())) {return false;}
+    return (Date.now() - created.getTime()) < 24 * 3600 * 1000;
+  }
+
+  /**
+   * root 配下の .relative-time[data-created-utc] を閲覧時刻基準の相対時刻で上書きする。
+   * 初期ページ（キャッシュ済みHTML）と無限スクロールで追加された要素の両方に適用する。
+   * @param root - 走査の起点要素（省略時は document）
+   */
+  function hydrateRelativeTimes(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.relative-time[data-created-utc]').forEach(function (el) {
+      const iso = el.getAttribute('data-created-utc');
+      const rel = formatRelativeTime(iso);
+      if (rel == null) {return;}
+      el.textContent = `· ${rel}`;
+      el.classList.toggle('recent', isRecentTime(iso));
+    });
+  }
+
   /**
    * body_html を安全な DOM ノードとして el に追加する。
    * 許可: テキストノード・<img class="emote" src="https://static-cdn.jtvnw.net/...">
@@ -190,13 +244,14 @@
       }<span class="meta">· ${  escapeHtml(comment.commenter_login_snapshot)  }${comment.commenter_display_name_snapshot ? `（${  escapeHtml(comment.commenter_display_name_snapshot)  }）` : ''  }の書き込み</span>` +
       `<span class="meta">· ${  escapeHtml(comment.offset_hms)  }</span>${
       comment.comment_created_at_jst ? `<span class="meta">· ${  escapeHtml(comment.comment_created_at_jst)  } JST</span>` : ''
-      }${options.showRelativeTime && comment.relative_time ? `<span class="meta ${  comment.is_recent ? 'recent' : ''  }">· ${  escapeHtml(comment.relative_time)  }</span>` : ''
+      }${options.showRelativeTime && comment.comment_created_at_iso ? `<span class="meta relative-time" data-created-utc="${  escapeHtml(comment.comment_created_at_iso)  }">· ${  escapeHtml(comment.relative_time)  }</span>` : ''
       }${options.showBits && comment.bits_spent ? `<span class="pill">bits ${  escapeHtml(comment.bits_spent)  }</span>` : ''
       }</div>` +
       `</div>` +
       `<div class="body"></div>${
       renderCommunityNote(comment)}`;
     appendSafeBodyHtml(commentDiv.querySelector('.body'), comment.body_html, comment.body);
+    hydrateRelativeTimes(commentDiv);  // 相対時刻を閲覧時刻基準で計算
     link.appendChild(commentDiv);
     return { link, commentDiv };
   }
@@ -399,6 +454,8 @@
   }
 
   updatePrevButton();
+  // 初期ページ（キャッシュ済みHTML）のサーバ描画コメントの相対時刻を閲覧時刻基準で再計算する。
+  hydrateRelativeTimes();
   if (document.readyState === 'complete') {
     scheduleDeferredVoteHydration();
   } else {
