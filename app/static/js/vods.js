@@ -22,6 +22,9 @@
   let currentSort = 'created_at';
   let currentStreamer = new URLSearchParams(window.location.search).get('owner_login') || '';
   let searchTimer = null;
+  // 多重実行ガードと、フィルタ変更で古いレスポンスを破棄するための世代トークン
+  let isLoading = false;
+  let requestSeq = 0;
 
   // URL パラメータで配信者が指定されていれば select を初期化
   if (currentStreamer && streamerFilter) {
@@ -163,15 +166,24 @@
    * @param reset - trueの場合は現在のグリッドをクリアして1ページ目から読み込む
    */
   function loadVods(reset) {
+    // reset（検索・フィルタ・並び順の変更）は常に最新条件を反映させるため通す。
+    // 追記ロード（reset=false）だけは多重実行を防ぐ。
+    if (!reset && isLoading) { return; }
+
+    const pageToLoad = reset ? 1 : currentPage + 1;
+    // 世代トークンを進め、これ以降に解決した古いリクエストの結果は破棄する
+    const seq = ++requestSeq;
+    isLoading = true;
+    if (vodsLoadMore) { vodsLoadMore.disabled = true; }
+
     if (reset) {
-      currentPage = 1;
       vodsGrid.innerHTML = '';
     }
 
     showStatus('読み込み中...');
 
     const params = new URLSearchParams({
-      page: currentPage,
+      page: pageToLoad,
       page_size: PAGE_SIZE,
       sort: currentSort,
     });
@@ -181,27 +193,35 @@
     fetch(`${rootPath}/api/vods?${params.toString()}`)
       .then(function (res) { return res.json(); })
       .then(function (data) {
+        // フィルタ変更などで世代が進んでいたら、このレスポンスは古いので破棄する
+        if (seq !== requestSeq) { return; }
         const items = data.items || [];
         currentTotal = data.total || 0;
         currentPages = data.pages || 0;
+        // ページ番号は成功時にのみ進める（失敗時にページが飛ぶのを防ぐ）
+        currentPage = pageToLoad;
 
         appendCards(items);
         hideStatus();
 
         vodsCount.textContent = `${currentTotal.toLocaleString('ja-JP')} 件`;
 
-        if (currentPage < currentPages) {
-          vodsPagination.hidden = false;
-        } else {
-          vodsPagination.hidden = true;
-        }
+        vodsPagination.hidden = currentPage >= currentPages;
 
         if (items.length === 0 && currentPage === 1) {
           showStatus('VOD が見つかりませんでした。');
         }
       })
       .catch(function () {
+        if (seq !== requestSeq) { return; }
         showStatus('読み込みに失敗しました。ページを再読み込みしてください。');
+      })
+      .finally(function () {
+        // 最新世代のリクエストだけがロード状態とボタンの活性を制御する
+        if (seq === requestSeq) {
+          isLoading = false;
+          if (vodsLoadMore) { vodsLoadMore.disabled = false; }
+        }
       });
   }
 
@@ -249,7 +269,6 @@
 
   if (vodsLoadMore) {
     vodsLoadMore.addEventListener('click', function () {
-      currentPage += 1;
       loadVods(false);
     });
   }
