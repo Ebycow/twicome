@@ -586,13 +586,29 @@
   }
 
   /**
+   * サーバ由来のUTC日時文字列をタイムゾーン付きISO文字列に正規化する。
+   * サーバは last_comment_at をTZ指定なし（"...T17:32:50" や "... 17:32:50"）で返すが値はUTC。
+   * JSの new Date() はオフセットなしの日時形式をローカル時刻として解釈するため、
+   * 明示的に 'Z' を付けてUTCとして扱わせる（付けないとJSTで9時間ずれる）。
+   * @param isoStr - サーバから受け取った日時文字列
+   * @returns 'Z' 付きに正規化したISO文字列。入力が空ならnull
+   */
+  function normalizeUtcIso(isoStr) {
+    if (!isoStr) {return null;}
+    let s = String(isoStr).replace(' ', 'T');
+    if (s.indexOf('T') !== -1 && s.indexOf('+') === -1 && s.slice(-1) !== 'Z') {s += 'Z';}
+    return s;
+  }
+
+  /**
    * ISO日時文字列から現在時刻までの差分を日本語の相対時間文字列に変換する。
    * @param isoStr - ISO形式の日時文字列
    * @returns 表示用の相対時間文字列。日時がない場合はnull
    */
   function formatRelativeTime(isoStr) {
-    if (!isoStr) {return null;}
-    const diff = Date.now() - new Date(isoStr).getTime();
+    const normalized = normalizeUtcIso(isoStr);
+    if (!normalized) {return null;}
+    const diff = Date.now() - new Date(normalized).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 60) {return `${Math.max(1, mins)  }分前`;}
     const hours = Math.floor(mins / 60);
@@ -667,7 +683,7 @@
         if (!a.lastCommentAt && !b.lastCommentAt) {return 0;}
         if (!a.lastCommentAt) {return 1;}
         if (!b.lastCommentAt) {return -1;}
-        return new Date(b.lastCommentAt) - new Date(a.lastCommentAt);
+        return new Date(normalizeUtcIso(b.lastCommentAt)) - new Date(normalizeUtcIso(a.lastCommentAt));
       });
     }
     return sorted;
