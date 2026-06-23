@@ -44,15 +44,32 @@
   }
 
   /**
+   * サーバ由来のUTC日時文字列をタイムゾーン付きISO文字列に正規化する。
+   * /api/users/index は last_comment_at をTZ指定なし（"2026-06-22 17:32:50"）で返すが値はUTC。
+   * JSの new Date() はオフセットなしの日時形式をローカル時刻として解釈するため、
+   * 明示的に 'Z' を付けてUTCとして扱わせる（付けないとJSTで9時間ずれ、日付が1日ずれる）。
+   * @param isoStr - サーバから受け取った日時文字列
+   * @returns 'Z' 付きに正規化したISO文字列。入力が空ならnull
+   */
+  function normalizeUtcIso(isoStr) {
+    if (!isoStr) { return null; }
+    let s = String(isoStr).replace(' ', 'T');
+    if (s.indexOf('T') !== -1 && s.indexOf('+') === -1 && s.slice(-1) !== 'Z') { s += 'Z'; }
+    return s;
+  }
+
+  /**
    * ISO日時文字列を日本語の短い日付文字列に変換する。
    * @param iso - ISO形式の日時文字列
    * @returns フォーマットされた日付文字列。変換に失敗した場合はnull
    */
   function formatDate(iso) {
-    if (!iso) { return null; }
+    const normalized = normalizeUtcIso(iso);
+    if (!normalized) { return null; }
     try {
-      const d = new Date(iso);
-      return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' });
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) { return null; }
+      return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Tokyo' });
     } catch (e) {
       return null;
     }
@@ -190,8 +207,8 @@
       copy.sort(function (a, b) { return (a.comment_count || 0) - (b.comment_count || 0); });
     } else if (sort === 'recent') {
       copy.sort(function (a, b) {
-        const ta = a.last_comment_at ? new Date(a.last_comment_at).getTime() : 0;
-        const tb = b.last_comment_at ? new Date(b.last_comment_at).getTime() : 0;
+        const ta = a.last_comment_at ? new Date(normalizeUtcIso(a.last_comment_at)).getTime() : 0;
+        const tb = b.last_comment_at ? new Date(normalizeUtcIso(b.last_comment_at)).getTime() : 0;
         return tb - ta;
       });
     } else {
