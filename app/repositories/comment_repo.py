@@ -78,31 +78,36 @@ def _build_user_comment_order(sort: str, seed: int | None = None) -> str:
     コミュニティノート・危険度・ランダムを含む全ソート種別に対応する。
     sort="random" かつ seed 指定時は ``RAND(:seed)`` を使い、ページネーション間で順序を固定する
     （シードなしの ``RAND()`` はクエリ毎に再シャッフルされ、OFFSET ページ送りで重複・欠落が起きる）。
+
+    末尾に一意キー ``c.comment_id`` を付与して全順序を保証する。これがないと like 数や
+    offset_seconds が同値の行（同一VOD・同一秒の投稿）の順序が不定になり、OFFSET ページ送りで
+    重複・欠落が起きる（random ソートと同じバグクラス）。
     """
     if sort == "created_at":
-        return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
+        return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
     if sort == "likes":
-        return "ORDER BY c.twicome_likes_count DESC, c.vod_id DESC, c.offset_seconds DESC"
+        return "ORDER BY c.twicome_likes_count DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
     if sort == "dislikes":
-        return "ORDER BY c.twicome_dislikes_count DESC, c.vod_id DESC, c.offset_seconds DESC"
+        return "ORDER BY c.twicome_dislikes_count DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
     if sort == "community_note":
-        return "ORDER BY cn.created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
+        return "ORDER BY cn.created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
     if sort == "danger":
         return (
             "ORDER BY COALESCE((cn.harm_risk + cn.exaggeration + cn.evidence_gap + cn.subjectivity), 0) DESC,"
-            " c.vod_id DESC, c.offset_seconds DESC"
+            " c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
         )
     if sort == "random":
         return "ORDER BY RAND(:seed)" if seed is not None else "ORDER BY RAND()"
-    return "ORDER BY c.vod_id DESC, c.offset_seconds DESC"
+    return "ORDER BY c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
 
 
 def _build_vod_order() -> str:
     """ORDER BY 句の SQL 文字列を返す（VOD 内コメント一覧用）。
 
     VOD 内コメントは再生順（投稿日時降順）のみで整列する。
+    末尾の ``c.comment_id`` は同一秒投稿でも順序を一意にするタイブレーカー。
     """
-    return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC"
+    return "ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC"
 
 
 def count_comments(
@@ -211,13 +216,13 @@ def fetch_comments(
                            twicome_likes_count, twicome_dislikes_count
                     FROM comments c0
                     WHERE commenter_user_id = :uid
-                    ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC
+                    ORDER BY comment_created_at_utc DESC, vod_id DESC, offset_seconds DESC, comment_id DESC
                     LIMIT :limit OFFSET :offset
                 ) c
                 JOIN vods v ON v.vod_id = c.vod_id
                 JOIN users u ON u.user_id = v.owner_user_id
                 LEFT JOIN community_notes cn ON cn.comment_id = c.comment_id
-                ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC
+                ORDER BY c.comment_created_at_utc DESC, c.vod_id DESC, c.offset_seconds DESC, c.comment_id DESC
             """),
                 params,
             )
@@ -301,17 +306,21 @@ def _build_vod_comment_order(sort: str, seed: int | None = None) -> str:
 
     sort="random" かつ seed 指定時は ``RAND(:seed)`` を使い、ページネーション間で順序を固定する
     （シードなしの ``RAND()`` はページ送り毎に再シャッフルされ、OFFSET ページ送りで重複・欠落が起きる）。
+
+    random 以外は末尾に一意キー ``c.comment_id`` を付与して全順序を保証する。VOD 内チャットは
+    like 数 0・同一 offset_seconds（同じ秒に複数ユーザーが投稿）の行が大量にあり、これがないと
+    同値行の順序が不定になって OFFSET ページ送りで重複・欠落が起きる。
     """
     if sort == "offset_desc":
-        return "ORDER BY c.offset_seconds DESC, c.comment_created_at_utc DESC"
+        return "ORDER BY c.offset_seconds DESC, c.comment_created_at_utc DESC, c.comment_id ASC"
     if sort == "likes":
-        return "ORDER BY c.twicome_likes_count DESC, c.offset_seconds ASC"
+        return "ORDER BY c.twicome_likes_count DESC, c.offset_seconds ASC, c.comment_id ASC"
     if sort == "dislikes":
-        return "ORDER BY c.twicome_dislikes_count DESC, c.offset_seconds ASC"
+        return "ORDER BY c.twicome_dislikes_count DESC, c.offset_seconds ASC, c.comment_id ASC"
     if sort == "random":
         return "ORDER BY RAND(:seed)" if seed is not None else "ORDER BY RAND()"
     # default: offset ascending (VOD 再生順)
-    return "ORDER BY c.offset_seconds ASC, c.comment_created_at_utc ASC"
+    return "ORDER BY c.offset_seconds ASC, c.comment_created_at_utc ASC, c.comment_id ASC"
 
 
 def count_vod_comments_filtered(

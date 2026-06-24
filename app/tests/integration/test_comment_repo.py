@@ -268,3 +268,39 @@ class TestFetchVodCommentsFilteredRandom:
         order1 = [r["comment_id"] for r in page_a]
         order2 = [r["comment_id"] for r in page_b]
         assert order1 == order2
+
+
+class TestFetchVodCommentsFilteredTiebreak:
+    """like 数・offset_seconds が同値の行でも OFFSET ページ送りで重複・欠落が起きないこと。
+
+    一意キー c.comment_id を最終タイブレーカーに追加する前は、同値行の順序が不定になり
+    ページ間で重複・欠落が発生していた回帰を防ぐ（random ソートと同じバグクラス）。
+    """
+
+    def test_likes_pagination_all_tied_no_overlap_or_gaps(self, db):
+        # 全件 like=0・offset=100 で同値 → comment_id だけが順序を一意に決める
+        for i in range(20):
+            seed_comment(db, comment_id=f"c{i:02d}", vod_id=100, commenter_user_id=2, offset_seconds=100, likes=0)
+
+        page1 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="likes", limit=10, offset=0)
+        page2 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="likes", limit=10, offset=10)
+        ids1 = [r["comment_id"] for r in page1]
+        ids2 = [r["comment_id"] for r in page2]
+        assert len(set(ids1)) == 10
+        assert len(set(ids2)) == 10
+        assert set(ids1).isdisjoint(set(ids2))  # ページ間で重複なし
+        assert set(ids1) | set(ids2) == {f"c{i:02d}" for i in range(20)}  # 全件をユニークに網羅
+        # 全タイ時は comment_id ASC が安定順
+        assert ids1 + ids2 == [f"c{i:02d}" for i in range(20)]
+
+    def test_offset_pagination_all_tied_no_overlap_or_gaps(self, db):
+        # 同一秒に多数投稿（offset=50 で同値）→ comment_id が順序を一意化
+        for i in range(20):
+            seed_comment(db, comment_id=f"c{i:02d}", vod_id=100, commenter_user_id=2, offset_seconds=50)
+
+        page1 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="offset", limit=10, offset=0)
+        page2 = comment_repo.fetch_vod_comments_filtered(db, vod_id=100, sort="offset", limit=10, offset=10)
+        ids1 = [r["comment_id"] for r in page1]
+        ids2 = [r["comment_id"] for r in page2]
+        assert set(ids1).isdisjoint(set(ids2))
+        assert set(ids1) | set(ids2) == {f"c{i:02d}" for i in range(20)}
