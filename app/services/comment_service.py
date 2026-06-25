@@ -105,7 +105,7 @@ def fetch_user_comment_page(
             cursor_body = cursor_row.get("body", "")
             page_title = f"{cursor_body[:20]}{'...' if len(cursor_body) > 20 else ''} の個別ページ"
             total = comment_repo.count_comments_in_vod(db, cursor_vod_id)
-            cursor_pos = comment_repo.get_cursor_position(db, cursor_vod_id, sort, cursor_row)
+            cursor_pos = comment_repo.get_cursor_position(db, cursor_vod_id, cursor_row)
             half = page_size // 2
             offset = max(0, cursor_pos - half)
             page = (offset // page_size) + 1

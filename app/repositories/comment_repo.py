@@ -388,7 +388,7 @@ def find_comment_by_id(db, comment_id: str) -> dict | None:
     row = (
         db.execute(
             text("""
-            SELECT vod_id, body, comment_created_at_utc,
+            SELECT comment_id, vod_id, body, comment_created_at_utc,
                    offset_seconds, twicome_likes_count, twicome_dislikes_count
             FROM comments
             WHERE comment_id = :comment_id
@@ -439,67 +439,41 @@ def fetch_comment_vote_counts(db, comment_ids: list[str]) -> dict[str, dict]:
     }
 
 
-def get_cursor_position(db, vod_id: int, sort: str, cursor_row: dict) -> int:
-    """指定ソート順でカーソルコメントより前にある行数を返す。
+def get_cursor_position(db, vod_id: int, cursor_row: dict) -> int:
+    """VOD 再生順でカーソルコメントより前にある行数を返す。
 
-    offset = max(0, cursor_pos - page_size // 2) の計算に使う。
+    offset = max(0, cursor_pos - page_size // 2) の中央寄せ計算に使う。
+
+    個別ページ（fetch_comments_in_vod）は _build_vod_order = 再生順
+    （created_at DESC, offset_seconds DESC, comment_id DESC）で固定取得するため、
+    位置も同じ順序で数える。ユーザー一覧の sort（likes 等）で数えると取得順と食い違い、
+    カーソルコメントがページ中央に来ない。並びは comment_id まで含めて _build_vod_order と一致させる。
     """
     c_created_at = cursor_row.get("comment_created_at_utc")
     c_offset = cursor_row.get("offset_seconds", 0)
-    c_likes = cursor_row.get("twicome_likes_count") or 0
-    c_dislikes = cursor_row.get("twicome_dislikes_count") or 0
+    c_comment_id = cursor_row.get("comment_id", "")
 
-    if sort == "created_at":
-        row = (
-            db.execute(
-                text("""
-                SELECT COUNT(*) AS pos FROM comments c
-                WHERE c.vod_id = :vod_id AND (
-                    c.comment_created_at_utc > :c_created_at
-                    OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds > :c_offset)
-                )
-            """),
-                {"vod_id": vod_id, "c_created_at": c_created_at, "c_offset": c_offset},
+    row = (
+        db.execute(
+            text("""
+            SELECT COUNT(*) AS pos FROM comments c
+            WHERE c.vod_id = :vod_id AND (
+                c.comment_created_at_utc > :c_created_at
+                OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds > :c_offset)
+                OR (c.comment_created_at_utc = :c_created_at AND c.offset_seconds = :c_offset
+                    AND c.comment_id > :c_comment_id)
             )
-            .mappings()
-            .first()
+        """),
+            {
+                "vod_id": vod_id,
+                "c_created_at": c_created_at,
+                "c_offset": c_offset,
+                "c_comment_id": c_comment_id,
+            },
         )
-    elif sort == "likes":
-        row = (
-            db.execute(
-                text("""
-                SELECT COUNT(*) AS pos FROM comments c
-                WHERE c.vod_id = :vod_id AND c.twicome_likes_count > :c_likes
-            """),
-                {"vod_id": vod_id, "c_likes": c_likes},
-            )
-            .mappings()
-            .first()
-        )
-    elif sort == "dislikes":
-        row = (
-            db.execute(
-                text("""
-                SELECT COUNT(*) AS pos FROM comments c
-                WHERE c.vod_id = :vod_id AND c.twicome_dislikes_count > :c_dislikes
-            """),
-                {"vod_id": vod_id, "c_dislikes": c_dislikes},
-            )
-            .mappings()
-            .first()
-        )
-    else:
-        row = (
-            db.execute(
-                text("""
-                SELECT COUNT(*) AS pos FROM comments c
-                WHERE c.vod_id = :vod_id AND c.offset_seconds > :c_offset
-            """),
-                {"vod_id": vod_id, "c_offset": c_offset},
-            )
-            .mappings()
-            .first()
-        )
+        .mappings()
+        .first()
+    )
 
     return int(row["pos"]) if row else 0
 

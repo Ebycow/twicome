@@ -1,9 +1,16 @@
 """comment_repo の統合テスト。"""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from repositories import comment_repo
 from tests.integration.helpers import seed_comment, seed_user, seed_vod
+
+
+def _dt(hour: int) -> datetime:
+    """2024-06-01 の指定時刻（UTC）を返すテスト用ヘルパー。"""
+    return datetime(2024, 6, 1, hour, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
@@ -224,22 +231,34 @@ class TestFetchQuizOtherComments:
 
 class TestGetCursorPosition:
     def test_position_by_offset_seconds(self, db):
+        # created_at は同一。再生順は offset_seconds DESC → c3, c2, c1
         seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, offset_seconds=10)
         seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, offset_seconds=30)
         seed_comment(db, comment_id="c3", vod_id=100, commenter_user_id=2, offset_seconds=60)
         # c3 (offset=60) は先頭から0番目（DESCソートで最大値が先頭）
         cursor_row = comment_repo.find_comment_by_id(db, "c3")
-        pos = comment_repo.get_cursor_position(db, vod_id=100, sort="vod_time", cursor_row=cursor_row)
+        pos = comment_repo.get_cursor_position(db, vod_id=100, cursor_row=cursor_row)
         assert pos == 0
 
-    def test_position_by_likes(self, db):
-        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, likes=100)
-        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, likes=50)
-        seed_comment(db, comment_id="c3", vod_id=100, commenter_user_id=2, likes=1)
-        # c3(likes=1) の前には c1, c2 がいる
+    def test_position_by_created_at_playback_order(self, db):
+        # 再生順は created_at DESC → c1(新), c2, c3(古)
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, created_at=_dt(12))
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, created_at=_dt(11))
+        seed_comment(db, comment_id="c3", vod_id=100, commenter_user_id=2, created_at=_dt(10))
         cursor_row = comment_repo.find_comment_by_id(db, "c3")
-        pos = comment_repo.get_cursor_position(db, vod_id=100, sort="likes", cursor_row=cursor_row)
-        assert pos == 2
+        pos = comment_repo.get_cursor_position(db, vod_id=100, cursor_row=cursor_row)
+        assert pos == 2  # c3 の前に c1, c2
+
+    def test_position_ignores_list_sort_likes(self, db):
+        # like 数に関わらず位置は常に再生順（created_at）で数える。
+        # fetch_comments_in_vod が常に再生順で取得するため、likes 順で数えると
+        # カーソルが中央に来ない不整合を防ぐ回帰テスト。
+        # 再生順は c1(新), c2(古)。c1 は like が少ないが再生順では先頭。
+        seed_comment(db, comment_id="c1", vod_id=100, commenter_user_id=2, created_at=_dt(12), likes=1)
+        seed_comment(db, comment_id="c2", vod_id=100, commenter_user_id=2, created_at=_dt(11), likes=100)
+        cursor_row = comment_repo.find_comment_by_id(db, "c1")
+        pos = comment_repo.get_cursor_position(db, vod_id=100, cursor_row=cursor_row)
+        assert pos == 0  # like 順なら c2 が前に来るが、再生順では c1 が先頭
 
 
 class TestFetchVodCommentsFilteredRandom:
