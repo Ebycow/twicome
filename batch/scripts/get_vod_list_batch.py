@@ -16,6 +16,29 @@ load_dotenv(str(ENV_PATH))
 DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "default"
 
 
+def get_app_access_token(client_id, client_secret):
+    """client_credentials で Twitch アプリアクセストークンを毎回新規取得する。
+
+    バッチは静的な ACCESS_TOKEN に依存するとトークン失効時に 401 で落ち続けるため、
+    Get Streams / Get Videos（アプリトークンのみで動く）用に実行時取得する。
+    """
+    r = requests.post(
+        "https://id.twitch.tv/oauth2/token",
+        data={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials",
+        },
+        timeout=20,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"Get app access token failed: {r.status_code} {r.text}")
+    token = r.json().get("access_token")
+    if not token:
+        raise RuntimeError(f"Unexpected token response: {r.json()}")
+    return token
+
+
 def get_live_user_ids(user_ids, access_token, client_id):
     """まとめて「今配信中のuser_id集合」を返す😺🦐"""
     headers = {"Client-ID": client_id, "Authorization": f"Bearer {access_token}"}
@@ -75,11 +98,19 @@ def main():
     """VOD リスト取得バッチのエントリーポイント。"""
     access_token = os.getenv("ACCESS_TOKEN")
     client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("CLIENT_SECRET")
     target_users_csv = Path(os.getenv("TARGET_USERS_CSV", str(DEFAULT_DATA_DIR / "targetusers.csv")))
     vods_csv = Path(os.getenv("VODS_CSV", str(DEFAULT_DATA_DIR / "batch_twitch_vods_all.csv")))
 
-    if not access_token:
-        raise RuntimeError("ACCESS_TOKEN が .env に無い or 読めてないよ")
+    if not client_id:
+        raise RuntimeError("CLIENT_ID が .env に無い or 読めてないよ")
+
+    # CLIENT_SECRET があれば実行時にアプリトークンを新規取得し、失効問題を根絶する。
+    # 無い場合のみ従来の静的 ACCESS_TOKEN にフォールバック。
+    if client_secret:
+        access_token = get_app_access_token(client_id, client_secret)
+    elif not access_token:
+        raise RuntimeError("CLIENT_SECRET も ACCESS_TOKEN も .env に無い or 読めてないよ")
     if not target_users_csv.exists():
         raise FileNotFoundError(f"target users CSV not found: {target_users_csv}. Set TARGET_USERS_CSV to override.")
 
