@@ -44,28 +44,36 @@ def seed_vod(
     url="https://www.twitch.tv/videos/100",
     youtube_url=None,
     length_seconds=3600,
+    created_at: datetime | None = None,
 ) -> dict:
     from sqlalchemy import text
 
+    # created_at 未指定なら NOW(6)、指定時はその値（タイブレーカー検証で同値を作るため）。
+    created_at_sql = "NOW(6)" if created_at is None else ":created_at"
+    params = {
+        "vod_id": vod_id,
+        "owner_user_id": owner_user_id,
+        "title": title,
+        "url": url,
+        "youtube_url": youtube_url,
+        "length_seconds": length_seconds,
+    }
+    if created_at is not None:
+        params["created_at"] = created_at.replace(tzinfo=None) if created_at.tzinfo else created_at
+
     db.execute(
-        text("""
+        text(f"""
             INSERT INTO vods (vod_id, owner_user_id, title, url, youtube_url, length_seconds, created_at_utc)
-            VALUES (:vod_id, :owner_user_id, :title, :url, :youtube_url, :length_seconds, NOW(6))
+            VALUES (:vod_id, :owner_user_id, :title, :url, :youtube_url, :length_seconds, {created_at_sql})
             ON DUPLICATE KEY UPDATE
                 owner_user_id=VALUES(owner_user_id),
                 title=VALUES(title),
                 url=VALUES(url),
                 youtube_url=VALUES(youtube_url),
-                length_seconds=VALUES(length_seconds)
+                length_seconds=VALUES(length_seconds),
+                created_at_utc=VALUES(created_at_utc)
         """),
-        {
-            "vod_id": vod_id,
-            "owner_user_id": owner_user_id,
-            "title": title,
-            "url": url,
-            "youtube_url": youtube_url,
-            "length_seconds": length_seconds,
-        },
+        params,
     )
     db.commit()
     return {"vod_id": vod_id, "owner_user_id": owner_user_id, "title": title}

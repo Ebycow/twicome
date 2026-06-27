@@ -110,6 +110,12 @@ def _build_vod_where(*, q: str | None, owner_login: str | None) -> tuple[str, di
 
 
 def _build_vod_list_order(sort: str) -> str:
+    """VOD 一覧用 ORDER BY 句を返す。
+
+    末尾に一意キー ``v.vod_id`` を付与して全順序を保証する。これがないと created_at_utc
+    （秒精度）が同値の VOD（別配信者が同じ秒に開始した VOD 等）の順序が不定になり、
+    LIMIT/OFFSET の「さらに読み込む」ページ送りで重複・欠落が起きる。
+    """
     if sort == "comment_count":
-        return "ORDER BY COALESCE(cc.comment_count, 0) DESC, v.created_at_utc DESC"
-    return "ORDER BY v.created_at_utc DESC"
+        return "ORDER BY COALESCE(cc.comment_count, 0) DESC, v.created_at_utc DESC, v.vod_id DESC"
+    return "ORDER BY v.created_at_utc DESC, v.vod_id DESC"
