@@ -1,5 +1,59 @@
+from starlette.datastructures import Headers
+
 import services.rate_limit as rate_limit_module
-from services.rate_limit import InMemoryRateLimiter
+from services.rate_limit import InMemoryRateLimiter, resolve_client_ip
+
+
+def _headers(d):
+    """大文字小文字を区別しない Starlette Headers を生成する（本番の request.headers と同等）。"""
+    return Headers(d)
+
+
+def test_resolve_client_ip_prefers_trusted_header():
+    """信頼ヘッダ指定時はその値を採用する（接続元IPやXFFより優先）。"""
+    headers = _headers({"CF-Connecting-IP": "203.0.113.7", "X-Forwarded-For": "10.0.0.9"})
+    assert resolve_client_ip(headers, "172.19.0.1", "CF-Connecting-IP") == "203.0.113.7"
+
+
+def test_resolve_client_ip_header_lookup_is_case_insensitive():
+    headers = _headers({"cf-connecting-ip": "203.0.113.7"})
+    assert resolve_client_ip(headers, "172.19.0.1", "CF-Connecting-IP") == "203.0.113.7"
+
+
+def test_resolve_client_ip_ignores_spoofed_xff_leftmost():
+    """攻撃者が詰めた X-Forwarded-For 先頭は無視され、信頼ヘッダが採用される。"""
+    headers = _headers(
+        {
+            # 先頭が攻撃者の詐称値、末尾が信頼境界の追記値
+            "X-Forwarded-For": "1.1.1.1, 172.26.0.3, 203.0.113.7",
+            "CF-Connecting-IP": "203.0.113.7",
+        }
+    )
+    assert resolve_client_ip(headers, "172.19.0.1", "CF-Connecting-IP") == "203.0.113.7"
+
+
+def test_resolve_client_ip_xff_uses_rightmost_not_leftmost():
+    """信頼ヘッダに XFF を指定した場合は末尾（信頼境界が追記した値）を使う。先頭詐称は効かない。"""
+    headers = _headers({"X-Forwarded-For": "1.1.1.1, 172.26.0.3, 203.0.113.7"})
+    assert resolve_client_ip(headers, "172.19.0.1", "X-Forwarded-For") == "203.0.113.7"
+
+
+def test_resolve_client_ip_falls_back_to_host_when_header_absent():
+    """信頼ヘッダが無い/空なら接続元IPに倒す（fail-closed）。"""
+    headers = _headers({"X-Forwarded-For": "1.1.1.1"})
+    # CF-Connecting-IP が無いので XFF 先頭(1.1.1.1)は採用せず接続元へ
+    assert resolve_client_ip(headers, "172.19.0.1", "CF-Connecting-IP") == "172.19.0.1"
+
+
+def test_resolve_client_ip_no_trusted_header_uses_host():
+    """trusted_header 未設定（デフォルト）なら、いかなる転送ヘッダも信用せず接続元IPを使う。"""
+    headers = _headers({"X-Forwarded-For": "1.1.1.1", "CF-Connecting-IP": "2.2.2.2"})
+    assert resolve_client_ip(headers, "172.19.0.1", None) == "172.19.0.1"
+    assert resolve_client_ip(headers, "172.19.0.1", "") == "172.19.0.1"
+
+
+def test_resolve_client_ip_unknown_when_no_host_and_no_header():
+    assert resolve_client_ip(_headers({}), None, "CF-Connecting-IP") == "unknown"
 
 
 def test_rate_limiter_blocks_after_limit_within_window():

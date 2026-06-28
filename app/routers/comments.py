@@ -27,13 +27,13 @@ from core.cache import (
     try_acquire_index_html_build_lock,
     try_acquire_index_users_build_lock,
 )
-from core.config import DEFAULT_PLATFORM, QUICK_LINK_LOGINS
+from core.config import DEFAULT_PLATFORM, QUICK_LINK_LOGINS, RATE_LIMIT_CLIENT_IP_HEADER
 from core.db import SessionLocal
 from core.templates import templates
 from repositories import comment_repo, user_repo, vote_repo
 from services.comment_service import export_user_comments, fetch_user_comment_page
 from services.index_service import build_index_context, build_landing_data
-from services.rate_limit import InMemoryRateLimiter
+from services.rate_limit import InMemoryRateLimiter, resolve_client_ip
 from services.vote_input import MAX_VOTE_BULK_IDS, normalize_comment_ids
 
 router = APIRouter()
@@ -163,10 +163,11 @@ def _is_initial_comments_page_request(
 
 
 def _client_key(request: Request) -> str:
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return (request.client.host if request.client else "unknown").strip() or "unknown"
+    return resolve_client_ip(
+        request.headers,
+        request.client.host if request.client else None,
+        RATE_LIMIT_CLIENT_IP_HEADER,
+    )
 
 
 def _check_vote_rate_limit(request: Request):

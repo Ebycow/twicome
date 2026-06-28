@@ -55,6 +55,13 @@ QUICK_LINK_LOGINS = _parse_csv_env("QUICK_LINK_LOGINS")
 # .env 例: HOST_CHECK_ENABLED=true
 HOST_CHECK_ENABLED = _parse_bool_env("HOST_CHECK_ENABLED", True)
 
+# レート制限のクライアント識別に使う「信頼境界が付与するヘッダ」名。
+# 例: Cloudflare 配下なら CF-Connecting-IP、nginx が X-Real-IP を設定するなら X-Real-IP。
+# 未設定時は接続元IP(request.client.host)を使う。プロキシ背後では接続元が常に同一になり
+# 全員が同一バケットへ落ちる（＝全体で過剰に絞られる）ため、プロキシ配下では必ず設定すること。
+# X-Forwarded-For の先頭はクライアントが詐称可能なので採用しない（末尾＝信頼境界が追記した値を使う）。
+RATE_LIMIT_CLIENT_IP_HEADER: str = os.getenv("RATE_LIMIT_CLIENT_IP_HEADER", "").strip()
+
 # .env 例: FAISS_API_URL=http://faiss-api:8100
 # 未設定の場合は埋め込み検索機能が無効化される
 FAISS_API_URL: str = os.getenv("FAISS_API_URL", "").strip().rstrip("/")
