@@ -5,7 +5,8 @@
 
 ## サマリ
 
-- 確認できた重複クラスタ: **16**（JS 6 / Python 10）
+- 確認できた重複クラスタ: **22**（JS 6 / Python 10 / クロス層 6）
+  - 当初版は JS / Python のみを対象としていた。2026-06-30 の検証で **Jinjaテンプレート層** と **app↔batch サーバ間重複**（C1〜C6）を追加。最悪の分岐はこのクロス層に集中している。
 - 危険度の本質は「重複」そのものではなく **すでに分岐（divergence）していること**。同一責務のはずのコピーが挙動を違え、過去の fix が一部のコピーにしか反映されていない。
 - 個々のコードの質は高い（コメント・コミット粒度とも良好）。問題は設計上の一点＝**単一の真実（source of truth）の欠如**に集約される。
 
@@ -74,7 +75,7 @@
 - `search.py`(94-122 インライン, 162-180 ヘルパ内)
 - `best9.py`(64-82)
 
-列追加（`cn_model`/`cn_ask` 等）時に一部で取りこぼすリスク。集約先: `comment_utils` に `COMMENT_LIST_COLUMNS` 定数。
+さらに **5つ目の変種** `_QUIZ_COL_LIST`(528) が存在し、列リストだけでなく `FROM comments c JOIN vods v … JOIN users u … LEFT JOIN community_notes cn …` の **JOIN句ブロックも4箇所で重複**（best9 は `cn.*` 列と community_notes JOIN を持たない分岐）。列追加（`cn_model`/`cn_ask` 等）時に一部で取りこぼすリスク。集約先: `comment_utils` に `COMMENT_LIST_COLUMNS` 定数＋JOIN句ヘルパ。
 
 ### P2. 🔴 ORDER BY タイブレーカー生成
 - `comment_repo.py`: `_build_user_comment_order`(75) `_build_vod_order`(104) `_build_vod_comment_order`(304)
@@ -92,7 +93,7 @@
 `_fetch_comment_ids_random`(538) というヘルパがあるのに、`fetch_quiz_other_comments`(613) は同じ COUNT/ratio/ORDER BY RAND の分岐を**インライン再実装**。集約先: ヘルパ呼び出しに統一。
 
 ### P6. ⚪ comment_id 正規化（strip/dedup）
-`vote_input.normalize_comment_ids`(6) と `comment_repo.fetch_comment_vote_counts`(404-413) に**同一ループ**。集約先: 単一正規化関数。
+`vote_input.normalize_comment_ids`(6) と `comment_repo.fetch_comment_vote_counts`(404-413) に**同一ループ**。さらに `config._parse_csv_env`(42-48) も同じ `seen=set()`+`strip`+dedup ループ（ドメインは違うがロジック同一・計3箇所）。集約先: 単一正規化関数。
 
 ### P7. 🟡 body_html 後処理（raw_json/body_html_version の除去）
 `comment_utils.decorate_comment`(290-291) と `index_service.build_popular_comments`(99-100) が同じ後処理を別実装。後者は decorate を部分的に手再現。集約先: 共通レンダラ。
@@ -107,15 +108,46 @@
 
 日本にDSTが無いため結果は一致するが、概念的に**4系統**。レイヤごとに「to_jst」を一本化したい。
 
-### P10. 🔴 危険度スコア式 (harm+exag+evid+subj)/4 の null 処理が4者4様
+### P10. 🔴 危険度スコア式 (harm+exag+evid+subj)/4 の null 処理が5者5様
 | 場所 | 式 | NULL時の挙動 |
 |---|---|---|
-| `user-comments.js`(173) | `(…+(subj||0))/4` | subj=null→0、4で割る（過小評価） |
+| `user-comments.js`(173) | `(…+(subj||0))/4` | subj=null→0、4で割る（過小評価）。harm/exag/evid が null だと NaN |
+| `vod_comments.html`(161) Jinja | `(harm+exag+evid+subj)/4` | **NULLガード無し**（harm_risk の is not none しか見ない→他列nullでJinja算術エラー/None） |
 | `comment_repo.py`(96) ORDER BY | `COALESCE(sum,0)` | **どれか1つでもNULL→合計NULL→0** で最下位ソート |
 | `stats_repo.py`(263) ヒストグラム | `sum/4/10` | NULL→そのコメントが集計から脱落 |
 | `stats_service.py`(110) 平均 | 各列を個別平均 | 列ごとにNULLを無視 |
 
-同じ「危険度」が**画面ごとに違う値**になりうる、明確な潜在不整合。集約先: 危険度の算出と欠損ポリシーを1関数（+対応SQL断片）に定義。
+同じ「危険度」が**画面ごとに違う値**になりうる、明確な潜在不整合。バッジ閾値(60/30)と配色rgbaも JS と Jinja で重複（→ C2）。集約先: 危険度の算出と欠損ポリシーを1関数（+対応SQL断片）に定義。
+
+---
+
+## クロス層クラスタ（テンプレート / app↔batch）
+
+本台帳は当初スコープを JS / Python に限定したため、**Jinjaテンプレート層**と **app↔batch のサーバ間重複**が抜けていた（2026-06-30 追記）。最悪の分岐はここにある——サーバ描画（Jinja）とクライアント描画（JS）が同じものを別実装で持ち、すでに食い違っている。
+
+### C1. 🔴 body_html / エモート描画が app↔batch で完全二重化（新・最優先級）
+`app/services/comment_utils.py` と `batch/scripts/comment_body_html.py` の `parse_raw_comment` / `_sanitize_emote_text` / `normalize_emote_id` / `render_comment_body_html` / `EMOTE_URL_TEMPLATE` / `EMOTE_ID_PATTERN` が**バイト単位で同一**。しかも **`BODY_HTML_RENDER_VERSION = 1` が両ファイルで独立定義**。
+
+危険性が最大の理由: batch（`insertdb.py` / `backfill_comment_body_html.py`）が version 付きで `body_html` を**保存**し、app は version 一致時にそれを使い不一致なら再描画する。**片方の描画ロジックだけ変えて version を揃えたままにすると、保存済みHTMLと実時描画が無言で食い違い、キャッシュ無効化も走らない**＝サイレントなデータ不整合。batch は app を import できない別デプロイなのでコピーされた。集約先: app/batch 双方が import できる共有モジュール（version 定数も単一定義）。
+
+### C2. 🔴 投票ボタン markup（J1のクロス層拡張）
+JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**が `vod_comments.html`(151) `user_comments.html`(312) `cluster_comments.html`(62) に**ハードコピー（計4箇所）**。J1 は JS 側しか見ていなかった。集約先: J1 の共通ウィジェット化と同時に、初期描画もマクロ/部分テンプレートで1定義に。
+
+### C3. 🔴 コミュニティノート描画が JS↔Jinja で分岐
+`renderCommunityNote`(user-comments.js 167) と Jinja 版（`vod_comments.html` 157 / `user_comments.html` 350）。**すでに分岐済み**:
+- `vod_comments.html` は**スコアバーも `cn_model が生成` も無い**（user_comments.html と JS には有る）
+- **`cluster-comments.js` はコミュニティノートを一切描画しない**（クラスタ画面では注釈が不可視）
+
+集約先: ノート1コメント分のHTMLを生成する単一ソース（テンプレート部分 or JSモジュール）に寄せ、全画面が同じ表現を使う。
+
+### C4. 🟡 判定ステータス日本語ラベル表が4ファイル重複
+`{supported:裏付けあり, insufficient:情報不足, inconsistent:矛盾あり, not_applicable:該当なし}` がリテラルで `user-comments.js`(181) `vod_comments.html`(167) `user_comments.html`(350) `user_stats.html`(67)。ステータス追加時に4箇所更新が必要。集約先: サーバ側マスタ→テンプレ/JSへ単一供給。
+
+### C5. ⚪ CNスコア5軸のラベル＋配色
+`検証可能性/被害可能性/誇張度/根拠不足/主観度` と hex色が `user-comments.js`(193) `user_comments.html`(364-385) `user-stats.js`(68 チャート) に三重化。集約先: 軸定義（ラベル+色）の単一データ。
+
+### C6. ⚪ ページング引数ボイラープレート
+`page:int=Query(1,ge=1)` / `page_size:int=Query(N,ge=10,le=200)` が `vods.py` `comments.py` の各エンドポイントに反復し、上限200のマジックナンバーが散在。集約先: 共通 Depends/Pydantic パラメータ。
 
 ---
 
@@ -123,18 +155,19 @@
 
 | 順位 | クラスタ | 理由 |
 |---|---|---|
-| 1 | J1 投票ウィジェット | 既存 fix がvod画面に未反映、チャンク欠落で表示破綻の芽 |
-| 2 | J2 時刻整形 | 9h/1日ズレの再発源。引数仕様まで分岐 |
-| 3 | P2 ORDER BY ビルダ | ページング重複/欠落の再発源。fixを毎回N重に適用中 |
-| 4 | P1 SELECT列 / P4 search内重複 | 列追加時の取りこぼし、即効性高 |
-| 5 | P10 危険度式 | 画面間で値が食い違う潜在不整合 |
-| 6 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9 | 体裁・保守性。ついでに回収 |
+| 1 | C1 body_html renderer (app↔batch) | version 定数まで二重定義。描画分岐がキャッシュ無効化されずサイレントなデータ不整合に直結 |
+| 2 | J1 投票ウィジェット ＋ C2 投票markup | 既存 fix がvod画面に未反映、チャンク欠落で表示破綻の芽。初期markupも3テンプレに散在 |
+| 3 | J2 時刻整形 | 9h/1日ズレの再発源。引数仕様まで分岐 |
+| 4 | P2 ORDER BY ビルダ | ページング重複/欠落の再発源。fixを毎回N重に適用中 |
+| 5 | C3 CNノート描画 / P1 SELECT列 / P4 search内重複 | C3はvod/clusterで表示欠落・分岐済み。P1は列追加時の取りこぼし、即効性高 |
+| 6 | P10 危険度式 / C4 ステータスラベル | 画面間で値・表記が食い違う潜在不整合（Jinja含め5〜4箇所） |
+| 7 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6 | 体裁・保守性。ついでに回収 |
 
 ## 再増殖の防止（これが無いと必ず戻る）
 
-1. **物理的に1箇所へ**: JSは共通モジュール import 必須、Pythonは utils/constants 参照必須。
-2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `normalizeUtcIso` の重複検出）。
-3. **修正フロー**: 「ある処理を直したら兄弟実装を grep で探す」を PR チェックリスト/フックに明文化。
+1. **物理的に1箇所へ**: JSは共通モジュール import 必須、Pythonは utils/constants 参照必須。app↔batch のように import 境界をまたぐものは共有モジュール（パッケージ化）で1定義に。
+2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `normalizeUtcIso` の重複検出）。加えて (a) `BODY_HTML_RENDER_VERSION` が単一ファイルでしか定義されないこと、(b) 投票ボタン/CNノートの markup・JA ステータスラベル表がテンプレと JS に二重定義されていないこと、を検出する。
+3. **修正フロー**: 「ある処理を直したら兄弟実装を grep で探す」を PR チェックリスト/フックに明文化。**特にレイヤをまたぐ描画（Jinjaテンプレート ↔ JS、app ↔ batch）は見落としやすいので明示的に確認する**。
 4. **集約はテスト先行・1クラスタずつ**: big-bang リファクタは禁止。回帰テストで挙動を固定 → 共通化 → 各呼び出し差し替え。
 
 ## 次アクション候補
