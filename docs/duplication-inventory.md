@@ -5,8 +5,9 @@
 
 ## サマリ
 
-- 確認できた重複クラスタ: **22**（JS 6 / Python 10 / クロス層 6）
+- 確認できた重複クラスタ: **29**（JS 6 / Python 10 / クロス層 6 / 追加検証 7）
   - 当初版は JS / Python のみを対象としていた。2026-06-30 の検証で **Jinjaテンプレート層** と **app↔batch サーバ間重複**（C1〜C6）を追加。最悪の分岐はこのクロス層に集中している。
+  - 2026-07-01 の全コード再走査で **N1〜N7** を追加。C1（body_html）は **クライアント検証層（JS）** まで含む多層重複だと判明し、実測で **app↔batch のコメント差分（コメント行の分岐）** も検出した。既存 C1〜C6 / J1〜J6 / P1〜P10 は全件コードで裏取り済み（行番号は 6/29 以降のコミットで多少ズレるが構造は不変）。
 - 危険度の本質は「重複」そのものではなく **すでに分岐（divergence）していること**。同一責務のはずのコピーが挙動を違え、過去の fix が一部のコピーにしか反映されていない。
 - 個々のコードの質は高い（コメント・コミット粒度とも良好）。問題は設計上の一点＝**単一の真実（source of truth）の欠如**に集約される。
 
@@ -130,6 +131,9 @@
 
 危険性が最大の理由: batch（`insertdb.py` / `backfill_comment_body_html.py`）が version 付きで `body_html` を**保存**し、app は version 一致時にそれを使い不一致なら再描画する。**片方の描画ロジックだけ変えて version を揃えたままにすると、保存済みHTMLと実時描画が無言で食い違い、キャッシュ無効化も走らない**＝サイレントなデータ不整合。batch は app を import できない別デプロイなのでコピーされた。集約先: app/batch 双方が import できる共有モジュール（version 定数も単一定義）。
 
+**2026-07-01 実測: すでに分岐が始まっている。** `_sanitize_emote_text` に `app` 側だけコメント行 `# Emote labels should stay plain text even if raw JSON is malformed or hostile.` があり `batch` 版には無い。レンダ本体は同一だがコメント単位で乖離済み——「無言の分岐」懸念が現実化しつつある証拠。
+**さらに描画は 4 経路に散在**（この台帳は当初 C1 を app↔batch の 2 経路として記述していたが、クライアント検証層を見落としていた）: ① batch 保存 ② app 再描画 ③ JS `appendSafeBodyHtml`（`user-comments.js` / `quiz.js`）。③の詳細は **N2** 参照。emote 許可 URL・`class="emote"`・属性許可リストが Python 2 実装 + JS 2 実装の計 **4 箇所**にハードコピーされている。集約は 3 層すべてを同時に揃える必要がある。
+
 ### C2. 🔴 投票ボタン markup（J1のクロス層拡張）
 JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**が `vod_comments.html`(151) `user_comments.html`(312) `cluster_comments.html`(62) に**ハードコピー（計4箇所）**。J1 は JS 側しか見ていなかった。集約先: J1 の共通ウィジェット化と同時に、初期描画もマクロ/部分テンプレートで1定義に。
 
@@ -151,22 +155,49 @@ JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**
 
 ---
 
+## 追加検証クラスタ（2026-07-01 全コード再走査）
+
+全 `.py` / `.js` を「2ファイル以上で定義される同名関数」「同一 SQL / DOM 構築」で機械的に洗い出し、既存クラスタに含まれない 7 件を追加。傾向は明確: **①同一責務 SQL の app 内二重化、②描画クラスタの JS 層・Python 層への波及（C1/J2 の追跡漏れ）、③クライアント/util の boilerplate**。
+
+### N1. 🔴 `count_user_comments` が app 内で二重実装
+[`stats_repo.py`(9)](../app/repositories/stats_repo.py) と [`comment_repo.py`(682)](../app/repositories/comment_repo.py)。どちらも「ユーザー総コメント数 `COUNT(*) WHERE commenter_user_id = :uid`」。一方は `COUNT(*) AS cnt` + `.mappings().first()`、他方は `.scalar()`。用途（統計 / タスク API 資格チェック）で分かれているが**同一責務**。カウント条件（例: 論理削除・除外フィルタ）を足すと片方に取りこぼしが出る。P2 と同型の「別ファイル同一 SQL」。集約先: 単一のカウント関数。
+
+### N2. 🔴 `appendSafeBodyHtml`（C1 のクライアント検証層＝body_html 描画の第3・第4実装）
+[`user-comments.js`(137)](../app/static/js/user-comments.js) と [`quiz.js`(67)](../app/static/js/quiz.js)。emote 許可 URL `https://static-cdn.jtvnw.net/`・`class="emote"`・属性許可リスト `[class,src,srcset,alt,title,loading,decoding]` を**ハードコピー**。C1（app↔batch Python）と合わせ emote 描画仕様が **4 実装**に散在。**すでに分岐済み**——`user-comments.js` 版は `fallbackBody` 引数を持ち空 body 時に `textContent` で埋めるが、`quiz.js` 版は無し（body_html 空でノード生成されない）。C1 を直す際に JS 側も揃えないと表示が食い違う。集約先: C1 の共有モジュール化と同時に、JS 側も単一の sanitizer に統一。
+
+### N3. 🟡 相対時刻文字列生成が Python にも存在（J2 のクロス層拡張）
+[`comment_utils.py` `decorate_comment`(286)](../app/services/comment_utils.py) が `"{hours}時間{minutes}分前"` / `"{days}日前"` を生成（noscript フォールバック）。JS `formatRelativeTime`(J2) と**同じ表記を別実装**。丸め・閾値が乖離すると **JS 有効時と無効時で「○分前」が食い違う**。J2 は JS ファイルのみ、P9 は JST 変換手段のみを対象にしており、この「相対時刻の文字列化」は両方の網から漏れていた。集約先: 相対時刻文字列の生成ルールを 1 か所に定義し、noscript 用サーバ描画と JS が同じ閾値・丸めを使う。
+
+### N4. 🟡 HTTP クライアント boilerplate（`_is_enabled` + `ping_*_api`）
+[`faiss.py`(16)](../app/clients/faiss.py) と [`morpheme.py`(16)](../app/clients/morpheme.py) が `_is_enabled()`（URL→bool）と `ping_*_api()`（`/health` 確認、失敗時 `RuntimeError`）を**ほぼ同型で複製**。外部クライアントを足すたび増殖する型。集約先: 有効判定 + ヘルスチェックの共通基底/ヘルパ。
+
+### N5. ⚪ `get_user_id` / `load_env` が app↔util で重複
+`get_user_id` は [`twitch.py`(11)](../app/clients/twitch.py)・[`util/userid.py`(29)](../util/userid.py)・[`util/adduserid.py`(34)](../util/adduserid.py) の **3 実装**（署名分岐: env 読み vs 引数渡し、URL 文字列 vs `params={login}`、timeout 定数 vs 20 固定）。`load_env` は `util/` 3 ファイルに同一定義。Twitch users API 呼び出しの真実が分散。C1 同様 import 境界越えなので、util を独立 CLI として残すなら最低限「Twitch API 呼び出しの正」を 1 か所に。
+
+### N6. ⚪ `showStatus` / `hideStatus`
+[`vods.js`(38)](../app/static/js/vods.js) と [`users.js`(24)](../app/static/js/users.js) に**変数名以外同一**のペア。`buildCard` / `render` / `formatDate` / root_path も含め、この 2 ファイルは「無限スクロール・リストページ」の**兄弟実装**でページ骨格ごと平行進化している（J6 多重実行ガードと同根）。集約先: リストページ共通の状態表示・カード描画ヘルパ。
+
+### N7. ⚪ ページングレスポンス / テンプレコンテキスト dict
+[`comments.py`(197)](../app/routers/comments.py) と [`vods.py`(76)](../app/routers/vods.py) 他で `{page, pages, total, filters, root_path, ...}` の構築が反復。C6（**引数側**）の対になる**応答側**の重複。集約先: ページングメタの生成ヘルパ or Pydantic レスポンスモデル。
+
+---
+
 ## 優先順位（バグ密度 × 影響範囲）
 
 | 順位 | クラスタ | 理由 |
 |---|---|---|
-| 1 | C1 body_html renderer (app↔batch) | version 定数まで二重定義。描画分岐がキャッシュ無効化されずサイレントなデータ不整合に直結 |
+| 1 | C1 body_html renderer (app↔batch) ＋ N2 JS sanitizer | version 定数まで二重定義。描画分岐がキャッシュ無効化されずサイレントなデータ不整合に直結。実測でコメント行の分岐を確認。emote 仕様は Python2 + JS2 の計4実装 |
 | 2 | J1 投票ウィジェット ＋ C2 投票markup | 既存 fix がvod画面に未反映、チャンク欠落で表示破綻の芽。初期markupも3テンプレに散在 |
-| 3 | J2 時刻整形 | 9h/1日ズレの再発源。引数仕様まで分岐 |
-| 4 | P2 ORDER BY ビルダ | ページング重複/欠落の再発源。fixを毎回N重に適用中 |
+| 3 | J2 時刻整形 ＋ N3 Python 相対時刻 | 9h/1日ズレの再発源。引数仕様まで分岐。noscript フォールバックが JS と別実装で「○分前」が食い違いうる |
+| 4 | P2 ORDER BY ビルダ / N1 count_user_comments | ページング重複/欠落の再発源。fixを毎回N重に適用中。N1 は同一 COUNT を app 内2実装 |
 | 5 | C3 CNノート描画 / P1 SELECT列 / P4 search内重複 | C3はvod/clusterで表示欠落・分岐済み。P1は列追加時の取りこぼし、即効性高 |
 | 6 | P10 危険度式 / C4 ステータスラベル | 画面間で値・表記が食い違う潜在不整合（Jinja含め5〜4箇所） |
-| 7 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6 | 体裁・保守性。ついでに回収 |
+| 7 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6, N4/N5/N6/N7 | 体裁・保守性。ついでに回収 |
 
 ## 再増殖の防止（これが無いと必ず戻る）
 
 1. **物理的に1箇所へ**: JSは共通モジュール import 必須、Pythonは utils/constants 参照必須。app↔batch のように import 境界をまたぐものは共有モジュール（パッケージ化）で1定義に。
-2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `normalizeUtcIso` の重複検出）。加えて (a) `BODY_HTML_RENDER_VERSION` が単一ファイルでしか定義されないこと、(b) 投票ボタン/CNノートの markup・JA ステータスラベル表がテンプレと JS に二重定義されていないこと、を検出する。
+2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `def count_user_comments` / `normalizeUtcIso` / `function appendSafeBodyHtml` の重複検出）。加えて (a) `BODY_HTML_RENDER_VERSION` が単一ファイルでしか定義されないこと、(b) 投票ボタン/CNノートの markup・JA ステータスラベル表がテンプレと JS に二重定義されていないこと、(c) emote 許可 URL `https://static-cdn.jtvnw.net/` / `class="emote"` 属性許可リストが JS 2 箇所以上に現れないこと、を検出する。
 3. **修正フロー**: 「ある処理を直したら兄弟実装を grep で探す」を PR チェックリスト/フックに明文化。**特にレイヤをまたぐ描画（Jinjaテンプレート ↔ JS、app ↔ batch）は見落としやすいので明示的に確認する**。
 4. **集約はテスト先行・1クラスタずつ**: big-bang リファクタは禁止。回帰テストで挙動を固定 → 共通化 → 各呼び出し差し替え。
 
