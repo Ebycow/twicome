@@ -5,9 +5,10 @@
 
 ## サマリ
 
-- 確認できた重複クラスタ: **29**（JS 6 / Python 10 / クロス層 6 / 追加検証 7）
+- 確認できた重複クラスタ: **36**（JS 6 / Python 10 / クロス層 6 / 追加検証 7 / リポジトリ全域 7）
   - 当初版は JS / Python のみを対象としていた。2026-06-30 の検証で **Jinjaテンプレート層** と **app↔batch サーバ間重複**（C1〜C6）を追加。最悪の分岐はこのクロス層に集中している。
   - 2026-07-01 の全コード再走査で **N1〜N7** を追加。C1（body_html）は **クライアント検証層（JS）** まで含む多層重複だと判明し、実測で **app↔batch のコメント差分（コメント行の分岐）** も検出した。既存 C1〜C6 / J1〜J6 / P1〜P10 は全件コードで裏取り済み（行番号は 6/29 以降のコミットで多少ズレるが構造は不変）。
+  - 2026-07-02 に **既存29クラスタを全件再検証（全件現存を確認、下記の増殖・訂正あり）** し、これまで一度も走査対象になっていなかった **challenge/ ・ morpheme-sample/ ・ util/ ・ migrate/ ・ faiss-api/ ・ morpheme-api/ ・ twicome-mcp-server/ ・ CSS層** を走査して **R1〜R7** を追加。台帳のスコープ外だったディレクトリに最大14ファイル同一コピーのクラスタが存在した。
 - 危険度の本質は「重複」そのものではなく **すでに分岐（divergence）していること**。同一責務のはずのコピーが挙動を違え、過去の fix が一部のコピーにしか反映されていない。
 - 個々のコードの質は高い（コメント・コミット粒度とも良好）。問題は設計上の一点＝**単一の真実（source of truth）の欠如**に集約される。
 
@@ -46,11 +47,13 @@
 過去 fix `2bda22b`(9時間ズレ)・`394356e`(1日ズレ) はこのクラスタの**同一バグを別ファイルで個別修正**した痕跡。集約先: `static/js/time-format.js`。
 
 ### J3. 🟡 root_path 正規化
-8ファイルに散在し **3変種**:
+10ファイルに散在し **4変種**（2026-07-02 再検証で quiz.js / offline-access.js を追加確認）:
 - インライン定番形: `cluster-comments.js`(3) `vods.js`(15) `users.js`(13) `index.js`(17) `user-stats.js`(7) `vod-comments.js`(6)
 - `base.js`(5) にヘルパ相当が既にある（未活用）
-- `user-comments.js`(13) は `.trim()` 追加の独自変種
+- `user-comments.js`(13) と `quiz.js`(7-8) は `.trim()` 追加の独自変種
+- `offline-access.js`(7) は `normalizeRootPath` という**4つ目のヘルパ関数**（trim 変種と同等ロジックの別実装）
 - `user-ego-graph.js`(13) は **正規化なし**（`JSON.parse` のみ → root_path 末尾スラッシュ時にURL不整合の恐れ）
+- （参考: `sw.js` は SW スコープ由来の独自正規化。DOM を読めない制約上やむを得ないが、正規化仕様を変えるときは追随が必要）
 
 集約先: `base.js` の正規化を全JSが import。
 
@@ -103,7 +106,7 @@
 `comments.py`(54) と `vods.py`(17) に同一実装。集約先: 共通util。
 
 ### P9. 🟡 JST変換手段の乱立
-- SQL: `+ INTERVAL 9 HOUR`（`stats_repo.py` ×4）
+- SQL: `+ INTERVAL 9 HOUR`（`stats_repo.py` ×5、2026-07-02 時点で1箇所増殖）
 - Python: `utc_to_jst`（pytz Asia/Tokyo）/ `comment_service.JST = timezone(+9h)` 固定オフセット
 - JS: `toLocale… timeZone:'Asia/Tokyo'` / 手動 `+9h`
 
@@ -134,6 +137,8 @@
 **2026-07-01 実測: すでに分岐が始まっている。** `_sanitize_emote_text` に `app` 側だけコメント行 `# Emote labels should stay plain text even if raw JSON is malformed or hostile.` があり `batch` 版には無い。レンダ本体は同一だがコメント単位で乖離済み——「無言の分岐」懸念が現実化しつつある証拠。
 **さらに描画は 4 経路に散在**（この台帳は当初 C1 を app↔batch の 2 経路として記述していたが、クライアント検証層を見落としていた）: ① batch 保存 ② app 再描画 ③ JS `appendSafeBodyHtml`（`user-comments.js` / `quiz.js`）。③の詳細は **N2** 参照。emote 許可 URL・`class="emote"`・属性許可リストが Python 2 実装 + JS 2 実装の計 **4 箇所**にハードコピーされている。集約は 3 層すべてを同時に揃える必要がある。
 
+2026-07-02 追記: emote CDN URL `static-cdn.jtvnw.net` は上記4実装に加えて **`core/middleware.py`(47) の CSP ヘッダ**と **`sw.js`(342) のキャッシュ分岐**にもリテラルで存在（計 **6 箇所**）。CDN ドメイン変更・追加時は描画4実装＋配信ポリシー2箇所の全てを揃える必要がある。
+
 ### C2. 🔴 投票ボタン markup（J1のクロス層拡張）
 JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**が `vod_comments.html`(151) `user_comments.html`(312) `cluster_comments.html`(62) に**ハードコピー（計4箇所）**。J1 は JS 側しか見ていなかった。集約先: J1 の共通ウィジェット化と同時に、初期描画もマクロ/部分テンプレートで1定義に。
 
@@ -144,11 +149,13 @@ JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**
 
 集約先: ノート1コメント分のHTMLを生成する単一ソース（テンプレート部分 or JSモジュール）に寄せ、全画面が同じ表現を使う。
 
-### C4. 🟡 判定ステータス日本語ラベル表が4ファイル重複
-`{supported:裏付けあり, insufficient:情報不足, inconsistent:矛盾あり, not_applicable:該当なし}` がリテラルで `user-comments.js`(181) `vod_comments.html`(167) `user_comments.html`(350) `user_stats.html`(67)。ステータス追加時に4箇所更新が必要。集約先: サーバ側マスタ→テンプレ/JSへ単一供給。
+### C4. 🟡 判定ステータス日本語ラベル表が6ファイル重複（4→6箇所に訂正）
+`{supported:裏付けあり, insufficient:情報不足, inconsistent:矛盾あり, not_applicable:該当なし}` がリテラルで `user-comments.js`(181) `vod_comments.html`(167) `user_comments.html`(350) `user_stats.html`(67)。
+
+2026-07-02 追記でさらに2箇所: **`manual.html`(319, 371) がラベル一覧を文書として再掲**しており、**ステータス集合の真のマスタは `batch/scripts/generate_community_notes.py`(70) の `ALLOWED_STATUSES` ＋同義語正規化マップ**にある（app からは import されない別デプロイ）。つまり C1 と同型の **app↔batch 境界越え**でもある。ステータス追加時に6箇所更新が必要。集約先: サーバ側マスタ→テンプレ/JS/manual へ単一供給（batch の enum 定義と共有）。
 
 ### C5. ⚪ CNスコア5軸のラベル＋配色
-`検証可能性/被害可能性/誇張度/根拠不足/主観度` と hex色が `user-comments.js`(193) `user_comments.html`(364-385) `user-stats.js`(68 チャート) に三重化。集約先: 軸定義（ラベル+色）の単一データ。
+`検証可能性/被害可能性/誇張度/根拠不足/主観度` と hex色が `user-comments.js`(193) `user_comments.html`(364-385) `user-stats.js`(68 チャート) に三重化。2026-07-02 追記: `manual.html`(351) にも軸名が文書として存在（4箇所目）。集約先: 軸定義（ラベル+色）の単一データ。
 
 ### C6. ⚪ ページング引数ボイラープレート
 `page:int=Query(1,ge=1)` / `page_size:int=Query(N,ge=10,le=200)` が `vods.py` `comments.py` の各エンドポイントに反復し、上限200のマジックナンバーが散在。集約先: 共通 Depends/Pydantic パラメータ。
@@ -182,6 +189,47 @@ JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**
 
 ---
 
+## リポジトリ全域クラスタ（2026-07-02 走査）
+
+既存台帳のスコープは実質 `app/` + `batch/` だった。今回、これまで一度も対象になっていなかった `challenge/`（20ファイル）・`morpheme-sample/`・`util/`・`migrate/`・`faiss-api/`・`morpheme-api/`・`twicome-mcp-server/`・**CSS層**（14ファイル）を「2ファイル以上で定義される同名関数」「同一セレクタの複数定義」「env/接続ボイラープレート」で機械走査した。**シロ判定**も記録する: `zen/` はモジュール分割済みで重複なし、`twicome-mcp-server` は app への HTTP クライアントで SQL 重複なし、テストは `tests/integration/helpers.py` に seed 関数が集約済み。
+
+### R1. 🔴 DB接続設定が3方式・9ファイルに分裂、デフォルト値がすでに分岐
+| 方式 | 場所 | デフォルト |
+|---|---|---|
+| `DATABASE_URL` 一本 | `app/core/config.py` `get_database_url`(12) | 定数フォールバックあり |
+| `DATABASE_URL` 一本（**同名関数の別実装**） | `migrate/migrations/env.py` `get_database_url`(17) | フォールバック無し・`.strip()` あり・エラー文言も別 |
+| `MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` 個別読み | `batch/scripts/` の `insertdb.py`(28) `backfill_comment_body_html.py`(17) `analyze_morphemes.py`(35) `build_faiss_index.py`(43) | host=`db`, db=`appdb`, パスワードのデフォルト無し |
+| 同上（**別デフォルト**） | `morpheme-sample/` の `analyze_user_comments.py`(27) `word_ranking.py`(29) | **host=`localhost`, password=`apppass`, db=`appdb_dev`** |
+
+batch 4スクリプトは `PROJECT_ROOT` / `ENV_PATH` の env 読みブロックまで同一コピー。接続先規約を変えると9ファイル修正になり、morpheme-sample はデフォルト分岐ですでに**別DBを向いて動く**。集約先: 接続設定の読み取りを共有モジュール1箇所に（少なくとも batch 内は共通 `db_config` に）。
+
+### R2. 🔴 challenge/ の APIクライアント関数が14ファイルに同一コピー
+`fetch_task` / `submit_answers` が `sentence_bert_utils.py` に共有実装として存在するのに、**非BERT系ベースライン12ファイル + `run_all.py` が同一コードを個別に再定義**（diff で完全一致を確認）。ほかに `predict` ×19 / `main`（argparse+実行フロー）×20 / `build_model` ×8 が同型ボイラープレート。クイズ API のパス・リクエスト形式（`/api/u/{login}/quiz/task`）を変えると**14箇所修正**。「ベースラインは1ファイル完結で配布したい」意図なら、その旨を本台帳と challenge/README に明記して CI ガード対象外にする（意図的コピーと事故コピーの区別を付ける）。そうでなければ `challenge/api_client.py` に集約。
+
+### R3. 🟡 morpheme-sample のDB取得・API呼び出しが多重コピー（すでに分岐）
+- `fetch_comments` が `analyze_user_comments.py`(36) `word_ranking.py`(41) `pipeline.py`(126) の**3実装**。SELECT 列（comment_id/body/created_at の有無）と **ORDER BY が DESC / DESC / ASC で分岐済み**。
+- `call_analyze_api` が上記3ファイル + **`batch/scripts/analyze_morphemes.py`(96)** の**4実装**（完全一致を確認）。morpheme-api のリクエスト形式変更で4箇所修正、しかも sample↔batch の境界越え。
+- `count_words` も `pipeline.py` / `word_ranking.py` で二重。
+
+集約先: sample ディレクトリ内共通モジュール（batch との共有は C1 と同じパッケージ化課題）。
+
+### R4. 🟡 Twitch OAuth `client_credentials` フローが3実装（N5の拡張）
+N5 は `get_user_id`（helix/users）だけを見ていたが、**トークン取得 POST `id.twitch.tv/oauth2/token` + `grant_type=client_credentials`** も `util/tokens.py`(52) `util/refreshtoken.py`(105) `batch/scripts/get_vod_list_batch.py`(26) の3実装。Twitch 認証仕様変更・エラー処理改善（レートリミット等）が3箇所行き。N5 と合わせ「Twitch API クライアントの正」を1モジュールに。
+
+### R5. 🟡 CSS層の重複（本台帳はこれまでCSSを完全に未対象）
+- **ページヘッダ骨格**: `.page-header` `.page-header-inner` `.page-title` `.page-back` が `streamers.css`(15) `users.css`(15) `vods.css`(15) `vod_comments.css`(8) に**同一ルールで4重コピー**（先頭3ファイルは行番号まで一致）。
+- **C2/J1 の CSS層**: `vod_comments.css`(215) が `base.css`(135) 定義済みの `.vote-btn` `.vote-controls` を再定義し、**すでに分岐**——base は角丸4px＋like緑/dislike赤の配色、vod版は pill(999px)・配色なし。`.comment` `.body` `.comment-head` も同様に vod だけ再定義。VODページの投票ボタンだけ見た目が別物。
+- **C3 の CSS層**: CNノートのスタイルが `user_comments.css`(54-) は `.cn-note-*` 系、`vod_comments.css`(229-) は `.community-note` 系と**クラス名から分岐**。マークアップ統一（C3）の際に CSS も同時に1系統へ。
+
+### R6. ⚪ users/vods 兄弟ページのフィルタUI（N6のテンプレ+CSS層）
+`users.html`(23-35) と `vods.html`(23-35) の `filter-bar / filter-item / sort-select` マークアップが行番号まで一致するコピー。対応する `.filter-bar` `.filter-item` `.filter-select` ルールも `users.css` / `vods.css` に二重。N6（JS骨格）と合わせ、リストページ雛形（テンプレ・CSS・JS）を3層セットで共通化するのが正道。
+
+### R7. ⚪ 同一ファイル内・サービス雛形の小規模重複
+- `vod_comments.html`(108, 180): ページングブロック（前/次＋件数表示）が**同一ファイル内で上下に2回コピー**。マクロ化で1定義に（C6/N7 と同族）。
+- `faiss-api/main.py` / `morpheme-api/main.py`: シングルトン＋`threading.Lock` の遅延初期化・`/health`・`startup` の雛形が同型（N4 のサーバ側対応物）。実害はないが、3つ目のAPIサービスを足すときに3重化する。
+
+---
+
 ## 優先順位（バグ密度 × 影響範囲）
 
 | 順位 | クラスタ | 理由 |
@@ -190,19 +238,18 @@ JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**
 | 2 | J1 投票ウィジェット ＋ C2 投票markup | 既存 fix がvod画面に未反映、チャンク欠落で表示破綻の芽。初期markupも3テンプレに散在 |
 | 3 | J2 時刻整形 ＋ N3 Python 相対時刻 | 9h/1日ズレの再発源。引数仕様まで分岐。noscript フォールバックが JS と別実装で「○分前」が食い違いうる |
 | 4 | P2 ORDER BY ビルダ / N1 count_user_comments | ページング重複/欠落の再発源。fixを毎回N重に適用中。N1 は同一 COUNT を app 内2実装 |
-| 5 | C3 CNノート描画 / P1 SELECT列 / P4 search内重複 | C3はvod/clusterで表示欠落・分岐済み。P1は列追加時の取りこぼし、即効性高 |
-| 6 | P10 危険度式 / C4 ステータスラベル | 画面間で値・表記が食い違う潜在不整合（Jinja含め5〜4箇所） |
-| 7 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6, N4/N5/N6/N7 | 体裁・保守性。ついでに回収 |
+| 5 | C3 CNノート描画 / P1 SELECT列 / P4 search内重複 | C3はvod/clusterで表示欠落・分岐済み（CSSもクラス名から分岐 → R5）。P1は列追加時の取りこぼし、即効性高 |
+| 6 | P10 危険度式 / C4 ステータスラベル / R1 DB接続設定 | 画面間で値・表記が食い違う潜在不整合（C4はbatchマスタ含め6箇所）。R1はデフォルト値がすでに分岐し別DBを向く |
+| 7 | R2 challenge APIクライアント / R3 morpheme-sample / R4 Twitchトークン | 本体の挙動には響かないが、API変更時に最大14箇所修正。意図的コピーなら明文化して除外 |
+| 8 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6, N4/N5/N6/N7, R5/R6/R7 | 体裁・保守性。ついでに回収 |
 
 ## 再増殖の防止（これが無いと必ず戻る）
 
 1. **物理的に1箇所へ**: JSは共通モジュール import 必須、Pythonは utils/constants 参照必須。app↔batch のように import 境界をまたぐものは共有モジュール（パッケージ化）で1定義に。
-2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `def count_user_comments` / `normalizeUtcIso` / `function appendSafeBodyHtml` の重複検出）。加えて (a) `BODY_HTML_RENDER_VERSION` が単一ファイルでしか定義されないこと、(b) 投票ボタン/CNノートの markup・JA ステータスラベル表がテンプレと JS に二重定義されていないこと、(c) emote 許可 URL `https://static-cdn.jtvnw.net/` / `class="emote"` 属性許可リストが JS 2 箇所以上に現れないこと、を検出する。
+2. **CIガード**: 「同名関数が2ファイル以上で定義されたら fail」する grep ベースの軽量チェックを1本追加（例: `function vote(` / `def _parse_int` / `def count_user_comments` / `normalizeUtcIso` / `function appendSafeBodyHtml` / `def fetch_task` / `def call_analyze_api` / `def get_database_url` の重複検出）。加えて (a) `BODY_HTML_RENDER_VERSION` が単一ファイルでしか定義されないこと、(b) 投票ボタン/CNノートの markup・JA ステータスラベル表がテンプレと JS に二重定義されていないこと、(c) emote 許可 URL `https://static-cdn.jtvnw.net/` / `class="emote"` 属性許可リストが JS 2 箇所以上に現れないこと、(d) `MYSQL_HOST` の os.getenv 直読みが共有モジュール以外に現れないこと、を検出する。challenge/ のような**意図的な1ファイル完結コピー**は除外リストで明示し、事故コピーと区別する。
 3. **修正フロー**: 「ある処理を直したら兄弟実装を grep で探す」を PR チェックリスト/フックに明文化。**特にレイヤをまたぐ描画（Jinjaテンプレート ↔ JS、app ↔ batch）は見落としやすいので明示的に確認する**。
 4. **集約はテスト先行・1クラスタずつ**: big-bang リファクタは禁止。回帰テストで挙動を固定 → 共通化 → 各呼び出し差し替え。
 
-## 次アクション候補
+## 次アクション
 
-- A) 本台帳を確定し、J1（投票）から テスト→共通化→差し替え に着手
-- B) 先に CIガード（防止策2）だけ入れて出血を止める
-- C) 各クラスタに GitHub Issue を切って追跡可能にする
+防止策の具体設計（CIガード実装・ラチェット方式・意図的コピー登録簿）と修正の進め方（層別の集約手段・分岐解消の原則・ロードマップ）は **[duplication-remediation-strategy.md](duplication-remediation-strategy.md)** に確定した。旧「次アクション候補」の A/B/C 択は B（ガード先行）→ A（クラスタ着手）の順で同書 Phase 0〜1 に置き換え。
