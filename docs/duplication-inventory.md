@@ -5,10 +5,11 @@
 
 ## サマリ
 
-- 確認できた重複クラスタ: **36**（JS 6 / Python 10 / クロス層 6 / 追加検証 7 / リポジトリ全域 7）
+- 確認できた重複クラスタ: **38**（JS 6 / Python 10 / クロス層 6 / 追加検証 7 / リポジトリ全域 7 / 検証層・指示層 2）
   - 当初版は JS / Python のみを対象としていた。2026-06-30 の検証で **Jinjaテンプレート層** と **app↔batch サーバ間重複**（C1〜C6）を追加。最悪の分岐はこのクロス層に集中している。
   - 2026-07-01 の全コード再走査で **N1〜N7** を追加。C1（body_html）は **クライアント検証層（JS）** まで含む多層重複だと判明し、実測で **app↔batch のコメント差分（コメント行の分岐）** も検出した。既存 C1〜C6 / J1〜J6 / P1〜P10 は全件コードで裏取り済み（行番号は 6/29 以降のコミットで多少ズレるが構造は不変）。
   - 2026-07-02 に **既存29クラスタを全件再検証（全件現存を確認、下記の増殖・訂正あり）** し、これまで一度も走査対象になっていなかった **challenge/ ・ morpheme-sample/ ・ util/ ・ migrate/ ・ faiss-api/ ・ morpheme-api/ ・ twicome-mcp-server/ ・ CSS層** を走査して **R1〜R7** を追加。台帳のスコープ外だったディレクトリに最大14ファイル同一コピーのクラスタが存在した。
+  - 2026-07-03 に手法を替えて再監査: **AST 正規化ハッシュによる機械走査**（同名 grep では捕まらない改名クローンも対象）と **git 履歴の co-change 定量分析**を実施。既存クラスタは全て機械走査でも裏付けられ、本番コードに改名クローンは無いことを確認（同名 grep 方式の妥当性を実証）。一方で **テスト基盤（T1）と指示ファイル（M1）** の2クラスタを新規検出し、R1-R7 時の「テストはシロ」判定を撤回。C1 は emote 仕様の Python 第3実装（`_BodyHtmlSanitizer`）を追加確認し **5実装**に訂正。証拠と考察の詳細は [duplication-verification-and-critique.md](duplication-verification-and-critique.md)。
 - 危険度の本質は「重複」そのものではなく **すでに分岐（divergence）していること**。同一責務のはずのコピーが挙動を違え、過去の fix が一部のコピーにしか反映されていない。
 - 個々のコードの質は高い（コメント・コミット粒度とも良好）。問題は設計上の一点＝**単一の真実（source of truth）の欠如**に集約される。
 
@@ -139,6 +140,8 @@
 
 2026-07-02 追記: emote CDN URL `static-cdn.jtvnw.net` は上記4実装に加えて **`core/middleware.py`(47) の CSP ヘッダ**と **`sw.js`(342) のキャッシュ分岐**にもリテラルで存在（計 **6 箇所**）。CDN ドメイン変更・追加時は描画4実装＋配信ポリシー2箇所の全てを揃える必要がある。
 
+2026-07-03 訂正: emote 仕様の実装は4ではなく **5**。`comment_utils.py` の `_BodyHtmlSanitizer`（`_ALLOWED_SRC_PREFIX` / `_ALLOWED_IMG_ATTRS` を独自保持、batch 側に対応物なし）が JS `appendSafeBodyHtml` と同じ許可リストの **Python 再実装**として存在する。さらに `decorate_comment` は保存済み/実時レンダの両出力をこのサニタイザに通すため、「**レンダラ出力はサニタイザ許可リストを恒等通過しなければならない**」という暗黙の契約が5実装に分散している——レンダラに属性を1つ足すと3つのサニタイザが黙って剥ぎ取る（分岐とは別種の協調不全リスク）。詳細は [verification-and-critique §3](duplication-verification-and-critique.md)。
+
 ### C2. 🔴 投票ボタン markup（J1のクロス層拡張）
 JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**が `vod_comments.html`(151) `user_comments.html`(312) `cluster_comments.html`(62) に**ハードコピー（計4箇所）**。J1 は JS 側しか見ていなかった。集約先: J1 の共通ウィジェット化と同時に、初期描画もマクロ/部分テンプレートで1定義に。
 
@@ -230,6 +233,18 @@ N5 は `get_user_id`（helix/users）だけを見ていたが、**トークン�
 
 ---
 
+## 検証層・指示層クラスタ（2026-07-03 AST走査）
+
+R1-R7 走査は「テストは `tests/integration/helpers.py` に seed 関数が集約済み」としてテスト層をシロ判定したが、seed 関数しか見ていなかった。AST 正規化ハッシュ走査（改名クローンも捕捉できる手法）で以下を検出。
+
+### T1. 🟡 テスト基盤 conftest の4フィクスチャクローン
+[`app/tests/ui/conftest.py`](../app/tests/ui/conftest.py)(54, 92, 106, 163) と [`app/tests/integration/conftest.py`](../app/tests/integration/conftest.py)(40, 50, 64, 72) に `_clear_all_tables` / `apply_migrations` / `db_engine` / `db` が **AST 完全一致で二重定義**。`_load_check_schema_module` も unit/integration の test_schema_check.py に二重。マイグレーション適用・TRUNCATE 手順が suite 間で分岐すると「片方のスイートだけ落ちる」偽陽性/偽陰性の温床になる。テストは重複を検出する側の装置なので、**検出装置自体の分岐は通常クラスタより性質が悪い**。集約先: `tests/conftest_shared.py` 等の共通フィクスチャモジュール（seed helpers 集約の前例に倣う）。
+
+### M1. ⚪ 指示ファイルのメタ重複（AGENTS.md ↔ CLAUDE.md）
+`AGENTS.md` は `CLAUDE.md` の `# Test` 節の**逐語コピー**。テスト実行ルール変更時に2ファイル更新が必要で、LLM 向け修正フロー（防止策3）を CLAUDE.md だけに書いても AGENTS.md 経由のエージェントには届かない。集約先: 正本を CLAUDE.md に置き、AGENTS.md は参照1行にする（または同期ガード対象）。
+
+---
+
 ## 優先順位（バグ密度 × 影響範囲）
 
 | 順位 | クラスタ | 理由 |
@@ -241,7 +256,8 @@ N5 は `get_user_id`（helix/users）だけを見ていたが、**トークン�
 | 5 | C3 CNノート描画 / P1 SELECT列 / P4 search内重複 | C3はvod/clusterで表示欠落・分岐済み（CSSもクラス名から分岐 → R5）。P1は列追加時の取りこぼし、即効性高 |
 | 6 | P10 危険度式 / C4 ステータスラベル / R1 DB接続設定 | 画面間で値・表記が食い違う潜在不整合（C4はbatchマスタ含め6箇所）。R1はデフォルト値がすでに分岐し別DBを向く |
 | 7 | R2 challenge APIクライアント / R3 morpheme-sample / R4 Twitchトークン | 本体の挙動には響かないが、API変更時に最大14箇所修正。意図的コピーなら明文化して除外 |
-| 8 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6, N4/N5/N6/N7, R5/R6/R7 | 体裁・保守性。ついでに回収 |
+| 8 | T1 テスト conftest | テスト基盤の分岐は偽陽性/偽陰性の温床（Phase 4 前後で回収が効率的） |
+| 9 | J3/J4/J5/J6, P3/P5/P6/P7/P8/P9, C5/C6, N4/N5/N6/N7, R5/R6/R7, M1 | 体裁・保守性。ついでに回収（M1 は Phase 0 で即日可） |
 
 ## 再増殖の防止（これが無いと必ず戻る）
 
@@ -253,3 +269,5 @@ N5 は `get_user_id`（helix/users）だけを見ていたが、**トークン�
 ## 次アクション
 
 防止策の具体設計（CIガード実装・ラチェット方式・意図的コピー登録簿）と修正の進め方（層別の集約手段・分岐解消の原則・ロードマップ）は **[duplication-remediation-strategy.md](duplication-remediation-strategy.md)** に確定した。旧「次アクション候補」の A/B/C 択は B（ガード先行）→ A（クラスタ着手）の順で同書 Phase 0〜1 に置き換え。
+
+2026-07-03 追記: 台帳と戦略の主張を独立検証した結果（co-change 定量分析・分岐コミットの考古学・AST 機械走査・戦略前提の実地検証）と、戦略へのロードマップ修正 4 点は **[duplication-verification-and-critique.md](duplication-verification-and-critique.md)** を参照。以後の「現存確認」は人手の再走査ではなく `ci/clone_scan.py`（同書 §2 の走査スクリプトをコミット予定）の定期実行で行う方針。
