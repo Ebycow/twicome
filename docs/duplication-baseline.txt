@@ -1,0 +1,127 @@
+# duplication-baseline.txt — 重複クラスタのベースライン台帳（機械検証可能な事実の正本）
+#
+# 位置づけ: duplication-remediation-strategy.md §2 Layer 2（ラチェット方式）の入力。
+#   duplication-verification-and-critique.md §6 の原則に従い、クラスタのシンボル名・
+#   ファイル集合・許容例外の正本は本ファイルとし、3文書はクラスタ ID と考察のみを持つ。
+#   戦略文書は最終配置を ci/duplication-baseline.txt と定めている。ci/check-duplication.sh
+#   実装（Phase 0）の際に ci/ へ移動し、docs/ からは参照リンクに置き換えること。
+#
+# 形式: タブ区切り4列
+#   <cluster>	<kind>	<pattern>	<allowed-files（カンマ区切り、リポジトリルート相対）>
+#   kind: fn-py / fn-js = 関数定義（def <sym>( / function <sym>( 相当。window.<sym> = も含む）
+#         const = 定数定義 / literal = 固定文字列 / sql = SQL断片 / css = セレクタ定義
+#         markup = HTML断片 / files = パターン検査なし（兄弟リマインダーフック用の紐付けのみ）
+#   pattern が「-」の行は grep 検査対象外（kind=files）。それ以外は fixed-string 検索を想定。
+#
+# 運用（ラチェット）:
+#   1. allowed-files に無いファイルに pattern が現れたら CI fail（新規増殖の禁止）
+#   2. クラスタを共通化した PR で該当行を削除する。削除した行は二度と追加しない
+#   3. 行数の合計がそのまま重複の残債メトリクスになる
+#   4. ファイル集合の変更（正当な理由がある場合のみ）は PR で理由を明記する
+#
+# 本ファイルのファイル集合は 2026-07-04 の grep 実測値。台帳の記載と異なる箇所（実測の方が
+# 広い）: R1 の MYSQL_HOST は batch 5 + morpheme-sample 3、R4 はテスト含め 4、R5 の
+# .page-header は manual.css 含め 5（manual は同名別ルール）、C2 の投票markupは JS 2 + テンプレ 3、
+# J3 の root_path 供給要素は root-path-data（JS 8 + テンプレ 8 + テスト 1）と app-root-path
+# （base.js + base.html）の2系統が並存（台帳未記載の分岐。quiz.html は cfg JSON、
+# offline-access.js は独自ヘルパでさらに別系統）。
+# 台帳未記載でベースライン検証時に新たに検出した増殖:
+#   - R6: .filter-bar の同一ルールが index.css(805) にもある（計3コピー、台帳は2）
+#   - C5: 5軸ラベルの真のマスタは batch/prompts/community_note_system_prompt.txt（LLM への
+#     出力指示）。C5 も C4 と同型の app↔batch 境界越えクラスタである（台帳は app 側4箇所のみ記載）
+
+# ---- JS クラスタ ----
+J1	fn-js	vote	app/static/js/user-comments.js,app/static/js/cluster-comments.js,app/static/js/vod-comments.js
+J1	fn-js	flushVote	app/static/js/user-comments.js,app/static/js/cluster-comments.js
+J1	fn-js	hydrateDeferredVoteControls	app/static/js/user-comments.js,app/static/js/cluster-comments.js
+J1	fn-js	renderVoteButtonsMarkup	app/static/js/user-comments.js
+J1	fn-js	loadVoteCounts	app/static/js/vod-comments.js
+J2	fn-js	normalizeUtcIso	app/static/js/users.js,app/static/js/index.js
+J2	fn-js	formatRelativeTime	app/static/js/index.js,app/static/js/user-comments.js
+J2	fn-js	formatDate	app/static/js/users.js,app/static/js/vods.js
+J2	fn-js	getJSTDate	app/static/js/user-comments.js
+J3	literal	root-path-data	app/static/js/cluster-comments.js,app/static/js/index.js,app/static/js/user-comments.js,app/static/js/user-ego-graph.js,app/static/js/user-stats.js,app/static/js/users.js,app/static/js/vod-comments.js,app/static/js/vods.js,app/templates/cluster_comments.html,app/templates/index.html,app/templates/streamers.html,app/templates/user_comments.html,app/templates/user_stats.html,app/templates/users.html,app/templates/vod_comments.html,app/templates/vods.html,app/tests/integration/test_html.py
+J3	literal	app-root-path	app/static/js/base.js,app/templates/base.html
+J3	fn-js	normalizeRootPath	app/static/offline-access.js
+J4	fn-js	escapeHtml	app/static/js/quiz.js,app/static/js/cluster-comments.js,app/static/js/user-comments.js
+J5	fn-js	spawnConfetti	app/static/js/quiz.js,app/static/js/cluster-comments.js,app/static/js/user-comments.js
+J6	files	-	app/static/js/vods.js,app/static/js/user-comments.js
+
+# ---- Python クラスタ（app 内）----
+P1	sql	cn.harm_risk AS cn_harm_risk	app/routers/search.py,app/repositories/comment_repo.py
+P1	files	-	app/repositories/comment_repo.py,app/routers/search.py,app/routers/best9.py
+P2	files	-	app/repositories/comment_repo.py,app/repositories/vod_repo.py
+P3	fn-py	find_user	app/repositories/user_repo.py
+P3	files	-	app/repositories/user_repo.py,app/routers/search.py
+P4	files	-	app/routers/search.py
+P5	files	-	app/repositories/comment_repo.py
+P6	fn-py	normalize_comment_ids	app/services/vote_input.py
+P6	files	-	app/services/vote_input.py,app/repositories/comment_repo.py,app/core/config.py
+P7	files	-	app/services/comment_utils.py,app/services/index_service.py
+P8	fn-py	_parse_int	app/routers/comments.py,app/routers/vods.py
+P9	sql	INTERVAL 9 HOUR	app/repositories/stats_repo.py
+P9	files	-	app/repositories/stats_repo.py,app/services/comment_utils.py,app/services/comment_service.py
+P10	sql	cn.harm_risk + cn.exaggeration	app/repositories/comment_repo.py,app/repositories/stats_repo.py
+P10	files	-	app/static/js/user-comments.js,app/templates/vod_comments.html,app/repositories/comment_repo.py,app/repositories/stats_repo.py,app/services/stats_service.py
+
+# ---- クロス層クラスタ ----
+C1	fn-py	parse_raw_comment	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	fn-py	_sanitize_emote_text	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	fn-py	normalize_emote_id	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	fn-py	render_comment_body_html	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	const	BODY_HTML_RENDER_VERSION =	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	const	EMOTE_URL_TEMPLATE	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	const	EMOTE_ID_PATTERN	app/services/comment_utils.py,batch/scripts/comment_body_html.py
+C1	literal	static-cdn.jtvnw.net	app/services/comment_utils.py,batch/scripts/comment_body_html.py,app/static/js/user-comments.js,app/static/js/quiz.js,app/core/middleware.py,app/static/sw.js,app/tests/unit/test_comment_utils.py
+C2	markup	onclick="vote(this	app/templates/cluster_comments.html,app/templates/user_comments.html,app/templates/vod_comments.html,app/static/js/cluster-comments.js,app/static/js/user-comments.js
+C3	fn-js	renderCommunityNote	app/static/js/user-comments.js
+C3	files	-	app/static/js/user-comments.js,app/templates/vod_comments.html,app/templates/user_comments.html
+C4	literal	裏付けあり	app/static/js/user-comments.js,app/templates/vod_comments.html,app/templates/user_comments.html,app/templates/user_stats.html,app/templates/manual.html
+C4	const	ALLOWED_STATUSES	batch/scripts/generate_community_notes.py
+C5	literal	検証可能性	app/static/js/user-comments.js,app/static/js/user-stats.js,app/templates/user_comments.html,app/templates/manual.html,batch/prompts/community_note_system_prompt.txt,batch/prompts/community_note_system_prompt.txt.example
+C6	literal	le=200	app/routers/comments.py,app/routers/vods.py
+
+# ---- 追加検証クラスタ ----
+N1	fn-py	count_user_comments	app/repositories/stats_repo.py,app/repositories/comment_repo.py
+N2	fn-js	appendSafeBodyHtml	app/static/js/user-comments.js,app/static/js/quiz.js
+N3	files	-	app/services/comment_utils.py,app/static/js/index.js,app/static/js/user-comments.js
+N4	fn-py	_is_enabled	app/clients/faiss.py,app/clients/morpheme.py
+N5	fn-py	get_user_id	app/clients/twitch.py,util/userid.py,util/adduserid.py
+N5	fn-py	load_env	util/userid.py,util/adduserid.py,util/tokens.py
+N6	fn-js	showStatus	app/static/js/users.js,app/static/js/vods.js
+N6	fn-js	hideStatus	app/static/js/users.js,app/static/js/vods.js
+N7	files	-	app/routers/comments.py,app/routers/vods.py
+
+# ---- リポジトリ全域クラスタ ----
+R1	fn-py	get_database_url	app/core/config.py,migrate/migrations/env.py
+R1	literal	getenv("MYSQL_HOST"	batch/scripts/insertdb.py,batch/scripts/backfill_comment_body_html.py,batch/scripts/analyze_morphemes.py,batch/scripts/build_faiss_index.py,batch/scripts/generate_community_notes.py,morpheme-sample/analyze_user_comments.py,morpheme-sample/word_ranking.py,morpheme-sample/pipeline.py
+R2	fn-py	fetch_task	challenge/baseline_adaptive.py,challenge/baseline_centroid.py,challenge/baseline_ensemble.py,challenge/baseline_gbm.py,challenge/baseline_handcrafted.py,challenge/baseline_janome.py,challenge/baseline_nb.py,challenge/baseline_random.py,challenge/baseline_rf.py,challenge/baseline_svm.py,challenge/baseline_tfidf.py,challenge/baseline_word_ngram.py,challenge/run_all.py,challenge/sentence_bert_utils.py
+R2	fn-py	submit_answers	challenge/baseline_adaptive.py,challenge/baseline_centroid.py,challenge/baseline_ensemble.py,challenge/baseline_gbm.py,challenge/baseline_handcrafted.py,challenge/baseline_janome.py,challenge/baseline_nb.py,challenge/baseline_random.py,challenge/baseline_rf.py,challenge/baseline_svm.py,challenge/baseline_tfidf.py,challenge/baseline_word_ngram.py,challenge/run_all.py,challenge/sentence_bert_utils.py
+R3	fn-py	fetch_comments	morpheme-sample/analyze_user_comments.py,morpheme-sample/word_ranking.py,morpheme-sample/pipeline.py,app/repositories/comment_repo.py
+R3	fn-py	call_analyze_api	morpheme-sample/analyze_user_comments.py,morpheme-sample/word_ranking.py,morpheme-sample/pipeline.py,batch/scripts/analyze_morphemes.py
+R3	fn-py	count_words	morpheme-sample/pipeline.py,morpheme-sample/word_ranking.py
+R4	literal	id.twitch.tv/oauth2/token	util/tokens.py,util/refreshtoken.py,batch/scripts/get_vod_list_batch.py,app/tests/unit/test_get_vod_list_batch.py
+R5	css	.page-header {	app/static/css/streamers.css,app/static/css/users.css,app/static/css/vods.css,app/static/css/vod_comments.css,app/static/css/manual.css
+R5	css	.vote-btn {	app/static/css/base.css,app/static/css/vod_comments.css
+R5	files	-	app/static/css/user_comments.css,app/static/css/vod_comments.css
+R6	css	.filter-bar {	app/static/css/users.css,app/static/css/vods.css,app/static/css/index.css
+R6	files	-	app/templates/users.html,app/templates/vods.html
+R7	files	-	app/templates/vod_comments.html
+R7	files	-	faiss-api/main.py,morpheme-api/main.py
+
+# ---- 検証層・指示層クラスタ ----
+T1	fn-py	_clear_all_tables	app/tests/ui/conftest.py,app/tests/integration/conftest.py
+T1	fn-py	apply_migrations	app/tests/ui/conftest.py,app/tests/integration/conftest.py
+T1	fn-py	db_engine	app/tests/ui/conftest.py,app/tests/integration/conftest.py
+T1	fn-py	db	app/tests/ui/conftest.py,app/tests/integration/conftest.py
+T1	fn-py	_load_check_schema_module	app/tests/unit/test_schema_check.py,app/tests/integration/test_schema_check.py
+M1	files	-	AGENTS.md,CLAUDE.md
+
+# ---- 意図的コピー / 検査除外（戦略 §2 Layer 4）----
+# EXEMPT <パス or glob>	<理由>	<扱い>
+EXEMPT	challenge/baseline_*.py,challenge/run_all.py	ベースラインは参加者配布物で1ファイル完結が仕様（forking パターン）	同名関数ガードは R2 行の許容集合で管理。同期ガード対象（正: challenge/sentence_bert_utils.py）
+EXEMPT	migrate/migrations/versions/	Alembic 規約の upgrade/downgrade	パス除外
+EXEMPT	app/static/sw.js	Service Worker は DOM 不可・スコープ由来の独自 root_path 正規化	現状維持（J3 の正規化仕様変更時に追随）
+EXEMPT	zen/	ES modules 分割済み・重複なし	対象外（集約の手本）
+EXEMPT	challenge/.venv/,**/node_modules/,**/__pycache__/	外部パッケージ	走査対象外
+EXEMPT	docs/,ci/,.claude/,.github/	文書・検査スクリプト自体がシンボル名やリテラルを言及するため	走査対象外

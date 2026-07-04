@@ -10,6 +10,7 @@
   - 2026-07-01 の全コード再走査で **N1〜N7** を追加。C1（body_html）は **クライアント検証層（JS）** まで含む多層重複だと判明し、実測で **app↔batch のコメント差分（コメント行の分岐）** も検出した。既存 C1〜C6 / J1〜J6 / P1〜P10 は全件コードで裏取り済み（行番号は 6/29 以降のコミットで多少ズレるが構造は不変）。
   - 2026-07-02 に **既存29クラスタを全件再検証（全件現存を確認、下記の増殖・訂正あり）** し、これまで一度も走査対象になっていなかった **challenge/ ・ morpheme-sample/ ・ util/ ・ migrate/ ・ faiss-api/ ・ morpheme-api/ ・ twicome-mcp-server/ ・ CSS層** を走査して **R1〜R7** を追加。台帳のスコープ外だったディレクトリに最大14ファイル同一コピーのクラスタが存在した。
   - 2026-07-03 に手法を替えて再監査: **AST 正規化ハッシュによる機械走査**（同名 grep では捕まらない改名クローンも対象）と **git 履歴の co-change 定量分析**を実施。既存クラスタは全て機械走査でも裏付けられ、本番コードに改名クローンは無いことを確認（同名 grep 方式の妥当性を実証）。一方で **テスト基盤（T1）と指示ファイル（M1）** の2クラスタを新規検出し、R1-R7 時の「テストはシロ」判定を撤回。C1 は emote 仕様の Python 第3実装（`_BodyHtmlSanitizer`）を追加確認し **5実装**に訂正。証拠と考察の詳細は [duplication-verification-and-critique.md](duplication-verification-and-critique.md)。
+  - 2026-07-04 にベースライン台帳 **[duplication-baseline.txt](duplication-baseline.txt)** を作成（戦略 Layer 2 の「シンボル → 許容ファイル集合」を全クラスタ分 grep 実測で凍結。最終配置は `ci/`、Phase 0 で移動）。作成時に全行を実リポジトリと照合した結果、**台帳未記載の増殖3件**を検出し J3・C5・R6 に追記した——供給要素2系統（J3）、batch プロンプトが軸ラベルのマスタ（C5）、`.filter-bar` の3コピー目（R6）。以後ファイル集合の正本はベースライン側とし、本台帳はクラスタ ID と考察を持つ（検証編 §6 の原則）。
 - 危険度の本質は「重複」そのものではなく **すでに分岐（divergence）していること**。同一責務のはずのコピーが挙動を違え、過去の fix が一部のコピーにしか反映されていない。
 - 個々のコードの質は高い（コメント・コミット粒度とも良好）。問題は設計上の一点＝**単一の真実（source of truth）の欠如**に集約される。
 
@@ -57,6 +58,8 @@
 - （参考: `sw.js` は SW スコープ由来の独自正規化。DOM を読めない制約上やむを得ないが、正規化仕様を変えるときは追随が必要）
 
 集約先: `base.js` の正規化を全JSが import。
+
+2026-07-04 追記（ベースライン照合で検出）: 正規化ロジックだけでなく **root_path の供給要素自体が2系統に分岐**している——`root-path-data`（読む側 JS 8ファイル + 出力するテンプレート8ファイル + integration テスト1）と `app-root-path`（`base.js` + `base.html`）。`base.js` の既存ヘルパは後者しか読まないため、「base.js に集約」は**要素 ID の統一を伴わないと成立しない**（quiz.html は cfg JSON 経由、offline-access.js は独自ヘルパでさらに別系統）。ファイル集合の全量は [duplication-baseline.txt](duplication-baseline.txt) の J3 行を正とする。
 
 ### J4. ⚪ `escapeHtml`
 `quiz.js`(55) `cluster-comments.js`(11) `user-comments.js`(65) の3複製（実装は同等）。
@@ -160,6 +163,8 @@ JS `renderVoteButtonsMarkup`(user-comments.js 296) と**同一のボタンHTML**
 ### C5. ⚪ CNスコア5軸のラベル＋配色
 `検証可能性/被害可能性/誇張度/根拠不足/主観度` と hex色が `user-comments.js`(193) `user_comments.html`(364-385) `user-stats.js`(68 チャート) に三重化。2026-07-02 追記: `manual.html`(351) にも軸名が文書として存在（4箇所目）。集約先: 軸定義（ラベル+色）の単一データ。
 
+2026-07-04 追記（ベースライン照合で検出）: 軸ラベルの**真のマスタは `batch/prompts/community_note_system_prompt.txt`(25) の LLM 出力指示**（`.example` 含め2ファイル、app からは参照されない別デプロイ）。つまり C5 は表示層の三重化ではなく、**C4 と同型の app↔batch 境界越えクラスタ**である。軸の追加・改名・意味変更はプロンプトと app 側表示の同時更新が必要で、片方だけ変えると「スコアの意味と画面のラベルが食い違う」C1 型のサイレント不整合になる。集約時は C4 の `NoteStatus` enum と同様に shared の軸定義を正とし、プロンプト生成もそこから供給するのが筋。
+
 ### C6. ⚪ ページング引数ボイラープレート
 `page:int=Query(1,ge=1)` / `page_size:int=Query(N,ge=10,le=200)` が `vods.py` `comments.py` の各エンドポイントに反復し、上限200のマジックナンバーが散在。集約先: 共通 Depends/Pydantic パラメータ。
 
@@ -226,6 +231,8 @@ N5 は `get_user_id`（helix/users）だけを見ていたが、**トークン�
 
 ### R6. ⚪ users/vods 兄弟ページのフィルタUI（N6のテンプレ+CSS層）
 `users.html`(23-35) と `vods.html`(23-35) の `filter-bar / filter-item / sort-select` マークアップが行番号まで一致するコピー。対応する `.filter-bar` `.filter-item` `.filter-select` ルールも `users.css` / `vods.css` に二重。N6（JS骨格）と合わせ、リストページ雛形（テンプレ・CSS・JS）を3層セットで共通化するのが正道。
+
+2026-07-04 追記（ベースライン照合で検出）: `.filter-bar` の同一ルール（display:flex / gap:12px / flex-wrap:wrap）が `index.css`(805) にも存在し**計3コピー**。トップページのフィルタUIも同じ骨格を再掲しており、本クラスタの共通化対象に index.css を含めること。
 
 ### R7. ⚪ 同一ファイル内・サービス雛形の小規模重複
 - `vod_comments.html`(108, 180): ページングブロック（前/次＋件数表示）が**同一ファイル内で上下に2回コピー**。マクロ化で1定義に（C6/N7 と同族）。
