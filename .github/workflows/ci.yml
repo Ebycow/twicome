@@ -53,6 +53,32 @@ jobs:
           print(f"syntax compile ok: {count} files")
           PY
 
+  # ── クローン棚卸し（non-blocking、docs/duplication-verification-and-critique.md §2） ──
+  clone-scan:
+    name: Clone Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run clone scan (non-blocking)
+        run: |
+          python ci/clone_scan.py | tee clone-scan.txt
+          {
+            echo "## Clone Scan（non-blocking 棚卸し）"
+            echo
+            echo '```text'
+            cat clone-scan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ── Lint / format チェック ────────────────────────────────────────────────
   lint:
     name: Lint
