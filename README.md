@@ -53,10 +53,10 @@ DEFAULT_LOGIN=userid
 
 DB・Redisの接続先はDocker Compose使用時はデフォルト値のままでよい。
 
-### 2. アプリ起動
+### 2. アプリ起動（開発）
 
 ```bash
-docker compose -f docker-compose.yml up --build
+docker compose -f docker-compose.dev.yml --profile faiss up --build
 ```
 
 アプリは `http://localhost:8011` で起動する。
@@ -66,10 +66,10 @@ docker compose -f docker-compose.yml up --build
 ### lint・テストの一括実行
 
 ```bash
-./run_batch.sh
+./ci-local.sh
 ```
 
-`run_batch.sh` は `docker-compose.dev.yml` を使い、lint・テストをまとめて実行するスクリプト。
+`ci-local.sh` は `docker-compose.dev.yml` を使い、GitHub Actions CI と同じ lint・テストをまとめて実行するスクリプト。
 
 ### 個別実行
 
@@ -122,21 +122,31 @@ VODリストの取得・コメントダウンロード・DBインポート・FAI
 
 ```
 twicome/
-├── app/                   # FastAPIアプリ本体
-│   ├── routers/           # APIエンドポイント
-│   ├── services/          # ビジネスロジック
-│   ├── repositories/      # DBアクセス層
-│   ├── templates/         # Jinja2テンプレート
-│   ├── static/            # JS / CSS / PWAリソース
-│   └── tests/             # unit / integration / ui
-├── batch/                 # バッチ処理スクリプト
-├── faiss-api/             # FAISSマイクロサービス
-├── migrate/               # Alembicマイグレーション
-├── challenge/             # クイズチャレンジAPIとベースライン
-├── docker-compose.yml     # 本番設定
-├── docker-compose.dev.yml # 開発・テスト設定
-├── run_batch.sh           # バッチ一括実行スクリプト
-└── .env.example           # 環境変数テンプレート
+├── app/                    # FastAPIアプリ本体
+│   ├── core/               # 設定・DB・キャッシュ・ミドルウェア
+│   ├── clients/            # 外部サービスクライアント（Twitch / FAISS / 形態素API）
+│   ├── routers/            # APIエンドポイント
+│   ├── services/           # ビジネスロジック
+│   ├── repositories/       # DBアクセス層
+│   ├── templates/          # Jinja2テンプレート
+│   ├── static/             # JS / CSS / PWAリソース
+│   └── tests/              # unit / integration / ui
+├── batch/                  # バッチ処理スクリプト（VOD取得・コメントDL・DBインポート・FAISS構築等）
+├── faiss-api/              # FAISS検索マイクロサービス
+├── morpheme-api/           # 形態素解析マイクロサービス
+├── migrate/                # Alembicマイグレーション
+├── twicome-mcp-server/     # Twicome HTTP API を公開するMCPサーバー
+├── challenge/              # クイズチャレンジのベースライン実装群
+├── morpheme-sample/        # 形態素解析のサンプルスクリプト
+├── util/                   # Twitch API補助スクリプト（トークン取得等）
+├── library/                # 同梱バイナリ（TwitchDownloaderCLI）
+├── ci/                     # CI補助スクリプト（クローン検出等）
+├── docs/                   # 調査・設計ドキュメント
+├── docker-compose.yml      # 本番設定
+├── docker-compose.dev.yml  # 開発・テスト設定
+├── ci-local.sh             # ローカルCI一括実行スクリプト
+├── run_batch.sh            # バッチ一括実行スクリプト
+└── .env.example            # 環境変数テンプレート
 ```
 
 ## 本番デプロイ
