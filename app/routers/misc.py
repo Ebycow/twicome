@@ -1,11 +1,14 @@
+import logging
 import re
 
 import pandas as pd
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from clients.twitch import get_user_id
+from clients.twitch import TwitchApiError, get_user_id
 from core.templates import templates
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -43,7 +46,15 @@ def add_user(request: Request, username: str = Form(...)):
         else:
             return RedirectResponse(url=str(request.url_for("add_user_page")) + "?error=無効なURLです", status_code=303)
 
-    user_id = get_user_id(username)
+    try:
+        user_id = get_user_id(username)
+    except TwitchApiError:
+        logger.exception("Twitch API からユーザー ID を取得できませんでした: %s", username)
+        return RedirectResponse(
+            url=str(request.url_for("add_user_page"))
+            + "?error=Twitch との通信に失敗しました。しばらく経ってから再度お試しください",
+            status_code=303,
+        )
     if not user_id:
         return RedirectResponse(
             url=str(request.url_for("add_user_page")) + f"?error=ユーザ {username} が見つかりませんでした",
@@ -72,9 +83,7 @@ def add_user(request: Request, username: str = Form(...)):
             status_code=303,
         )
     except Exception:
-        import logging
-
-        logging.exception("CSV書き込みエラー")
+        logger.exception("CSV書き込みエラー")
         return RedirectResponse(
             url=str(request.url_for("add_user_page"))
             + "?error=ユーザの追加に失敗しました。しばらく経ってから再度お試しください",
