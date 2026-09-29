@@ -3,7 +3,7 @@
 /**
  * UI コントローラーを生成する。
  * @param {object} state - 共有ミュータブル状態オブジェクト
- * @param {{overlay: HTMLElement, canvas: HTMLCanvasElement, commentEl: HTMLElement, commentWrap: HTMLElement|null, themeSwitcher: HTMLElement|null, fsBtn: HTMLElement|null}} dom - DOM 要素群
+ * @param {{overlay: HTMLElement, canvas: HTMLCanvasElement, commentEl: HTMLElement, commentWrap: HTMLElement|null, themeSwitcher: HTMLElement|null, fsBtn: HTMLElement|null, dopamine: {sceneId: string, activate: Function, deactivate: Function}|null}} dom - DOM 要素群（dopamine はドーパミン演出）
  * @param {{SCENES: Array, sceneMap: Map}} scenesData - シーン定義データ
  * @param {{initGL: Function, resizeCanvas: Function, buildSceneProgram: Function, render: Function}} renderer - レンダラー関数群
  * @param {{collectComments: Function, showNextComment: Function, cancelCarousel: Function}} carousel - カルーセル関数群
@@ -78,6 +78,21 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
   }
 
   /**
+   * 表示中かつドーパミンシーンのときだけドーパミン演出を動かす。
+   * @returns {void}
+   */
+  function syncDopamine() {
+    if (!dom.dopamine) {
+      return;
+    }
+    if (!dom.overlay.hidden && state.currentSceneId === dom.dopamine.sceneId) {
+      dom.dopamine.activate();
+    } else {
+      dom.dopamine.deactivate();
+    }
+  }
+
+  /**
    * シーンを切り替えて、必要なら GL プログラムも差し替える。
    * @param {string} sceneId - 切り替え先のシーン ID
    * @returns {void}
@@ -88,6 +103,7 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
     dom.overlay.dataset.zenScene = state.currentSceneId;
     storeSceneId(state.currentSceneId);
     updateThemeButtons();
+    syncDopamine();
 
     if (!state.glReady) {
       return;
@@ -157,6 +173,7 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
       applyScene(state.currentSceneId);
     } else {
       dom.canvas.style.display = 'none';
+      syncDopamine();
     }
 
     if (state.raf === null) {
@@ -194,6 +211,7 @@ export function createUIController(state, dom, scenesData, renderer, carousel, s
     }
 
     dom.overlay.hidden = true;
+    syncDopamine();
     document.body.style.overflow = '';
     dom.commentEl.style.opacity = '0';
     dom.commentEl.style.transform = 'translate3d(0, 18px, 0) scale(0.985)';

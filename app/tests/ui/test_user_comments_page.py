@@ -209,6 +209,40 @@ class TestZenMode:
 
         expect(overlay).to_have_attribute("data-zen-scene", "inferno")
 
+    def test_dopamine_scene_reveals_comment_with_gacha_rank(self, page: Page, db):
+        """
+        【確認内容】ドーパミンシーンではガチャ演出を経てレアリティ付きでコメントが開封される
+
+        🧠 ボタンで切り替えると HUD が表示され、召喚演出の後に
+        コメントへレアリティ (N〜UR) が付与され撃破数が加算されることを確認する。
+        他シーンへ戻すと HUD が隠れることも確認する。
+        """
+        _seed_basic(db, login="fan_dopamine", comment_body="ガチャ引いたら虹色に光った")
+
+        page.goto("/u/fan_dopamine")
+
+        page.locator("#zen-mode-btn").click()
+
+        overlay = page.locator("#zen-overlay")
+        dopamine_button = page.locator(".zen-theme-btn[data-scene-id='dopamine']")
+
+        expect(dopamine_button).to_be_visible()
+
+        dopamine_button.click()
+
+        expect(overlay).to_have_attribute("data-zen-scene", "dopamine")
+        expect(page.locator(".dopa-xp")).to_be_visible()
+        # 現在のコメントの表示が終わってから召喚 → 開封されるまで待つ
+        expect(page.locator("#zen-comment")).to_have_attribute(
+            "data-dopa-rank", re.compile(r"^(N|R|SR|SSR|UR)$"), timeout=20000
+        )
+        expect(page.locator(".dopa-stats [data-stat='kills']")).not_to_have_text("0")
+
+        page.locator(".zen-theme-btn[data-scene-id='night-sky']").click()
+
+        expect(page.locator(".dopa-xp")).to_be_hidden()
+        expect(page.locator("#zen-comment")).not_to_have_attribute("data-dopa-rank", re.compile(".*"))
+
 
 class TestFilterForm:
     """フィルターフォームの動作を確認するテスト群。"""

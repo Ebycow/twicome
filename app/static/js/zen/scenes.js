@@ -1184,6 +1184,111 @@ void main(){
 }
 `;
 
+const DOPAMINE_FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform float u_time;
+uniform vec2 u_res;
+uniform float u_pulse;
+uniform float u_charge;
+uniform float u_rarity;
+
+float h2(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+vec3 hsv(float h,float s,float v){vec3 k=clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.);return v*mix(vec3(1.),k,s);}
+
+// 0=N 1=R 2=SR 3=SSR 4=UR(虹)
+vec3 rarityCol(float r,float h){
+  vec3 c=vec3(.55,.66,.85);
+  c=mix(c,vec3(.15,.75,1.),step(.5,r));
+  c=mix(c,vec3(.78,.35,1.),step(1.5,r));
+  c=mix(c,vec3(1.,.76,.18),step(2.5,r));
+  c=mix(c,hsv(h,.8,1.),step(3.5,r));
+  return c;
+}
+
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*u_res)/u_res.y;
+  float t=u_time;
+  float r=length(uv);
+  float a=atan(uv.y,uv.x);
+  float an=a/6.28318+.5;
+  float ch=u_charge;
+  float burst=exp(-u_pulse*1.4);
+  float flash=exp(-u_pulse*9.);
+  float energy=clamp(max(ch*ch,burst),0.,1.);
+  float beat=pow(.5+.5*sin(t*10.),8.);
+
+  vec3 rc=rarityCol(u_rarity,an+t*.15);
+  vec3 rainbow=hsv(an*2.+t*.12-r*.6,.85,1.);
+  vec3 tint=mix(rainbow,rc,energy*.85);
+
+  // 色相が巡る背景
+  vec3 col=hsv(t*.03+r*.35+.75,.85,.16+.08*beat)*(1.3-r*.7);
+
+  // ガチャのサンバースト (チャージで加速・太くなる)
+  float spin=t*.4+ch*ch*9.;
+  float rays=pow(.5+.5*sin(a*18.+spin),mix(10.,2.5,energy));
+  float rays2=pow(.5+.5*sin(a*11.-spin*1.6+1.),14.);
+  float rayMask=smoothstep(.02,.18,r)*exp(-r*mix(1.8,.7,energy));
+  col+=tint*(rays*(.35+1.1*energy)+rays2*.25)*rayMask;
+
+  // 鼓動に合わせて広がるリング
+  float rings=smoothstep(.9,1.,sin((r-t*.35)*22.));
+  col+=tint*rings*exp(-r*1.8)*(.18+.25*beat);
+
+  // 開封時の衝撃波
+  float sw=exp(-abs(r-u_pulse*1.9)*30.)+.6*exp(-abs(r-u_pulse*1.2)*22.);
+  col+=mix(vec3(1.),rc,.5)*sw*burst*1.6;
+
+  // 中心へ吸い込まれる集中線
+  float bucket=floor(an*160.);
+  float rnd=h2(vec2(bucket,7.));
+  float dash=fract(r*1.3+t*(1.6+rnd*2.4)+rnd*9.);
+  float lines=step(.72,rnd)*smoothstep(.55,1.,dash)*smoothstep(.1,.45,r);
+  col+=vec3(1.)*lines*(ch*1.1+burst*.6);
+
+  // ワープする星
+  float warp=.1+energy*.9;
+  for(int i=0;i<4;i++){
+    float fi=float(i);
+    float z=fract(fi*.25+t*(.08+warp*.35));
+    float sc=mix(22.,1.2,z);
+    vec2 g=uv*sc+vec2(fi*17.3,fi*9.1);
+    vec2 id=floor(g);
+    vec2 f=fract(g)-.5;
+    float n=h2(id+fi*31.7);
+    vec2 o=vec2(h2(id+3.1),h2(id+7.7))-.5;
+    float d=length(f-o*.7);
+    float fade=smoothstep(0.,.35,z)*smoothstep(1.,.75,z);
+    col+=hsv(n*3.+t*.2,.45,1.)*smoothstep(.09,0.,d)*step(.72,n)*fade*1.4;
+  }
+
+  // きらめき
+  vec2 gg=uv*5.;
+  vec2 gid=floor(gg);
+  float gn=h2(gid+11.3);
+  vec2 q=fract(gg)-.5-(vec2(h2(gid+1.7),h2(gid+2.9))-.5)*.6;
+  float tw=pow(max(0.,sin(t*2.6+gn*40.)),10.);
+  float glint=smoothstep(.018,0.,abs(q.x))*smoothstep(.22,0.,abs(q.y))
+             +smoothstep(.018,0.,abs(q.y))*smoothstep(.22,0.,abs(q.x));
+  col+=vec3(1.,.95,.8)*glint*tw*step(.5,gn)*(.8+energy);
+
+  // 中心コア
+  float core=.025/(r+.03);
+  col+=rc*core*(ch*(1.+.2*sin(t*22.))+burst*.8);
+  col+=tint*core*.12*beat;
+
+  col+=mix(vec3(1.),rc,.3)*flash*.9;
+
+  col*=1.-.45*smoothstep(.4,1.2,r);
+  col=1.-exp(-col*1.25);
+  gl_FragColor=vec4(col,1.);
+}
+`;
+
 export const SCENES = [
   {
     id: 'night-sky',
@@ -1238,6 +1343,12 @@ export const SCENES = [
     label: 'パラパラ',
     emoji: '🪩',
     fragmentSource: Y2K_PARA_FRAG
+  },
+  {
+    id: 'dopamine',
+    label: 'ドーパミン',
+    emoji: '🧠',
+    fragmentSource: DOPAMINE_FRAG
   }
 ];
 

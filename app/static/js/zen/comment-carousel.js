@@ -6,9 +6,10 @@
  * @param {HTMLElement} commentEl - コメントテキスト表示要素
  * @param {HTMLElement|null} commentWrap - コメントラッパー要素（波紋演出用）
  * @param {{speak: Function}|null} [tts] - TTS コントローラー（省略可）
+ * @param {{sceneId: string, summon: Function, dismiss: Function}|null} [dopamine] - ドーパミン演出（省略可）
  * @returns {{collectComments: Function, showNextComment: Function, pulseCommentAura: Function, cancelCarousel: Function}} カルーセル関数群
  */
-export function createCarousel(state, commentEl, commentWrap, tts) {
+export function createCarousel(state, commentEl, commentWrap, tts, dopamine) {
   let generation = 0;
   /**
    * DOM 内のコメント本文をテキストとして収集してシャッフルして返す。
@@ -51,6 +52,59 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
   }
 
   /**
+   * ドーパミンモード: ガチャ召喚演出で開封してからコメントを叩きつけ、
+   * 表示時間と TTS 読み上げ完了を待って弾け飛ばす。
+   * @param {{html: string, tts: string}} comment - 表示するコメント
+   * @param {number} gen - 呼び出し時のカルーセル世代
+   * @returns {void}
+   */
+  function showDopamineComment(comment, gen) {
+    commentEl.style.transition = 'none';
+    commentEl.style.opacity = '0';
+    commentEl.style.transform = 'none';
+    commentEl.style.filter = 'none';
+    commentEl.innerHTML = comment.html;
+
+    dopamine.summon().then(function (revealed) {
+      if (gen !== generation) {
+        return;
+      }
+      // シーン切替で召喚が中断されたら、新しいシーンで次のコメントへ
+      if (!revealed) {
+        showNextComment();
+        return;
+      }
+
+      commentEl.style.opacity = '1';
+      const ttsPromise = tts ? tts.speak(comment.tts) : Promise.resolve();
+      const minDisplayPromise = new Promise(function (r) {
+        state.slideTimer = setTimeout(function () {
+          state.slideTimer = null;
+          r();
+        }, 5600);
+      });
+
+      Promise.all([minDisplayPromise, ttsPromise]).then(function () {
+        if (gen !== generation) {
+          return;
+        }
+
+        dopamine.dismiss();
+        commentEl.style.transition = 'opacity 0.35s ease, transform 0.4s ease, filter 0.4s ease';
+        commentEl.style.opacity = '0';
+        commentEl.style.transform = 'scale(1.35)';
+        commentEl.style.filter = 'blur(8px)';
+        setTimeout(function () {
+          if (gen !== generation) {
+            return;
+          }
+          showNextComment();
+        }, 420);
+      });
+    });
+  }
+
+  /**
    * 次のコメントをフェードイン表示し、表示時間経過後にフェードアウト、
    * さらに TTS 読み上げ完了を待ってから次へ進める。
    * @returns {void}
@@ -63,6 +117,11 @@ export function createCarousel(state, commentEl, commentWrap, tts) {
     const gen = generation;
     const comment = state.comments[state.commentIdx % state.comments.length];
     state.commentIdx += 1;
+
+    if (dopamine && state.currentSceneId === dopamine.sceneId) {
+      showDopamineComment(comment, gen);
+      return;
+    }
 
     const isMatrix = state.currentSceneId === 'matrix-rain';
 

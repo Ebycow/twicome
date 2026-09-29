@@ -8,12 +8,16 @@ const [
   { createCarousel },
   { createUIController },
   { createTTSController },
+  { createDopamineFx },
+  { createDopamineSfx },
 ] = await Promise.all([
   import(`./zen/scenes.js${_q}`),
   import(`./zen/gl-renderer.js${_q}`),
   import(`./zen/comment-carousel.js${_q}`),
   import(`./zen/ui-controller.js${_q}`),
   import(`./zen/tts-controller.js${_q}`),
+  import(`./zen/dopamine-fx.js${_q}`),
+  import(`./zen/dopamine-sfx.js${_q}`),
 ]);
 
 const STORAGE_KEY = 'twicome-zen-scene';
@@ -55,6 +59,7 @@ const commentWrap = document.getElementById('zen-comment-wrap');
 const closeBtn = document.getElementById('zen-close-btn');
 const fsBtn = document.getElementById('zen-fs-btn');
 const ttsBtn = document.getElementById('zen-tts-btn');
+const sfxBtn = document.getElementById('zen-sfx-btn');
 const triggerBtn = document.getElementById('zen-mode-btn');
 const themeSwitcher = document.getElementById('zen-theme-switcher');
 
@@ -79,13 +84,16 @@ function init() {
     comments: [],
     commentIdx: 0,
     slideTimer: null,
-    lunarPhase: 0
+    lunarPhase: 0,
+    fxUniforms: { burstAt: -Infinity, chargeStart: 0, chargeEnd: 0, rarity: 0 }
   };
 
   const tts = createTTSController();
+  const sfx = createDopamineSfx();
+  const dopamine = createDopamineFx(state, { overlay, commentEl, commentWrap }, sfx);
   const renderer = createRenderer(state, canvas, overlay, VERT, ATTR_POSITION);
-  const carousel = createCarousel(state, commentEl, commentWrap, tts);
-  const dom = { overlay, canvas, commentEl, commentWrap, themeSwitcher, fsBtn, tts };
+  const carousel = createCarousel(state, commentEl, commentWrap, tts, dopamine);
+  const dom = { overlay, canvas, commentEl, commentWrap, themeSwitcher, fsBtn, tts, dopamine };
   const ui = createUIController(
     state, dom, { SCENES, sceneMap }, renderer, carousel, storeSceneId, ATTR_POSITION
   );
@@ -119,10 +127,29 @@ function init() {
       });
     }
   }
+  if (sfxBtn) {
+    if (!sfx.isSupported()) {
+      sfxBtn.hidden = true;
+    } else {
+      sfxBtn.addEventListener('click', function () {
+        const nowEnabled = sfx.toggle();
+        const label = nowEnabled ? '効果音をオフ' : '効果音をオン';
+        sfxBtn.setAttribute('aria-pressed', nowEnabled ? 'true' : 'false');
+        sfxBtn.title = label;
+        sfxBtn.setAttribute('aria-label', label);
+        sfxBtn.innerHTML = nowEnabled
+          ? '<i class="fa-solid fa-bell"></i>'
+          : '<i class="fa-solid fa-bell-slash"></i>';
+      });
+    }
+  }
   if (commentWrap) {
     commentWrap.addEventListener('animationend', function (event) {
       if (event.animationName === 'zen-comment-ripple') {
         commentWrap.classList.remove('is-pulsing');
+      }
+      if (event.animationName === 'dopa-shake') {
+        commentWrap.classList.remove('is-dopa-shake');
       }
     });
   }

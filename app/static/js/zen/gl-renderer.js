@@ -47,7 +47,7 @@ export function createRenderer(state, canvas, overlay, vert, attrPosition) {
   /**
    * シーンに対応する GL プログラムを生成または取得する。
    * @param {{id: string, fragmentSource: string}} scene - 使用するシーン定義
-   * @returns {{program: WebGLProgram, uniforms: {time: WebGLUniformLocation|null, res: WebGLUniformLocation|null, phase: WebGLUniformLocation|null}}|null} プログラム情報
+   * @returns {{program: WebGLProgram, uniforms: Object<string, WebGLUniformLocation|null>}|null} プログラム情報
    */
   function buildSceneProgram(scene) {
     const cached = state.scenePrograms.get(scene.id);
@@ -93,7 +93,10 @@ export function createRenderer(state, canvas, overlay, vert, attrPosition) {
       uniforms: {
         time: gl.getUniformLocation(program, 'u_time'),
         res: gl.getUniformLocation(program, 'u_res'),
-        phase: gl.getUniformLocation(program, 'u_phase')
+        phase: gl.getUniformLocation(program, 'u_phase'),
+        pulse: gl.getUniformLocation(program, 'u_pulse'),
+        charge: gl.getUniformLocation(program, 'u_charge'),
+        rarity: gl.getUniformLocation(program, 'u_rarity')
       }
     };
     state.scenePrograms.set(scene.id, entry);
@@ -190,6 +193,18 @@ export function createRenderer(state, canvas, overlay, vert, attrPosition) {
     }
     if (uniforms.phase) {
       gl.uniform1f(uniforms.phase, state.lunarPhase);
+    }
+    const fx = state.fxUniforms;
+    if (uniforms.pulse) {
+      gl.uniform1f(uniforms.pulse, Math.min((ts - fx.burstAt) * 0.001, 99));
+    }
+    if (uniforms.charge) {
+      const span = fx.chargeEnd - fx.chargeStart;
+      const charge = span > 0 && ts < fx.chargeEnd ? (ts - fx.chargeStart) / span : 0;
+      gl.uniform1f(uniforms.charge, Math.min(Math.max(charge, 0), 1));
+    }
+    if (uniforms.rarity) {
+      gl.uniform1f(uniforms.rarity, fx.rarity);
     }
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }

@@ -798,3 +798,428 @@
           letter-spacing: 0.07em;
         }
       }
+
+      /* ═══════════════════════════════════
+         Zen ドーパミンモード (🧠)
+      ═══════════════════════════════════ */
+      #zen-ui-left {
+        display: flex;
+        gap: 10px;
+      }
+
+      #zen-overlay:not([data-zen-scene="dopamine"]) #zen-sfx-btn,
+      #zen-overlay:not([data-zen-scene="dopamine"]) .dopa-layer {
+        display: none;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] {
+        background: #0a0014;
+
+        --zen-switch-bg: rgba(24, 0, 44, 0.66);
+        --zen-switch-border: rgba(255, 90, 230, 0.38);
+        --zen-switch-text: rgba(255, 230, 255, 0.88);
+        --zen-switch-active-bg: rgba(255, 60, 200, 0.32);
+        --zen-switch-active-border: rgba(255, 220, 90, 0.8);
+        --zen-switch-active-text: #fff;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-theme-switcher,
+      #zen-overlay[data-zen-scene="dopamine"] #zen-ui-left,
+      #zen-overlay[data-zen-scene="dopamine"] #zen-ui {
+        top: 30px;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment-wrap::before,
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment-wrap::after,
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment-wrap.is-pulsing::after {
+        opacity: 0;
+        animation: none;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment-wrap.is-dopa-shake {
+        animation: dopa-shake 0.5s linear;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment {
+        --dopa-c: #a9bcd9;
+
+        font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", system-ui, sans-serif;
+        font-weight: 900;
+        font-size: clamp(1.25rem, 3vw, 2.4rem);
+        line-height: 1.7;
+        letter-spacing: 0.04em;
+        color: #fff;
+        max-width: min(78vw, 980px);
+        padding: 36px 40px 28px;
+        border: 3px solid var(--dopa-c);
+        border-radius: 18px;
+        background: linear-gradient(160deg, rgba(46, 0, 78, 0.8), rgba(8, 0, 26, 0.88));
+        box-shadow:
+          inset 0 0 0 2px rgba(255, 255, 255, 0.12),
+          0 0 24px var(--dopa-c),
+          0 0 70px var(--dopa-c);
+        text-shadow:
+          0 2px 0 #000,
+          0 0 3px #000,
+          0 0 18px var(--dopa-c);
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-tier="1"] { --dopa-c: #3cc8ff; }
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-tier="2"] { --dopa-c: #c46bff; }
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-tier="3"] { --dopa-c: #ffd23f; }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-tier="4"] {
+        --dopa-c: #ff5ce1;
+
+        border-color: transparent;
+        background:
+          linear-gradient(160deg, rgba(46, 0, 78, 0.9), rgba(8, 0, 26, 0.94)) padding-box,
+          linear-gradient(90deg, #ff3b3b, #ffd93b, #3bff6b, #3bd8ff, #7a3bff, #ff3be0) border-box;
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment.is-dopa-slam {
+        animation:
+          dopa-slam 0.62s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+          dopa-throb 0.9s ease-in-out 0.62s infinite;
+      }
+
+      /* レアリティ札 (例: "SSR ★★★★") */
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-rank]::before {
+        content: attr(data-dopa-rank) "  " attr(data-dopa-stars);
+        position: absolute;
+        top: 0;
+        left: 50%;
+        padding: 4px 18px;
+        font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+        font-style: italic;
+        letter-spacing: 0.12em;
+        white-space: nowrap;
+        line-height: 1.5;
+        color: #1a0026;
+        background: var(--dopa-c);
+        border-radius: 999px;
+        text-shadow: none;
+        box-shadow: 0 0 18px var(--dopa-c);
+        transform: translate(-50%, -62%);
+      }
+
+      #zen-overlay[data-zen-scene="dopamine"] #zen-comment[data-dopa-tier="4"]::before {
+        background: linear-gradient(90deg, #ff3b3b, #ffd93b, #3bff6b, #3bd8ff, #7a3bff, #ff3be0);
+      }
+
+      .dopa-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .dopa-fx-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .dopa-xp {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 3;
+        height: 16px;
+        background: rgba(0, 0, 0, 0.72);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.28);
+      }
+
+      .dopa-xp__fill {
+        width: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #1e6bff, #3bd8ff);
+        box-shadow: 0 0 12px #3bd8ff;
+        transition: width 0.18s ease-out;
+      }
+
+      .dopa-xp__level {
+        position: absolute;
+        top: 0;
+        right: 10px;
+        font: italic 900 12px/16px system-ui, sans-serif;
+        color: #fff;
+        text-shadow: 0 1px 2px #000;
+      }
+
+      .dopa-stats {
+        position: absolute;
+        left: 50%;
+        bottom: 20px;
+        z-index: 3;
+        display: flex;
+        gap: 18px;
+        padding: 6px 16px;
+        font: 800 0.95rem/1.4 system-ui, sans-serif;
+        color: #fff;
+        white-space: nowrap;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        transform: translateX(-50%);
+      }
+
+      .dopa-stat b {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .dopa-stat--pity {
+        color: #ffd23f;
+      }
+
+      .dopa-combo {
+        position: absolute;
+        right: 28px;
+        top: 42%;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        font-style: italic;
+        font-weight: 900;
+        color: #ffe23d;
+        text-shadow: 0 3px 0 #b3005f, 0 0 20px rgba(255, 60, 200, 0.8);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .dopa-combo.is-visible {
+        opacity: 1;
+      }
+
+      .dopa-combo.is-bump {
+        animation: dopa-bump 0.4s cubic-bezier(0.3, 1.8, 0.5, 1);
+      }
+
+      .dopa-combo__count {
+        font-size: clamp(2.2rem, 6vw, 4.2rem);
+        line-height: 1;
+      }
+
+      .dopa-combo__label {
+        font-size: 0.95rem;
+        letter-spacing: 0.2em;
+      }
+
+      .dopa-orb {
+        --dopa-orb: #a9bcd9;
+        --dopa-amp: 1px;
+
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 1;
+        width: 150px;
+        height: 150px;
+        margin: -75px 0 0 -75px;
+        opacity: 0;
+        transform: scale(0.2);
+        transition: opacity 0.2s, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      .dopa-orb[data-tier="1"] { --dopa-orb: #3cc8ff; }
+      .dopa-orb[data-tier="2"] { --dopa-orb: #c46bff; }
+      .dopa-orb[data-tier="3"] { --dopa-orb: #ffd23f; }
+      .dopa-orb[data-tier="4"] { --dopa-orb: #ff5ce1; }
+
+      .dopa-orb.is-charging {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .dopa-orb.is-promote {
+        animation: dopa-promote 0.45s ease-out;
+      }
+
+      .dopa-orb__core {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: radial-gradient(circle at 36% 30%, #fff 0%, var(--dopa-orb) 34%, rgba(0, 0, 0, 0) 70%);
+        box-shadow: 0 0 40px var(--dopa-orb), 0 0 120px var(--dopa-orb);
+        transition: box-shadow 0.2s;
+      }
+
+      .dopa-orb.is-charging .dopa-orb__core {
+        animation: dopa-orb-shake 0.08s linear infinite;
+      }
+
+      .dopa-orb[data-tier="4"] .dopa-orb__core {
+        background:
+          radial-gradient(circle at 36% 30%, #fff 0%, rgba(255, 255, 255, 0) 30%),
+          conic-gradient(#ff3b3b, #ffd93b, #3bff6b, #3bd8ff, #7a3bff, #ff3be0, #ff3b3b);
+      }
+
+      .dopa-caption {
+        position: absolute;
+        left: 50%;
+        top: calc(50% + 100px);
+        z-index: 2;
+        font: italic 900 clamp(1.6rem, 4.5vw, 3rem)/1.1 "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+        color: #fff;
+        text-shadow: 0 3px 0 #000, 0 0 24px #ff3be0;
+        opacity: 0;
+        transform: translateX(-50%);
+      }
+
+      .dopa-caption[data-tier="3"] { color: #ffd23f; }
+      .dopa-caption[data-tier="4"] { color: #ff9cf0; }
+
+      .dopa-caption.is-show {
+        animation: dopa-caption-pop 1.2s ease-out forwards;
+      }
+
+      .dopa-banner {
+        position: absolute;
+        left: 50%;
+        top: 18%;
+        z-index: 3;
+        padding: 8px 32px;
+        font: italic 900 clamp(1.6rem, 5vw, 3.2rem)/1.2 system-ui, sans-serif;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+        color: #fff6a8;
+        background: linear-gradient(90deg, rgba(255, 0, 140, 0), rgba(255, 0, 140, 0.6), rgba(255, 0, 140, 0));
+        text-shadow: 0 3px 0 #7a0040, 0 0 22px #ffd23f;
+        opacity: 0;
+        transform: translateX(-50%);
+      }
+
+      .dopa-banner.is-show {
+        animation: dopa-banner 1.8s ease-out forwards;
+      }
+
+      .dopa-flash {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        background: #fff;
+        opacity: 0;
+      }
+
+      .dopa-flash.is-on {
+        animation: dopa-flash 0.5s ease-out;
+      }
+
+      @keyframes dopa-slam {
+        0% { opacity: 0; transform: scale(2.6) rotate(-7deg); filter: blur(10px) brightness(3); }
+        45% { opacity: 1; transform: scale(0.9) rotate(1deg); filter: blur(0) brightness(1.6); }
+        70% { transform: scale(1.07) rotate(0); }
+        100% { opacity: 1; transform: scale(1); filter: none; }
+      }
+
+      @keyframes dopa-throb {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.025); }
+      }
+
+      @keyframes dopa-shake {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-14px, 6px); }
+        20% { transform: translate(12px, -10px); }
+        30% { transform: translate(-10px, -6px); }
+        40% { transform: translate(8px, 8px); }
+        55% { transform: translate(-5px, 3px); }
+        70% { transform: translate(3px, -2px); }
+        85% { transform: translate(-1px, 1px); }
+      }
+
+      @keyframes dopa-orb-shake {
+        0% { transform: translate(var(--dopa-amp), 0); }
+        25% { transform: translate(0, calc(var(--dopa-amp) * -1)); }
+        50% { transform: translate(calc(var(--dopa-amp) * -1), 0); }
+        75% { transform: translate(0, var(--dopa-amp)); }
+        100% { transform: translate(var(--dopa-amp), 0); }
+      }
+
+      @keyframes dopa-promote {
+        0% { transform: scale(1); filter: brightness(1); }
+        30% { transform: scale(1.45); filter: brightness(2.4); }
+        100% { transform: scale(1); filter: brightness(1); }
+      }
+
+      @keyframes dopa-caption-pop {
+        0% { opacity: 0; transform: translateX(-50%) scale(2.2); }
+        18% { opacity: 1; transform: translateX(-50%) scale(0.92); }
+        30% { transform: translateX(-50%) scale(1.05); }
+        80% { opacity: 1; transform: translateX(-50%) scale(1); }
+        100% { opacity: 0; transform: translateX(-50%) scale(1); }
+      }
+
+      @keyframes dopa-banner {
+        0% { opacity: 0; transform: translateX(-50%) scale(0.4); }
+        15% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+        25% { transform: translateX(-50%) scale(1); }
+        80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+      }
+
+      @keyframes dopa-flash {
+        0% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+
+      @keyframes dopa-bump {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.5) rotate(-4deg); }
+        100% { transform: scale(1); }
+      }
+
+      @media (max-width: 720px) {
+        #zen-overlay[data-zen-scene="dopamine"] #zen-theme-switcher {
+          top: 24px;
+        }
+
+        #zen-overlay[data-zen-scene="dopamine"] #zen-ui-left,
+        #zen-overlay[data-zen-scene="dopamine"] #zen-ui {
+          top: auto;
+        }
+
+        #zen-overlay[data-zen-scene="dopamine"] #zen-comment {
+          max-width: 88vw;
+          padding: 30px 20px 20px;
+          font-size: clamp(1.1rem, 5vw, 1.7rem);
+        }
+
+        .dopa-stats {
+          bottom: 68px;
+          gap: 10px;
+          padding: 4px 12px;
+          font-size: 0.8rem;
+        }
+
+        .dopa-combo {
+          top: auto;
+          right: 14px;
+          bottom: 116px;
+        }
+
+        .dopa-orb {
+          width: 110px;
+          height: 110px;
+          margin: -55px 0 0 -55px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #zen-overlay[data-zen-scene="dopamine"] #zen-comment.is-dopa-slam {
+          animation: dopa-fade-in 0.3s ease-out;
+        }
+
+        .dopa-orb.is-charging .dopa-orb__core {
+          animation: none;
+        }
+      }
+
+      @keyframes dopa-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
