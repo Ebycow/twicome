@@ -53,6 +53,19 @@
   const listElement = document.querySelector('.list');
   const isCursorMode = Boolean(filters.cursor);
 
+  // コメントカードのクリックで ?cursor= に遷移する（サーバー描画・JS描画の両方を委譲で処理）。
+  // 本文(.body)はテキスト選択用に遷移対象外とし、選択操作の直後のクリックでも遷移しない。
+  if (listElement) {
+    listElement.addEventListener('click', function (e) {
+      if (e.target.closest('button, a, .body')) {return;}
+      const card = e.target.closest('.comment[id]');
+      if (!card || !listElement.contains(card)) {return;}
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {return;}
+      window.location.href = `?cursor=${  encodeURIComponent(card.id)}`;
+    });
+  }
+
   // FAISS mode flags (declared at top so scroll observer can reference them)
   let isSimilarMode = false;
   let isSpecialMode = false;
@@ -206,22 +219,14 @@
   }
 
   /**
-   * コメントオブジェクトからDOM要素（リンクとコメント本体）を生成して返す。
+   * コメントオブジェクトからコメントカードのDOM要素を生成して返す。
    * @param comment - 描画対象のコメントオブジェクト
    * @param options - バッジ表示や強調表示を切り替える描画オプション
-   * @returns コメントリンク要素とコメント本体要素
+   * @returns コメントカード要素
    */
   function createCommentElement(comment, options) {
     options = options || {};
     const badge = typeof options.badge === 'function' ? options.badge(comment) : (options.badge || '');
-    const link = document.createElement('a');
-    link.href = `?cursor=${  comment.comment_id}`;
-    link.style.textDecoration = 'none';
-    link.style.color = 'inherit';
-    link.style.display = 'block';
-    link.addEventListener('click', function (e) {
-      if (e.target.closest('button')) { e.preventDefault(); return; }
-    });
     const commentDiv = document.createElement('div');
     if (options.cursorMode) {
       if (comment.comment_id === filters.cursor) {commentDiv.className = 'comment highlighted';}
@@ -252,8 +257,7 @@
       renderCommunityNote(comment)}`;
     appendSafeBodyHtml(commentDiv.querySelector('.body'), comment.body_html, comment.body);
     hydrateRelativeTimes(commentDiv);  // 相対時刻を閲覧時刻基準で計算
-    link.appendChild(commentDiv);
-    return { link, commentDiv };
+    return commentDiv;
   }
 
   /**
@@ -409,18 +413,18 @@
 
       const itemsToRender = direction === 'prepend' ? data.items.slice().reverse() : data.items;
       itemsToRender.forEach(function (comment) {
-        const el = createCommentElement(comment, {
+        const commentDiv = createCommentElement(comment, {
           cursorMode: isCursorMode,
           showOwner: true,
           showRelativeTime: true,
           showBits: true,
         });
         if (direction === 'prepend') {
-          listElement.insertBefore(el.link, listElement.firstChild);
+          listElement.insertBefore(commentDiv, listElement.firstChild);
         } else {
-          listElement.appendChild(el.link);
+          listElement.appendChild(commentDiv);
         }
-        if (isBest9Mode) {addBest9Button(el.commentDiv);}
+        if (isBest9Mode) {addBest9Button(commentDiv);}
       });
 
       if (direction === 'prepend') {currentMinPage = Math.min(currentMinPage, page);}
@@ -891,9 +895,9 @@
       return;
     }
     items.forEach(function (comment) {
-      const el = createCommentElement(comment, { badge: badgeHtml });
-      listElement.appendChild(el.link);
-      if (isBest9Mode) {addBest9Button(el.commentDiv);}
+      const commentDiv = createCommentElement(comment, { badge: badgeHtml });
+      listElement.appendChild(commentDiv);
+      if (isBest9Mode) {addBest9Button(commentDiv);}
     });
   }
 

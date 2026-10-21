@@ -5,6 +5,10 @@
 
       .list { margin-top: 16px; }
 
+      /* カードはクリックで ?cursor= に遷移するが、本文だけはテキスト選択用に遷移対象外 */
+      .list .comment[id] { cursor: pointer; }
+      .list .comment .body { cursor: text; }
+
       .filters {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));

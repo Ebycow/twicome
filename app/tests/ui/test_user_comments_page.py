@@ -422,3 +422,43 @@ class TestNetworkRequests:
         assert response.status == 200
         data = response.json()
         assert "items" in data
+
+
+class TestCommentCardNavigation:
+    """コメントカードのクリック遷移と本文のテキスト選択を確認するテスト群。"""
+
+    def test_clicking_card_head_navigates_to_cursor(self, page: Page, db):
+        """【確認内容】本文以外（ヘッダ部）をクリックすると ?cursor= に遷移する"""
+        _seed_basic(db, login="fan_nav", comment_body="遷移のテスト")
+
+        page.goto("/u/fan_nav")
+        page.locator("#c1 .comment-meta .meta").first.click()
+        expect(page).to_have_url(re.compile(r"\?cursor=c1$"))
+
+    def test_clicking_body_does_not_navigate(self, page: Page, db):
+        """【確認内容】本文をクリックしても遷移せず、テキストとして選択できる"""
+        _seed_basic(db, login="fan_select", comment_body="https://example.com/選択したいテキスト")
+
+        page.goto("/u/fan_select")
+        body = page.locator("#c1 .body")
+        body.click()
+        body.dblclick()
+        body.click(click_count=3)
+        expect(page).to_have_url(re.compile(r"/u/fan_select$"))
+        selected = page.evaluate("() => window.getSelection().toString()")
+        assert "選択したいテキスト" in selected
+
+    def test_drag_selection_from_body_to_head_does_not_navigate(self, page: Page, db):
+        """【確認内容】本文からヘッダへドラッグ選択しても（click がカードで発火しても）遷移しない"""
+        _seed_basic(db, login="fan_drag", comment_body="ドラッグ選択のテスト")
+
+        page.goto("/u/fan_drag")
+        body_box = page.locator("#c1 .body").bounding_box()
+        head_box = page.locator("#c1 .comment-head").bounding_box()
+        assert body_box and head_box
+        page.mouse.move(body_box["x"] + body_box["width"] - 2, body_box["y"] + body_box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(head_box["x"] + 4, head_box["y"] + head_box["height"] - 4, steps=8)
+        page.mouse.up()
+        page.wait_for_timeout(300)
+        expect(page).to_have_url(re.compile(r"/u/fan_drag$"))

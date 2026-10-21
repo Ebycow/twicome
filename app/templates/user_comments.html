@@ -295,7 +295,7 @@
           {% else %}
             {% set comment_class = 'comment' %}
           {% endif %}
-          <div class="{{ comment_class }}" id="{{ c.comment_id }}" onclick="if (!event.target.closest('button, a')) window.location.href='?cursor={{ c.comment_id }}';" style="cursor:pointer;">
+          <div class="{{ comment_class }}" id="{{ c.comment_id }}">
             <div class="comment-head">
               <div class="comment-title">
                 <a href="{{ c.vod_jump_link }}" target="_blank" class="pill">VOD {{ c.vod_id }}</a>
