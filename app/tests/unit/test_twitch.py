@@ -115,9 +115,7 @@ def test_valid_token_is_cached_between_calls(monkeypatch):
         return _DummyResponse({"access_token": "fresh-token", "expires_in": 5000})
 
     monkeypatch.setattr(twitch_service.requests, "post", _fake_post)
-    monkeypatch.setattr(
-        twitch_service.requests, "get", lambda *_a, **_kw: _DummyResponse({"data": [{"id": "12345"}]})
-    )
+    monkeypatch.setattr(twitch_service.requests, "get", lambda *_a, **_kw: _DummyResponse({"data": [{"id": "12345"}]}))
 
     twitch_service.get_user_id("viewer")
     twitch_service.get_user_id("viewer")
