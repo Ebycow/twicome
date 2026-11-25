@@ -1,5 +1,8 @@
 name: twicome
 
+# 軽量構成: db(MySQL, 省メモリ設定) / migrate(起動時のみ) / app / batch の 4 サービス。
+# Redis・FAISS・形態素解析は廃止した。
+
 x-logging: &default-logging
   driver: json-file
   options:
@@ -47,6 +50,7 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
+    restart: unless-stopped
     logging: *default-logging
     networks:
       - backend
@@ -65,11 +69,10 @@ services:
       - backend
 
   app:
-    ports:
-      - "8000:8000"
     build:
       context: ./app
       target: runtime
+    # ホストにはポートを開けない。リバースプロキシから http://twicome:8000 で届く
     env_file:
       - ./.env
     environment:
@@ -78,12 +81,11 @@ services:
       # ROOT_PATH: /
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
     volumes:
-      # - ./app:/app
       - ./data/honban:/host # 主にtargetusers.csvのため
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-access-log"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
@@ -92,9 +94,13 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
     logging: *default-logging
     networks:
-      - backend
+      backend:
+      proxy:
+        aliases:
+          - twicome
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -111,12 +117,15 @@ services:
       APP_ENV: honban
     volumes:
       - ./data/honban:/app/data/honban
+      # チャットファイル（<vod_id>.json.gz と判定台帳）の保存先。別ディスクに置く場合は .env で指定する
+      - ${COMMENTS_HOST_DIR:-./data/honban/comments}:/app/data/honban/comments
       - ./.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
     logging: *default-logging
     networks:
       - backend
@@ -130,3 +139,7 @@ volumes:
 networks:
   backend:
     driver: bridge
+  # リバースプロキシと共有する外部ネットワーク（名前は .env の PROXY_NETWORK で指定）
+  proxy:
+    external: true
+    name: "${PROXY_NETWORK:-proxy_net}"
