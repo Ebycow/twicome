@@ -10,6 +10,9 @@ COPY requirements.txt requirements-dev.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-dev.txt
 
+# 最新の Playwright 同梱 node は libatomic を要求する（slim イメージには無い）
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/*
+
 # Playwright + pytest-playwright のインストール
 RUN pip install pytest-playwright playwright
 
