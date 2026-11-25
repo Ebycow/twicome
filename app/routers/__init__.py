@@ -1,4 +1,4 @@
-from . import best9, clusters, comments, misc, search, streamers, vods
+from . import best9, comments, misc, search, streamers, vods
 
 ALL_ROUTERS = [
     comments.router,
@@ -6,6 +6,5 @@ ALL_ROUTERS = [
     streamers.router,
     best9.router,
     search.router,
-    clusters.router,
     misc.router,
 ]

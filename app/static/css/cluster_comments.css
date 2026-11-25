@@ -1,9 +1,0 @@
-      /* base.css から継承: :root 変数, body, a, a.pill, label, input, select, button,
-         .card, .error, .meta, .pill, .top, .list, .comment, .comment-head,
-         .body, .emote, .recent, .vote-btn, .vote-controls, .confetti */
-
-      .top { margin-bottom: 16px; }
-
-      @media (max-width: 720px) {
-        /* body margin は base.css が処理 */
-      }
