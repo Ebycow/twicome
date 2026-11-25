@@ -10,7 +10,6 @@ SCRIPT_DIR="${PROJECT_ROOT}/batch/scripts"
 APP_ENV="${APP_ENV:-development}"
 BATCH_DATA_DIR="${BATCH_DATA_DIR:-${PROJECT_ROOT}/data/${APP_ENV}}"
 COMMENTS_DIR="${COMMENTS_DIR:-${BATCH_DATA_DIR}/comments}"
-COMMUNITY_NOTE_BACKUP_DIR="${COMMUNITY_NOTE_BACKUP_DIR:-${BATCH_DATA_DIR}/oldcommunitylog}"
 LOG_DIR="${LOG_DIR:-${BATCH_DATA_DIR}/logs}"
 
 if [ -z "${TARGET_USERS_CSV:-}" ]; then
@@ -21,16 +20,16 @@ if [ -z "${TARGET_USERS_CSV:-}" ]; then
     fi
 fi
 
-mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${COMMUNITY_NOTE_BACKUP_DIR}" "${LOG_DIR}"
+mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${LOG_DIR}"
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/batch_${TIMESTAMP}.log"
 START_TS="$(date +%s)"
 
-export PROJECT_ROOT APP_ENV BATCH_DATA_DIR TARGET_USERS_CSV VODS_CSV COMMENTS_DIR COMMUNITY_NOTE_BACKUP_DIR
 
 VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
 export VODS_CSV
+export PROJECT_ROOT APP_ENV BATCH_DATA_DIR TARGET_USERS_CSV VODS_CSV COMMENTS_DIR
 
 run_required() {
     local name="$1"
@@ -57,7 +56,6 @@ run_required "insertdb.py"
 run_optional "invalidate_cache.py"
 run_optional "prewarm_index_cache.py"
 
-run_optional "generate_community_notes.py"
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"

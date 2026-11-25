@@ -131,7 +131,7 @@ class TestFilterForm:
         soup = _soup(client.get("/u/viewer"))
         select = soup.find(id="select-sort")
         values = [o.get("value") for o in select.find_all("option")]
-        for expected in ("created_at", "vod_time", "likes", "dislikes", "community_note", "danger", "random"):
+        for expected in ("created_at", "vod_time", "likes", "dislikes", "random"):
             assert expected in values, f"sort オプション '{expected}' が見つからない"
 
     def test_owner_filtered_vod_options_loaded_even_when_quick_link_meta_cached(self, client, db, monkeypatch):
