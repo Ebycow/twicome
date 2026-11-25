@@ -6,6 +6,14 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+x-db-env: &db-env
+  DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
+  MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
+  MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
+  MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
+  MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+  MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
+
 services:
   db:
     image: mysql:8.0
@@ -65,14 +73,9 @@ services:
     env_file:
       - ./.env
     environment:
+      <<: *db-env
       DEFAULT_PLATFORM: twitch
       # ROOT_PATH: /
-      DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
-      MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
-      MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
-      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
-      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
-      MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
     volumes:
       # - ./app:/app
@@ -103,12 +106,7 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
-      MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
-      MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
-      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
-      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
-      MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
+      <<: *db-env
       PROJECT_ROOT: /app
       APP_ENV: honban
     volumes:
