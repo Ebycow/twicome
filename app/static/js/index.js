@@ -20,7 +20,7 @@
 
   const serviceWorkerUrl = `${rootPath  }/sw.js`;
   const offlineAccess = window.TwicomeOfflineAccess || {
-    createEmpty () { return { comments: new Set(), stats: new Set(), quiz: new Set() }; },
+    createEmpty () { return { comments: new Set() }; },
     getStorageKey () { return null; },
     isAccessible (routes, route, login) {
       const normalized = String(login || '').trim().toLowerCase();
@@ -30,8 +30,6 @@
   };
   const offlineAccessStorageKey = offlineAccess.getStorageKey(rootPath);
 
-  const statsLink = document.getElementById('stats-link');
-  const quizLink = document.getElementById('quiz-link');
   const goBtn = document.getElementById('go-btn');
   const quickLinkElements = Array.from(document.querySelectorAll('.quick-link[data-prefetch-login]'));
   const streamerFilter = document.getElementById('streamer-filter');
@@ -40,8 +38,6 @@
 
   const maxCandidates = 25;
   const usersIndexUrl = `${rootPath  }/api/users/index`;
-  const statsPathTemplate = `${rootPath  }/u/__LOGIN_PLACEHOLDER__/stats`;
-  const quizPathTemplate = `${rootPath  }/u/__LOGIN_PLACEHOLDER__/quiz`;
   const commentsPathTemplate = `${rootPath  }/u/__LOGIN_PLACEHOLDER__`;
   const commentPrefetchConcurrency = 2;
 
@@ -349,34 +345,6 @@
   }
 
   /**
-   * リンク要素のaria-disabled属性を設定して有効/無効状態を切り替える。
-   * @param link - 状態を変更するリンク要素
-   * @param enabled - trueなら有効、falseなら無効（aria-disabled）
-   */
-  function setLinkState(link, enabled) {
-    link.setAttribute('aria-disabled', String(!enabled));
-  }
-
-  /**
-   * 統計ページとクイズページへのリンクを一括で有効/無効にする。
-   * @param enabled - trueなら統計・クイズリンクを有効化、falseなら無効化
-   */
-  function setActionLinkState(enabled) {
-    const disabled = String(!enabled);
-    statsLink.setAttribute('aria-disabled', disabled);
-    quizLink.setAttribute('aria-disabled', disabled);
-  }
-
-  /**
-   * 統計ページとクイズページへのリンクhrefを指定ユーザのURLに更新する。
-   * @param login - リンク先を設定するユーザのログイン名
-   */
-  function setActionLinks(login) {
-    statsLink.href = `${pathForLogin(statsPathTemplate, login)  }?platform=twitch`;
-    quizLink.href = `${pathForLogin(quizPathTemplate, login)  }?platform=twitch`;
-  }
-
-  /**
    * 選択中ユーザカードのアバター領域をプロフィール画像または頭文字で更新する。
    * @param user - 表示対象ユーザ。null の場合はプレースホルダ表示
    * @param fallbackText - ユーザ不在時に表示する1文字
@@ -475,7 +443,7 @@
 
   /**
    * 指定ルートとログイン名の組み合わせがオフラインでアクセス可能かどうかを返す。
-   * @param route - チェック対象のルート名（'comments', 'stats', 'quiz'）
+   * @param route - チェック対象のルート名（'comments'）
    * @param login - ユーザのログイン名
    * @returns オフラインでアクセス可能かどうか
    */
@@ -791,9 +759,7 @@
   function selectLogin(login) {
     loginInput.value = login;
     loginInput.setCustomValidity('');
-    setActionLinks(login);
     updateSelectedUserPreview();
-    syncActionLinksFromInput();
     queueCommentPrefetch(login);
     hideCandidates();
     updateClearBtn();
@@ -806,7 +772,6 @@
   async function renderCandidates(input) {
     if (!usersLoaded) {showCandidateMessage('候補を読み込み中...');}
     try { await ensureUsersLoaded(); } catch (_) {
-      setActionLinkState(false);
       showCandidateMessage('候補の読み込みに失敗しました');
       return;
     }
@@ -833,25 +798,10 @@
   }
 
   /**
-   * 入力欄の現在値を解決して統計・クイズリンクのhrefと有効/無効状態を同期する。
+   * 入力欄の現在値に合わせて選択中ユーザのプレビューを更新する。
    */
   function syncActionLinksFromInput() {
     updateSelectedUserPreview();
-    const currentValue = loginInput.value.trim();
-    if (!usersLoaded) {
-      if (currentValue) { setActionLinks(currentValue); setActionLinkState(!offlineMode); }
-      else { setActionLinkState(false); }
-      return;
-    }
-    const resolved = resolveLogin(loginInput.value);
-    if (!resolved) { setActionLinkState(false); return; }
-    setActionLinks(resolved);
-    if (offlineMode) {
-      setLinkState(statsLink, hasOfflineRouteAccess('stats', resolved));
-      setLinkState(quizLink, hasOfflineRouteAccess('quiz', resolved));
-      return;
-    }
-    setActionLinkState(true);
   }
 
   /**
@@ -867,7 +817,6 @@
   function resetLoginSearch() {
     loginInput.value = '';
     loginInput.setCustomValidity('');
-    setActionLinkState(false);
     syncActionLinksFromInput();
     updateClearBtn();
   }

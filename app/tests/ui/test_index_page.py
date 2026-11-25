@@ -257,17 +257,3 @@ class TestFormSubmission:
 
         # /u/gostreamer に遷移したことを確認
         expect(page).to_have_url(re.compile(r"/u/gostreamer"))
-
-    def test_stats_link_points_to_stats_page(self, page: Page):
-        """
-        【確認内容】統計ページへのリンクが href を持っている
-
-        locator.get_attribute() で要素の属性値を取得する例。
-        動的なリンク (JS で href が変わるもの) のテストにも使える。
-        """
-        page.goto("/")
-        stats_link = page.locator("#stats-link")
-        expect(stats_link).to_be_visible()
-        href = stats_link.get_attribute("href")
-        assert href is not None
-        assert "/stats" in href
