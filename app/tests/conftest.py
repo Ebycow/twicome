@@ -13,7 +13,6 @@ APP_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(APP_DIR))
 
 os.environ.setdefault("REDIS_URL", "")
-os.environ.setdefault("FAISS_API_URL", "")
 os.environ.setdefault("HOST_CHECK_ENABLED", "false")
 os.environ.setdefault("ROOT_PATH", "")
 os.environ.setdefault("DEFAULT_PLATFORM", "twitch")

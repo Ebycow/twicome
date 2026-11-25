@@ -65,29 +65,6 @@ services:
     networks:
       - backend
 
-  faiss-api:
-    profiles: [faiss]
-    build:
-      context: ./faiss-api
-      dockerfile: Dockerfile
-    environment:
-      DATA_DIR: /app/data/faiss_data
-      FAISS_CONFIG_PATH: /app/data/faiss_config.json
-      EMBEDDING_MODEL: cl-nagoya/sup-simcse-ja-base
-    volumes:
-      - ./data/honban:/app/data
-      - hf-cache:/root/.cache/huggingface
-    expose:
-      - "8100"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8100/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - backend
-
   app:
     build: ./app
     ports:
@@ -103,7 +80,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
-      FAISS_API_URL: "http://faiss-api:8100"
       MORPHEME_API_URL: "http://morpheme-api:8200"
       REDIS_URL: "redis://redis:6379/0"
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
@@ -145,8 +121,6 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       PROJECT_ROOT: /app
       APP_ENV: honban
-      FAISS_API_URL: "http://faiss-api:8100"
-      FAISS_CONFIG_PATH: /app/data/honban/faiss_config.json
       MORPHEME_API_URL: "http://morpheme-api:8200"
       REDIS_URL: "redis://redis:6379/0"
     volumes:
@@ -157,9 +131,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      faiss-api:
-        condition: service_healthy
-        required: false
       morpheme-api:
         condition: service_healthy
         required: false
@@ -170,7 +141,6 @@ services:
       - 8.8.8.8
 
 volumes:
-  hf-cache:
   mysql8_honban_data:
   redis_honban_data:
 

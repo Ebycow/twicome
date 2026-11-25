@@ -34,7 +34,6 @@ jobs:
               Path("migrate"),
               Path("util"),
               Path("mcp-server"),
-              Path("faiss-api"),
           ]
 
           count = 0

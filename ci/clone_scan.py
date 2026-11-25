@@ -19,7 +19,6 @@ DEFAULT_ROOTS = [
     "util",
     "migrate",
     "morpheme-sample",
-    "faiss-api",
     "morpheme-api",
     "twicome-mcp-server",
 ]

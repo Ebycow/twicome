@@ -106,10 +106,6 @@ run_required "get_vod_list_batch.py"
 run_required "batch_download_comments.py"
 run_required "insertdb.py"
 
-if [ "${SKIP_FAISS:-0}" != "1" ]; then
-    run_optional "build_faiss_index.py"
-fi
-
 run_optional "generate_community_notes.py"
 
 END_TS="$(date +%s)"

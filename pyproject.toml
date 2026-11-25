@@ -47,8 +47,6 @@ ignore = [
 "app/tests/**/*.py" = ["D", "F811"]
 # ルーター: パスと HTTP メソッドで自明なため関数 docstring 不要
 "app/routers/**/*.py" = ["D100", "D103"]
-# faiss-api エンドポイント: 同上
-"faiss-api/main.py" = ["D103"]
 # マイグレーション: 自動生成コード
 "migrate/**/*.py" = ["D", "E501"]
 # エントリーポイント: docstring 不要

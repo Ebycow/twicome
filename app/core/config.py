@@ -61,11 +61,6 @@ HOST_CHECK_ENABLED = _parse_bool_env("HOST_CHECK_ENABLED", True)
 # X-Forwarded-For の先頭はクライアントが詐称可能なので採用しない（末尾＝信頼境界が追記した値を使う）。
 RATE_LIMIT_CLIENT_IP_HEADER: str = os.getenv("RATE_LIMIT_CLIENT_IP_HEADER", "").strip()
 
-# .env 例: FAISS_API_URL=http://faiss-api:8100
-# 未設定の場合は埋め込み検索機能が無効化される
-FAISS_API_URL: str = os.getenv("FAISS_API_URL", "").strip().rstrip("/")
-FAISS_ENABLED: bool = bool(FAISS_API_URL)
-
 # .env 例: REDIS_URL=redis://redis:6379/0
 # 未設定の場合はキャッシュ無効（DB に直接アクセス）
 REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
