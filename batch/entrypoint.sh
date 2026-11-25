@@ -53,9 +53,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting batch process" | tee -a "${LOG_FIL
 run_required "get_vod_list_batch.py"
 run_required "batch_download_comments.py"
 run_required "insertdb.py"
-run_optional "invalidate_cache.py"
-run_optional "prewarm_index_cache.py"
-
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"

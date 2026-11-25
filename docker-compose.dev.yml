@@ -43,21 +43,6 @@ services:
     networks:
       - backend
 
-  redis:
-    image: redis:7-alpine
-    expose:
-      - "6379"
-    volumes:
-      - redis_dev_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
   app:
     build: ./app
     ports:
@@ -73,7 +58,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb_dev}"
-      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./app:/app
       - ./data/development:/host
@@ -89,8 +73,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     networks:
       - backend
     dns:
@@ -112,7 +94,6 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb_dev}"
       PROJECT_ROOT: /app
       APP_ENV: development
-      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./data/development:/app/data/development
       - ./.env.development:/app/.env.development:ro
@@ -240,7 +221,6 @@ services:
 
 volumes:
   mysql8_dev_data:
-  redis_dev_data:
   eslint-node-modules:
 
 networks:
