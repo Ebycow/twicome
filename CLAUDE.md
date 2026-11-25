@@ -6,7 +6,7 @@
 
 CSS・テンプレート等の静的ファイルを変更した後、サーバーが変更を反映していない場合は再ビルドが必要:
 ```
-docker compose -f docker-compose.dev.yml --profile faiss up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ### 静的ファイル変更後のブラウザキャッシュ問題
