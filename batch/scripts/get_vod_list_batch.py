@@ -1,9 +1,9 @@
 """Twitch VOD リスト取得バッチスクリプト。"""
 
+import csv
 import os
 from pathlib import Path
 
-import pandas as pd
 import requests
 from dotenv import load_dotenv
 
@@ -94,6 +94,19 @@ def get_all_vods(user_id, access_token, client_id):
     return all_vods
 
 
+VOD_CSV_COLUMNS = ["user_id", "id", "title", "created_at", "url", "view_count", "duration"]
+
+
+def write_vods_csv(vods_csv: Path, vods: list[dict]) -> None:
+    """必要なカラムだけを CSV に書き出す（VOD 0 件でもヘッダーは出力する）。"""
+    vods_csv.parent.mkdir(parents=True, exist_ok=True)
+    with vods_csv.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=VOD_CSV_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for vod in vods:
+            writer.writerow({col: vod.get(col, "") for col in VOD_CSV_COLUMNS})
+
+
 def main():
     """VOD リスト取得バッチのエントリーポイント。"""
     access_token = os.getenv("ACCESS_TOKEN")
@@ -115,8 +128,8 @@ def main():
         raise FileNotFoundError(f"target users CSV not found: {target_users_csv}. Set TARGET_USERS_CSV to override.")
 
     # ✅ 複数のユーザー ID のリスト (targetusers.csv から読み込み)
-    df_users = pd.read_csv(target_users_csv)
-    user_ids = df_users["id"].astype(str).tolist()
+    with target_users_csv.open(encoding="utf-8") as f:
+        user_ids = [str(row["id"]).strip() for row in csv.DictReader(f) if str(row.get("id") or "").strip()]
 
     live_user_ids = get_live_user_ids(user_ids, access_token, client_id)
 
@@ -133,24 +146,7 @@ def main():
             vod["user_id"] = user_id  # ユーザー ID を追加
             all_vods_data.append(vod)
 
-    # ✅ 取得したデータを DataFrame に変換
-    df = pd.DataFrame(all_vods_data)
-
-    # ✅ デバッグ: DataFrameのカラムを確認
-    print("DataFrame columns:", df.columns.tolist())
-
-    # ✅ 必要なカラムだけ選択（不要なデータを削除）
-    required_columns = ["user_id", "id", "title", "created_at", "url", "view_count", "duration"]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        print(f"Error: Missing columns: {missing_columns}")
-        print("Available columns:", df.columns.tolist())
-        exit(1)
-    df = df[required_columns]
-
-    # ✅ CSV に保存（UTF-8 エンコーディング）
-    vods_csv.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(vods_csv, index=False, encoding="utf-8")
+    write_vods_csv(vods_csv, all_vods_data)
 
     print(f"すべての VOD データを '{vods_csv}' に保存しました！")
 

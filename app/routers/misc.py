@@ -1,7 +1,8 @@
+import csv
 import logging
 import re
+from pathlib import Path
 
-import pandas as pd
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -12,6 +13,26 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+TARGET_USERS_CSV = Path("/host/targetusers.csv")
+TARGET_USERS_FIELDS = ["name", "id"]
+
+
+def _read_target_users() -> list[dict]:
+    """配信者 CSV（name,id）を読み込む。存在しない・空の場合は空リスト。"""
+    try:
+        with TARGET_USERS_CSV.open(encoding="utf-8", newline="") as f:
+            return [{k: row.get(k, "") for k in TARGET_USERS_FIELDS} for row in csv.DictReader(f)]
+    except FileNotFoundError:
+        return []
+
+
+def _write_target_users(users: list[dict]) -> None:
+    """配信者 CSV を書き出す。"""
+    with TARGET_USERS_CSV.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=TARGET_USERS_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(users)
+
 
 @router.get("/manual", response_class=HTMLResponse)
 def manual_page(request: Request):
@@ -21,8 +42,7 @@ def manual_page(request: Request):
 @router.get("/add_user", response_class=HTMLResponse)
 def add_user_page(request: Request, message: str | None = Query(None), error: str | None = Query(None)):
     try:
-        df = pd.read_csv("/host/targetusers.csv")
-        users = df.to_dict("records")
+        users = _read_target_users()
     except Exception:
         users = []
     return templates.TemplateResponse(
@@ -62,22 +82,15 @@ def add_user(request: Request, username: str = Form(...)):
         )
 
     try:
-        # CSV を読み込み (存在しなければ空のDataFrameを作成)
-        try:
-            df = pd.read_csv("/host/targetusers.csv")
-        except (FileNotFoundError, pd.errors.EmptyDataError):
-            df = pd.DataFrame(columns=["name", "id"])
+        users = _read_target_users()
         # すでに存在するかチェック
-        if username in df["name"].values:
+        if any(u["name"] == username for u in users):
             return RedirectResponse(
                 url=str(request.url_for("add_user_page")) + f"?error=ユーザ {username} はすでに登録されています",
                 status_code=303,
             )
-        # 新しい行を追加
-        new_row = pd.DataFrame({"name": [username], "id": [user_id]})
-        df = pd.concat([df, new_row], ignore_index=True)
-        # CSV に保存
-        df.to_csv("/host/targetusers.csv", index=False)
+        users.append({"name": username, "id": user_id})
+        _write_target_users(users)
         return RedirectResponse(
             url=str(request.url_for("add_user_page")) + f"?message=ユーザ {username} (ID: {user_id}) を追加しました",
             status_code=303,
