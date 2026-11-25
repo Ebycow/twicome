@@ -103,6 +103,7 @@ echo "Starting batch process at $(date)" >> "${LOG_FILE}"
 run_required "get_vod_list_batch.py"
 run_required "batch_download_comments.py"
 run_required "insertdb.py"
+run_optional "prune_non_targets.py"
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"

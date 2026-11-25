@@ -227,6 +227,21 @@ def test_ingest_one_file_returns_none_without_target(tmp_path):
     assert conn.log == []  # 配信者・VOD も書かない
 
 
+# ── prune_non_targets / get_vod_list_batch ──────────────────────────────────
+
+
+def test_build_prune_statements_binds_sorted_targets():
+    prune = _import("prune_non_targets")
+    stmts = prune.build_prune_statements(frozenset({"bob", "alice"}))
+    assert len(stmts) == 3
+    comments_sql, comments_params = stmts[0]
+    assert "DELETE FROM comments" in comments_sql
+    assert comments_sql.count("%s") == 2
+    assert comments_params == ("alice", "bob")
+    assert stmts[1][1] == ()
+    assert stmts[2][1] == ("alice", "bob")
+
+
 def test_write_vods_csv_selects_columns(tmp_path):
     vl = _import("get_vod_list_batch")
     out = tmp_path / "sub" / "vods.csv"
