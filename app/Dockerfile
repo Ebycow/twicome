@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim AS base
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
 COPY requirements.txt .
@@ -26,4 +30,5 @@ COPY static/ ./static/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 単一ワーカー。--no-access-log でログ量（ディスク）を抑える
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

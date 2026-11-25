@@ -1,5 +1,11 @@
 name: twicome
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: mysql:8.0
@@ -33,6 +39,7 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
+    logging: *default-logging
     networks:
       - backend
 
@@ -45,6 +52,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    logging: *default-logging
     networks:
       - backend
 
@@ -69,7 +77,7 @@ services:
     volumes:
       # - ./app:/app
       - ./data/honban:/host # 主にtargetusers.csvのため
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-access-log"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -81,6 +89,7 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    logging: *default-logging
     networks:
       - backend
     dns:
@@ -110,6 +119,7 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    logging: *default-logging
     networks:
       - backend
     dns:

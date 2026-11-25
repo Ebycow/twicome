@@ -11,6 +11,9 @@ APP_ENV="${APP_ENV:-development}"
 BATCH_DATA_DIR="${BATCH_DATA_DIR:-${PROJECT_ROOT}/data/${APP_ENV}}"
 COMMENTS_DIR="${COMMENTS_DIR:-${BATCH_DATA_DIR}/comments}"
 LOG_DIR="${LOG_DIR:-${BATCH_DATA_DIR}/logs}"
+VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
+# バッチログの保持日数（古いものは毎回削除してディスクを圧迫しないようにする）
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-14}"
 
 if [ -z "${TARGET_USERS_CSV:-}" ]; then
     if [ -f "${BATCH_DATA_DIR}/targetusers.csv" ]; then
@@ -21,14 +24,12 @@ if [ -z "${TARGET_USERS_CSV:-}" ]; then
 fi
 
 mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${LOG_DIR}"
+find "${LOG_DIR}" -name 'batch_*.log' -type f -mtime "+${LOG_RETENTION_DAYS}" -delete 2>/dev/null || true
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/batch_${TIMESTAMP}.log"
 START_TS="$(date +%s)"
 
-
-VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
-export VODS_CSV
 export PROJECT_ROOT APP_ENV BATCH_DATA_DIR TARGET_USERS_CSV VODS_CSV COMMENTS_DIR
 
 run_required() {
