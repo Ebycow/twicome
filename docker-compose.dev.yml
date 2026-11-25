@@ -9,6 +9,20 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       TEST_MYSQL_DATABASE: "${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}"
+    # 本番と同じ省メモリ設定（docker-compose.yml と揃える）
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --innodb-redo-log-capacity=64M
+      - --performance-schema=OFF
+      - --disable-log-bin
+      - --max-connections=30
+      - --table-open-cache=256
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --temptable-max-ram=64M
+      - --thread-cache-size=4
+      - --skip-name-resolve
     # DB はホストへ公開せず、同一 Compose ネットワーク内から参照する
     expose:
       - "3306"

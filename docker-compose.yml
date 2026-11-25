@@ -8,6 +8,20 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+    # 収集対象ユーザーのコメントだけを保存するのでデータは小さい。メモリとディスクを絞る。
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --innodb-redo-log-capacity=64M
+      - --performance-schema=OFF
+      - --disable-log-bin
+      - --max-connections=30
+      - --table-open-cache=256
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --temptable-max-ram=64M
+      - --thread-cache-size=4
+      - --skip-name-resolve
     # DB はホストへ公開せず、同一 Compose ネットワーク内から参照する
     expose:
       - "3306"
@@ -15,10 +29,10 @@ services:
       - mysql8_honban_data:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 20
-      start_period: 20s
+      start_period: 30s
     networks:
       - backend
 
