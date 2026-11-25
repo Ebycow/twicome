@@ -78,6 +78,89 @@ def test_load_chat_json_reads_plain_and_gzip(tmp_path):
     assert ct.load_chat_json(gz) == data
 
 
+# ── batch_download_comments ─────────────────────────────────────────────────
+
+
+def _fake_downloader(payload_by_vod):
+    """TwitchDownloaderCLI の代わりに -o で指定されたパスへ JSON を書く subprocess.run。"""
+
+    def _run(cmd, check):
+        out = Path(cmd[cmd.index("-o") + 1])
+        vod_id = Path(out).stem
+        out.write_text(json.dumps(payload_by_vod[vod_id]), encoding="utf-8")
+
+    return _run
+
+
+def test_process_vod_keeps_gzip_only_when_target_present(tmp_path, monkeypatch):
+    dl = _import("batch_download_comments")
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+    payloads = {"100": _chat([_comment("alice")], 100), "200": _chat([_comment("zed")], 200)}
+    monkeypatch.setattr(dl.subprocess, "run", _fake_downloader(payloads))
+    targets = frozenset({"alice"})
+
+    assert dl.process_vod(Path("dl"), "u/100", "100", tmp_path, tmp_dir, targets) == "kept"
+    assert dl.process_vod(Path("dl"), "u/200", "200", tmp_path, tmp_dir, targets) == "discarded"
+
+    kept = tmp_path / "100.json.gz"
+    with gzip.open(kept, "rt", encoding="utf-8") as f:
+        assert json.load(f) == payloads["100"]
+    assert not (tmp_path / "200.json.gz").exists()
+    assert list(tmp_dir.iterdir()) == []  # 一時ファイルは必ず消える
+
+
+def test_ledger_skips_until_new_target_added(tmp_path):
+    dl = _import("batch_download_comments")
+    ledger_path = tmp_path / dl.LEDGER_FILENAME
+    dl.append_ledger(ledger_path, "200", frozenset({"alice", "bob"}))
+    ledger = dl.load_ledger(ledger_path)
+
+    assert dl.already_handled(tmp_path, "200", ledger, frozenset({"alice"}))
+    assert dl.already_handled(tmp_path, "200", ledger, frozenset({"alice", "bob"}))
+    # 判定時にいなかったユーザーが対象に加わったら再判定する
+    assert not dl.already_handled(tmp_path, "200", ledger, frozenset({"alice", "carol"}))
+    assert not dl.already_handled(tmp_path, "300", ledger, frozenset({"alice"}))
+
+    (tmp_path / "300.json.gz").write_bytes(b"x")
+    assert dl.already_handled(tmp_path, "300", ledger, frozenset({"alice"}))
+
+
+def test_main_end_to_end(tmp_path, monkeypatch):
+    dl = _import("batch_download_comments")
+    comments_dir = tmp_path / "comments"
+    vods_csv = tmp_path / "vods.csv"
+    vods_csv.write_text(
+        "user_id,id,title,created_at,url,view_count,duration\n"
+        "1,100,a,x,https://www.twitch.tv/videos/100,0,1h\n"
+        "1,200,b,x,https://www.twitch.tv/videos/200,0,1h\n",
+        encoding="utf-8",
+    )
+    downloader = tmp_path / "TwitchDownloaderCLI"
+    downloader.write_text("#!/bin/sh\n")
+    downloader.chmod(0o755)
+    monkeypatch.setenv("VODS_CSV", str(vods_csv))
+    monkeypatch.setenv("COMMENTS_DIR", str(comments_dir))
+    monkeypatch.setenv("TWITCH_DOWNLOADER_CLI", str(downloader))
+    payloads = {"100": _chat([_comment("bob")], 100), "200": _chat([_comment("zed")], 200)}
+    calls = []
+
+    def _run(cmd, check):
+        calls.append(cmd)
+        _fake_downloader(payloads)(cmd, check)
+
+    monkeypatch.setattr(dl.subprocess, "run", _run)
+
+    dl.main()
+    assert (comments_dir / "100.json.gz").exists()
+    assert not (comments_dir / "200.json.gz").exists()
+    assert "200\t" in (comments_dir / dl.LEDGER_FILENAME).read_text(encoding="utf-8")
+    assert not (comments_dir / dl.TMP_DIRNAME).exists()
+
+    dl.main()  # 2 回目は保存済み・台帳済みなので一切ダウンロードしない
+    assert len(calls) == 2
+
+
 # ── insertdb ────────────────────────────────────────────────────────────────
 
 
