@@ -21,9 +21,6 @@ logs
 comments
 data/
 
-# morpheme 分析
-morpheme-sample/exports
-
 # database backup
 backup/
 

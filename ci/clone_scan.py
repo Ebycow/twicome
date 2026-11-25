@@ -18,8 +18,6 @@ DEFAULT_ROOTS = [
     "batch",
     "util",
     "migrate",
-    "morpheme-sample",
-    "morpheme-api",
     "twicome-mcp-server",
 ]
 

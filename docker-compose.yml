@@ -49,22 +49,6 @@ services:
     networks:
       - backend
 
-  morpheme-api:
-    profiles: [morpheme]
-    build:
-      context: ./morpheme-api
-      dockerfile: Dockerfile
-    expose:
-      - "8200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8200/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - backend
-
   app:
     build: ./app
     ports:
@@ -80,7 +64,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
-      MORPHEME_API_URL: "http://morpheme-api:8200"
       REDIS_URL: "redis://redis:6379/0"
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
     volumes:
@@ -121,7 +104,6 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       PROJECT_ROOT: /app
       APP_ENV: honban
-      MORPHEME_API_URL: "http://morpheme-api:8200"
       REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./data/honban:/app/data/honban
@@ -131,9 +113,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      morpheme-api:
-        condition: service_healthy
-        required: false
     networks:
       - backend
     dns:
