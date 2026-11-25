@@ -104,7 +104,7 @@ _summary() {
 do_compile() {
     python3 - <<'PY'
 from pathlib import Path
-roots = ["app", "batch", "migrate", "util", "mcp-server", "faiss-api"]
+roots = ["app", "batch", "migrate", "util", "twicome-mcp-server"]
 count, errors = 0, []
 for r in roots:
     p = Path(r)

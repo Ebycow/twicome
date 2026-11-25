@@ -67,24 +67,9 @@
       .cn-status-badge { display:inline-flex; align-items:center; padding:1px 7px; border-radius:999px; font-size:0.75rem; border:1px solid var(--pill-border); color:var(--meta-color); white-space:nowrap; }
       .cn-model-meta { display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:1px 7px; border-radius:999px; font-size:0.75rem; border:1px solid var(--pill-border); color:var(--meta-color); overflow-wrap:anywhere; }
       .cn-model-meta span { min-width:0; }
-      .similarity-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e8f5e9; border:1px solid #4caf50; color:#2e7d32; }
 
       @media (prefers-color-scheme: dark) {
-        .similarity-badge { background:#1b3a1b; border-color:#4caf50; color:#81c784; }
         .best9-slot-num { color:#4caf50; }
-      }
-      .slider-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
-      .slider-row label { min-width:100px; margin:0; font-size:0.9rem; }
-      .slider-row input[type="range"] { flex:1; min-width:0; padding:0; border:none; background:transparent; }
-      .slider-row .slider-val { min-width:32px; text-align:right; font-size:0.85rem; color:var(--meta-color); }
-
-      @media (max-width: 480px) {
-        .slider-row label { min-width:60px; font-size:0.8rem; }
-      }
-      .centroid-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.85rem; background:#e3f2fd; border:1px solid #2196f3; color:#1565c0; }
-
-      @media (prefers-color-scheme: dark) {
-        .centroid-badge { background:#1a2a3a; border-color:#2196f3; color:#64b5f6; }
       }
       .card details summary { cursor:pointer; user-select:none; font-weight:500; }
       .card details summary::-webkit-details-marker { margin-right:6px; }

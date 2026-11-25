@@ -131,7 +131,7 @@ class TestFilterForm:
         soup = _soup(client.get("/u/viewer"))
         select = soup.find(id="select-sort")
         values = [o.get("value") for o in select.find_all("option")]
-        for expected in ("created_at", "vod_time", "likes", "dislikes", "community_note", "danger", "random"):
+        for expected in ("created_at", "vod_time", "likes", "dislikes", "random"):
             assert expected in values, f"sort オプション '{expected}' が見つからない"
 
     def test_owner_filtered_vod_options_loaded_even_when_quick_link_meta_cached(self, client, db, monkeypatch):
@@ -295,12 +295,11 @@ class TestCommunityNotes:
         assert "openrouter/free-model:free が生成" in model_meta.get_text(" ", strip=True)
 
 
-# ── FAISS UI の非表示 ────────────────────────────────────────────────────────
+# ── 廃止した FAISS UI の非表示 ────────────────────────────────────────────────────────
 
 
 class TestFaissUiDisabled:
-    """conftest.py で FAISS_API_URL="" に設定されているため、
-    FAISS 関連 UI は一切レンダリングされないことを確認する。"""
+    """FAISS 検索は廃止したため、関連 UI が一切レンダリングされないことを確認する。"""
 
     def test_similar_search_section_absent(self, client, db):
         _setup_viewer(db)

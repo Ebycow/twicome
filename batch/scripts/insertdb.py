@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import mysql.connector
+from collect_targets import iter_target_comments, load_chat_json, load_target_logins
 from comment_body_html import BODY_HTML_RENDER_VERSION, render_comment_body_html
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
@@ -36,8 +37,8 @@ MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "appdb")
 COMMENTS_DIR = os.getenv("COMMENTS_DIR", str(PROJECT_ROOT / "data" / "default" / "comments"))
 DEFAULT_PLATFORM = os.getenv("PLATFORM", "twitch")
 
-# ファイル名: <vodid>.json
-VOD_JSON_RE = re.compile(r"^(\d+)\.json$")
+# ファイル名: <vodid>.json または <vodid>.json.gz
+VOD_JSON_RE = re.compile(r"^(\d+)\.json(\.gz)?$")
 
 
 def parse_dt_utc(dt_str: str | None) -> datetime | None:
@@ -271,17 +272,20 @@ def upsert_vod_ingest_marker(
 
 
 def list_comment_json_files(dir_path: str) -> list[tuple[str, str, int]]:
-    """ディレクトリ内のコメント JSON ファイル一覧を返す。"""
-    items: list[tuple[str, str, int]] = []
+    """ディレクトリ内のコメント JSON ファイル一覧を返す。同一 VOD に .json と .json.gz があれば .gz を優先。"""
+    by_vod: dict[int, tuple[str, str, int]] = {}
     for name in sorted(os.listdir(dir_path)):
         m = VOD_JSON_RE.match(name)
         if not m:
             continue
         vod_id = int(m.group(1))
         full = os.path.join(dir_path, name)
-        if os.path.isfile(full):
-            items.append((full, name, vod_id))
-    return items
+        if not os.path.isfile(full):
+            continue
+        if vod_id in by_vod and not name.endswith(".gz"):
+            continue
+        by_vod[vod_id] = (full, name, vod_id)
+    return [by_vod[k] for k in sorted(by_vod)]
 
 
 def resolve_input_dir(raw_path: str) -> str:
@@ -308,12 +312,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -> tuple[int, int]:
-    """1 つの VOD JSON ファイルを DB に取り込む。(vod_id, comment_count) を返す。"""
+def ingest_one_file(
+    conn, json_path: str, filename: str, expected_vod_id: int, targets: frozenset[str]
+) -> tuple[int, int] | None:
+    """1 つの VOD JSON ファイルから収集対象ユーザーのコメントだけを DB に取り込む。
+
+    (vod_id, comment_count) を返す。対象ユーザーのコメントが無い場合は何も書かず None を返す。
+    """
     if os.path.getsize(json_path) == 0:
         raise ValueError("ファイルが空です（ダウンロード中断の可能性）。削除して再ダウンロードしてください。")
-    with open(json_path, encoding="utf-8") as f:
-        data = json.load(f)
+    data = load_chat_json(json_path)
 
     vod = data.get("video") or {}
     streamer = data.get("streamer") or {}
@@ -330,9 +338,17 @@ def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -
             f"{filename}: ファイル名vod_id({expected_vod_id})とJSON video.id({vod_id_in_json})が不一致😾🦐"
         )
 
+    target_comments = [
+        c
+        for c in iter_target_comments(comments, targets)
+        if c.get("content_id") is None or int(c["content_id"]) == vod_id_in_json
+    ]
+    if not target_comments:
+        return None
+
     cur = conn.cursor()
 
-    # owner user upsert 😺🦐
+    # owner user upsert 😺🦐（vods.owner_user_id の外部キーのため配信者は保存する）
     owner_user_id = int(streamer["id"])
     owner_login = streamer.get("login") or streamer.get("name") or str(owner_user_id)
     owner_display = streamer.get("name")
@@ -343,10 +359,7 @@ def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -
 
     # comments insert/upsert 😺🦐
     count = 0
-    for c in comments:
-        content_id = c.get("content_id")
-        if content_id is not None and int(content_id) != vod_id:
-            continue
+    for c in target_comments:
         insert_comment(cur, vod_id, c, platform)
         count += 1
 
@@ -356,10 +369,32 @@ def ingest_one_file(conn, json_path: str, filename: str, expected_vod_id: int) -
     return vod_id, count
 
 
+INGEST_TARGETS_FILENAME = ".ingested_targets"
+
+
+def read_ingested_targets(dir_path: str) -> frozenset[str]:
+    """前回取り込み完了時の収集対象ログイン集合を返す（記録が無ければ空集合）。"""
+    path = Path(dir_path) / INGEST_TARGETS_FILENAME
+    if not path.exists():
+        return frozenset()
+    return frozenset(x for x in path.read_text(encoding="utf-8").split() if x)
+
+
+def write_ingested_targets(dir_path: str, targets: frozenset[str]) -> None:
+    """取り込み完了時の収集対象ログイン集合を記録する。"""
+    (Path(dir_path) / INGEST_TARGETS_FILENAME).write_text("\n".join(sorted(targets)) + "\n", encoding="utf-8")
+
+
 def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
     """ディレクトリ内の全 VOD JSON ファイルを DB に取り込む。"""
     if not os.path.isdir(dir_path):
         raise FileNotFoundError(f"COMMENTS_DIR not found: {dir_path}")
+    targets = load_target_logins()
+    previous_targets = read_ingested_targets(dir_path)
+    if skip_existing_vods and not targets <= previous_targets:
+        # 前回取り込み時にいなかったユーザーが増えた: 取り込み済みファイルにもその人のコメントがあり得る
+        print(f"🆕 収集対象ユーザーが増えたため全ファイルを再取り込みします: {sorted(targets - previous_targets)}")
+        skip_existing_vods = False
 
     conn = mysql.connector.connect(
         host=MYSQL_HOST,
@@ -372,6 +407,7 @@ def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
 
     total_files = 0
     skipped = 0
+    no_target = 0
     ingested = 0
     total_comments = 0
 
@@ -380,6 +416,7 @@ def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
         total_files = len(files)
         print(f"📂 COMMENTS_DIR={dir_path}")
         print(f"🧭 skip_existing_vods={skip_existing_vods}")
+        print(f"🎯 targets={', '.join(sorted(targets))}")
 
         for fullpath, filename, vod_id in files:
             cur = conn.cursor()
@@ -397,7 +434,12 @@ def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
                 elif skip_existing_vods and marker is None and vod_already_ingested(cur, vod_id):
                     print(f"ℹ️ {filename}: VOD exists without completion marker, re-ingesting once")
 
-                vod_done, ccount = ingest_one_file(conn, fullpath, filename, vod_id)
+                result = ingest_one_file(conn, fullpath, filename, vod_id, targets)
+                if result is None:
+                    no_target += 1
+                    print(f"⏭️ {filename}: 収集対象ユーザーのコメントなし")
+                    continue
+                vod_done, ccount = result
                 upsert_vod_ingest_marker(
                     cur=cur,
                     vod_id=vod_done,
@@ -417,8 +459,10 @@ def ingest_directory(dir_path: str, skip_existing_vods: bool = True) -> None:
                 print(f"❌ {filename}: {e}")
                 continue
 
+        write_ingested_targets(dir_path, targets)
         print(
-            f"\n🎉 Done. total_files={total_files}, ingested={ingested}, skipped={skipped}, comments={total_comments}"
+            f"\n🎉 Done. total_files={total_files}, ingested={ingested}, skipped={skipped}, "
+            f"no_target={no_target}, comments={total_comments}"
         )
 
     finally:

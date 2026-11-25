@@ -10,25 +10,12 @@ node_modules
 .env.lock
 .env.development
 
-# faiss search
-faiss_config.json
-faiss_config.*.json
-app/faiss_data/*.faiss
-app/faiss_data/*.meta.json
-
-# community note
-oldcommunitylog
-batch/prompts/community_note_system_prompt.txt
-
 # batch data
 batch_twitch_vods_all.csv
 targetusers.csv
 logs
 comments
 data/
-
-# morpheme 分析
-morpheme-sample/exports
 
 # database backup
 backup/

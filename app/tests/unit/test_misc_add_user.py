@@ -45,3 +45,32 @@ def test_blank_username_redirects_with_error():
 
     assert response.status_code == 303
     assert "ユーザ名を入力してください" in unquote(response.headers["location"])
+
+
+def test_add_user_appends_to_csv_and_rejects_duplicate(monkeypatch, tmp_path):
+    csv_path = tmp_path / "targetusers.csv"
+    csv_path.write_text("name,id\nexisting,111\n", encoding="utf-8")
+    monkeypatch.setattr(misc_module, "TARGET_USERS_CSV", csv_path)
+    monkeypatch.setattr(misc_module, "get_user_id", lambda _username: "222")
+    client = _build_client()
+
+    response = client.post("/add_user", data={"username": "newone"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert "を追加しました" in unquote(response.headers["location"])
+    assert csv_path.read_text(encoding="utf-8").splitlines() == ["name,id", "existing,111", "newone,222"]
+
+    response = client.post("/add_user", data={"username": "existing"}, follow_redirects=False)
+    assert "すでに登録されています" in unquote(response.headers["location"])
+
+
+def test_add_user_creates_csv_when_missing(monkeypatch, tmp_path):
+    csv_path = tmp_path / "targetusers.csv"
+    monkeypatch.setattr(misc_module, "TARGET_USERS_CSV", csv_path)
+    monkeypatch.setattr(misc_module, "get_user_id", lambda _username: "333")
+
+    response = _build_client().post(
+        "/add_user", data={"username": "https://www.twitch.tv/someone"}, follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert csv_path.read_text(encoding="utf-8").splitlines() == ["name,id", "someone,333"]

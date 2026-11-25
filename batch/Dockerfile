@@ -3,6 +3,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# ログファイルへのリダイレクト時も進捗がすぐ書き出されるようにする
+ENV PYTHONUNBUFFERED=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     libicu-dev \

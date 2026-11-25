@@ -41,7 +41,6 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", _DEFAULT_TEST_DB)
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("REDIS_URL", "")
-os.environ.setdefault("FAISS_API_URL", "")
 os.environ.setdefault("HOST_CHECK_ENABLED", "false")
 os.environ.setdefault("ROOT_PATH", "")
 os.environ.setdefault("DEFAULT_PLATFORM", "twitch")

@@ -10,8 +10,10 @@ SCRIPT_DIR="${PROJECT_ROOT}/batch/scripts"
 APP_ENV="${APP_ENV:-development}"
 BATCH_DATA_DIR="${BATCH_DATA_DIR:-${PROJECT_ROOT}/data/${APP_ENV}}"
 COMMENTS_DIR="${COMMENTS_DIR:-${BATCH_DATA_DIR}/comments}"
-COMMUNITY_NOTE_BACKUP_DIR="${COMMUNITY_NOTE_BACKUP_DIR:-${BATCH_DATA_DIR}/oldcommunitylog}"
 LOG_DIR="${LOG_DIR:-${BATCH_DATA_DIR}/logs}"
+VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
+# バッチログの保持日数（古いものは毎回削除してディスクを圧迫しないようにする）
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-14}"
 
 if [ -z "${TARGET_USERS_CSV:-}" ]; then
     if [ -f "${BATCH_DATA_DIR}/targetusers.csv" ]; then
@@ -21,16 +23,14 @@ if [ -z "${TARGET_USERS_CSV:-}" ]; then
     fi
 fi
 
-mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${COMMUNITY_NOTE_BACKUP_DIR}" "${LOG_DIR}"
+mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${LOG_DIR}"
+find "${LOG_DIR}" -name 'batch_*.log' -type f -mtime "+${LOG_RETENTION_DAYS}" -delete 2>/dev/null || true
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/batch_${TIMESTAMP}.log"
 START_TS="$(date +%s)"
 
-export PROJECT_ROOT APP_ENV BATCH_DATA_DIR TARGET_USERS_CSV VODS_CSV COMMENTS_DIR COMMUNITY_NOTE_BACKUP_DIR
-
-VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
-export VODS_CSV
+export PROJECT_ROOT APP_ENV BATCH_DATA_DIR TARGET_USERS_CSV VODS_CSV COMMENTS_DIR
 
 run_required() {
     local name="$1"
@@ -54,18 +54,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting batch process" | tee -a "${LOG_FIL
 run_required "get_vod_list_batch.py"
 run_required "batch_download_comments.py"
 run_required "insertdb.py"
-run_optional "invalidate_cache.py"
-run_optional "prewarm_index_cache.py"
-
-if [ "${SKIP_FAISS:-0}" != "1" ] && [ -n "${FAISS_API_URL:-}" ]; then
-    run_optional "build_faiss_index.py"
-elif [ "${SKIP_FAISS:-0}" = "1" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] build_faiss_index.py をスキップ (SKIP_FAISS=1)" | tee -a "${LOG_FILE}"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] build_faiss_index.py をスキップ (FAISS_API_URL 未設定)" | tee -a "${LOG_FILE}"
-fi
-
-run_optional "generate_community_notes.py"
+run_optional "prune_non_targets.py"
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"

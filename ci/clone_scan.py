@@ -18,11 +18,7 @@ DEFAULT_ROOTS = [
     "batch",
     "util",
     "migrate",
-    "morpheme-sample",
-    "faiss-api",
-    "morpheme-api",
     "twicome-mcp-server",
-    "challenge",
 ]
 
 # 外部コード・生成物は対象外（.venv は challenge/ 配下等ルート直下以外にもある）

@@ -9,6 +9,20 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       TEST_MYSQL_DATABASE: "${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}"
+    # 本番と同じ省メモリ設定（docker-compose.yml と揃える）
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --innodb-redo-log-capacity=64M
+      - --performance-schema=OFF
+      - --disable-log-bin
+      - --max-connections=30
+      - --table-open-cache=256
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --temptable-max-ram=64M
+      - --thread-cache-size=4
+      - --skip-name-resolve
     # DB はホストへ公開せず、同一 Compose ネットワーク内から参照する
     expose:
       - "3306"
@@ -43,62 +57,10 @@ services:
     networks:
       - backend
 
-  redis:
-    image: redis:7-alpine
-    expose:
-      - "6379"
-    volumes:
-      - redis_dev_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
-  morpheme-api:
-    profiles: [morpheme]
-    build:
-      context: ./morpheme-api
-      dockerfile: Dockerfile
-    expose:
-      - "8200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8200/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - backend
-
-  faiss-api:
-    profiles: [faiss]
-    build:
-      context: ./faiss-api
-      dockerfile: Dockerfile
-    environment:
-      DATA_DIR: /app/data/faiss_data
-      FAISS_CONFIG_PATH: /app/data/faiss_config.json
-      EMBEDDING_MODEL: cl-nagoya/sup-simcse-ja-base
-    volumes:
-      - ./data/development:/app/data
-      - hf-cache:/root/.cache/huggingface
-    expose:
-      - "8100"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8100/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - backend
-
   app:
-    build: ./app
+    build:
+      context: ./app
+      target: runtime
     ports:
       - "8011:8000"
     env_file:
@@ -112,9 +74,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb_dev}"
-      FAISS_API_URL: "http://faiss-api:8100"
-      MORPHEME_API_URL: "http://morpheme-api:8200"
-      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./app:/app
       - ./data/development:/host
@@ -130,8 +89,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     networks:
       - backend
     dns:
@@ -153,10 +110,6 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb_dev}"
       PROJECT_ROOT: /app
       APP_ENV: development
-      FAISS_API_URL: "http://faiss-api:8100"
-      FAISS_CONFIG_PATH: /app/data/development/faiss_config.json
-      MORPHEME_API_URL: "http://morpheme-api:8200"
-      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./data/development:/app/data/development
       - ./.env.development:/app/.env.development:ro
@@ -165,12 +118,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      faiss-api:
-        condition: service_healthy
-        required: false
-      morpheme-api:
-        condition: service_healthy
-        required: false
     networks:
       - backend
     dns:
@@ -184,7 +131,9 @@ services:
   #   統合テストのみ:  docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
   test:
     profiles: [test]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     environment:
       TEST_DATABASE_URL: "mysql+pymysql://${COMPOSE_MYSQL_USER:-appuser}:${COMPOSE_MYSQL_PASSWORD:-apppass}@db:3306/${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}?charset=utf8mb4"
       MYSQL_HOST: "db"
@@ -192,7 +141,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       REDIS_URL: ""
-      FAISS_API_URL: ""
       HOST_CHECK_ENABLED: "false"
       ROOT_PATH: ""
     volumes:
@@ -218,7 +166,9 @@ services:
   #   CSS 自動修正:   docker compose -f docker-compose.dev.yml run --rm lint-css npx stylelint 'app/static/css/**/*.css' --fix
   lint:
     profiles: [lint]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     volumes:
       - .:/workspace
     working_dir: /workspace
@@ -226,7 +176,9 @@ services:
 
   lint-html:
     profiles: [lint]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     volumes:
       - .:/workspace
     working_dir: /workspace
@@ -269,7 +221,6 @@ services:
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
       REDIS_URL: ""
-      FAISS_API_URL: ""
       HOST_CHECK_ENABLED: "false"
       ROOT_PATH: ""
     volumes:
@@ -291,9 +242,7 @@ services:
     command: ["/ms-playwright/chromium-1155/chrome-linux/chrome", "--headless", "--remote-debugging-port=9222", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--disable-setuid-sandbox"]
 
 volumes:
-  hf-cache:
   mysql8_dev_data:
-  redis_dev_data:
   eslint-node-modules:
 
 networks:

@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_PREFIX = 'twicome:offline-accessible-routes:v1';
-  const ROUTES = ['comments', 'stats', 'quiz'];
+  const ROUTES = ['comments'];
 
   function normalizeRootPath(rootPath) {
     const value = typeof rootPath === 'string' ? rootPath.trim() : '';
@@ -17,8 +17,6 @@
   function createEmpty() {
     return {
       comments: new Set(),
-      stats: new Set(),
-      quiz: new Set(),
     };
   }
 
@@ -53,8 +51,6 @@
     try {
       localStorage.setItem(getStorageKey(rootPath), JSON.stringify({
         comments: [...routes.comments].sort(),
-        stats: [...routes.stats].sort(),
-        quiz: [...routes.quiz].sort(),
       }));
     } catch {}
   }

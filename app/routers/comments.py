@@ -9,7 +9,6 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
-from clients.faiss import is_index_available
 from core.cache import (
     get_comments_html_cache,
     get_data_version,
@@ -207,7 +206,6 @@ def _build_user_comments_context(
         "filters": filters,
         "root_path": request.scope.get("root_path", ""),
         "page_title": page_title,
-        "faiss_enabled": is_index_available(user["login"]),
         "data_version": data_version,
     }
 

@@ -162,18 +162,6 @@
     commentsLink.innerHTML = '<i class="fa-solid fa-play"></i> コメント一覧';
     links.appendChild(commentsLink);
 
-    const statsLink = document.createElement('a');
-    statsLink.className = 'user-card-link user-card-link-secondary';
-    statsLink.href = `${rootPath}/u/${encodeURIComponent(user.login)}/stats?platform=twitch`;
-    statsLink.innerHTML = '<i class="fa-solid fa-chart-bar"></i> 統計';
-    links.appendChild(statsLink);
-
-    const quizLink = document.createElement('a');
-    quizLink.className = 'user-card-link user-card-link-secondary';
-    quizLink.href = `${rootPath}/u/${encodeURIComponent(user.login)}/quiz?platform=twitch`;
-    quizLink.innerHTML = '<i class="fa-solid fa-dice"></i> クイズ';
-    links.appendChild(quizLink);
-
     card.appendChild(links);
 
     return card;

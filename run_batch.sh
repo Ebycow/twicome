@@ -55,7 +55,6 @@ APP_ENV="${APP_ENV:-development}"
 BATCH_DATA_DIR="${BATCH_DATA_DIR:-${ROOT_DIR}/data/${APP_ENV}}"
 VODS_CSV="${VODS_CSV:-${BATCH_DATA_DIR}/batch_twitch_vods_all.csv}"
 COMMENTS_DIR="${COMMENTS_DIR:-${BATCH_DATA_DIR}/comments}"
-COMMUNITY_NOTE_BACKUP_DIR="${COMMUNITY_NOTE_BACKUP_DIR:-${BATCH_DATA_DIR}/oldcommunitylog}"
 LOG_DIR="${LOG_DIR:-${BATCH_DATA_DIR}/logs}"
 
 if [ -z "${TARGET_USERS_CSV:-}" ]; then
@@ -66,7 +65,7 @@ if [ -z "${TARGET_USERS_CSV:-}" ]; then
     fi
 fi
 
-mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${COMMUNITY_NOTE_BACKUP_DIR}" "${LOG_DIR}"
+mkdir -p "${BATCH_DATA_DIR}" "${COMMENTS_DIR}" "${LOG_DIR}"
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/batch_${TIMESTAMP}.log"
@@ -79,7 +78,6 @@ export BATCH_DATA_DIR
 export TARGET_USERS_CSV
 export VODS_CSV
 export COMMENTS_DIR
-export COMMUNITY_NOTE_BACKUP_DIR
 
 run_required() {
     local script_name="$1"
@@ -105,12 +103,7 @@ echo "Starting batch process at $(date)" >> "${LOG_FILE}"
 run_required "get_vod_list_batch.py"
 run_required "batch_download_comments.py"
 run_required "insertdb.py"
-
-if [ "${SKIP_FAISS:-0}" != "1" ]; then
-    run_optional "build_faiss_index.py"
-fi
-
-run_optional "generate_community_notes.py"
+run_optional "prune_non_targets.py"
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"

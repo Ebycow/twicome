@@ -1,5 +1,22 @@
 name: twicome
 
+# 軽量構成: db(MySQL, 省メモリ設定) / migrate(起動時のみ) / app / batch の 4 サービス。
+# Redis・FAISS・形態素解析は廃止した。
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-db-env: &db-env
+  DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
+  MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
+  MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
+  MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
+  MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+  MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
+
 services:
   db:
     image: mysql:8.0
@@ -8,6 +25,20 @@ services:
       MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
       MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
       MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
+    # 収集対象ユーザーのコメントだけを保存するのでデータは小さい。メモリとディスクを絞る。
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --innodb-redo-log-capacity=64M
+      - --performance-schema=OFF
+      - --disable-log-bin
+      - --max-connections=30
+      - --table-open-cache=256
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --temptable-max-ram=64M
+      - --thread-cache-size=4
+      - --skip-name-resolve
     # DB はホストへ公開せず、同一 Compose ネットワーク内から参照する
     expose:
       - "3306"
@@ -15,10 +46,12 @@ services:
       - mysql8_honban_data:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 20
-      start_period: 20s
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
     networks:
       - backend
 
@@ -31,89 +64,28 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - backend
-
-  redis:
-    image: redis:7-alpine
-    expose:
-      - "6379"
-    volumes:
-      - redis_honban_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
-  morpheme-api:
-    profiles: [morpheme]
-    build:
-      context: ./morpheme-api
-      dockerfile: Dockerfile
-    expose:
-      - "8200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8200/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - backend
-
-  faiss-api:
-    profiles: [faiss]
-    build:
-      context: ./faiss-api
-      dockerfile: Dockerfile
-    environment:
-      DATA_DIR: /app/data/faiss_data
-      FAISS_CONFIG_PATH: /app/data/faiss_config.json
-      EMBEDDING_MODEL: cl-nagoya/sup-simcse-ja-base
-    volumes:
-      - ./data/honban:/app/data
-      - hf-cache:/root/.cache/huggingface
-    expose:
-      - "8100"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8100/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+    logging: *default-logging
     networks:
       - backend
 
   app:
-    build: ./app
-    ports:
-      - "8000:8000"
+    build:
+      context: ./app
+      target: runtime
+    # ホストにはポートを開けない。リバースプロキシから http://twicome:8000 で届く
     env_file:
       - ./.env
     environment:
+      <<: *db-env
       DEFAULT_PLATFORM: twitch
       # ROOT_PATH: /
-      DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
-      MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
-      MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
-      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
-      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
-      MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
-      FAISS_API_URL: "http://faiss-api:8100"
-      MORPHEME_API_URL: "http://morpheme-api:8200"
-      REDIS_URL: "redis://redis:6379/0"
       FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
     volumes:
-      # - ./app:/app
       - ./data/honban:/host # 主にtargetusers.csvのため
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-access-log"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
@@ -122,10 +94,13 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
     networks:
-      - backend
+      backend:
+      proxy:
+        aliases:
+          - twicome
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -137,32 +112,21 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: "${COMPOSE_DATABASE_URL:-mysql+pymysql://appuser:apppass@db:3306/appdb?charset=utf8mb4}"
-      MYSQL_HOST: "${COMPOSE_MYSQL_HOST:-db}"
-      MYSQL_PORT: "${COMPOSE_MYSQL_PORT:-3306}"
-      MYSQL_USER: "${COMPOSE_MYSQL_USER:-appuser}"
-      MYSQL_PASSWORD: "${COMPOSE_MYSQL_PASSWORD:-apppass}"
-      MYSQL_DATABASE: "${COMPOSE_MYSQL_DATABASE:-appdb}"
+      <<: *db-env
       PROJECT_ROOT: /app
       APP_ENV: honban
-      FAISS_API_URL: "http://faiss-api:8100"
-      FAISS_CONFIG_PATH: /app/data/honban/faiss_config.json
-      MORPHEME_API_URL: "http://morpheme-api:8200"
-      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./data/honban:/app/data/honban
+      # チャットファイル（<vod_id>.json.gz と判定台帳）の保存先。別ディスクに置く場合は .env で指定する
+      - ${COMMENTS_HOST_DIR:-./data/honban/comments}:/app/data/honban/comments
       - ./.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      faiss-api:
-        condition: service_healthy
-        required: false
-      morpheme-api:
-        condition: service_healthy
-        required: false
+    restart: unless-stopped
+    logging: *default-logging
     networks:
       - backend
     dns:
@@ -170,10 +134,12 @@ services:
       - 8.8.8.8
 
 volumes:
-  hf-cache:
   mysql8_honban_data:
-  redis_honban_data:
 
 networks:
   backend:
     driver: bridge
+  # リバースプロキシと共有する外部ネットワーク（名前は .env の PROXY_NETWORK で指定）
+  proxy:
+    external: true
+    name: "${PROXY_NETWORK:-proxy_net}"
