@@ -44,7 +44,9 @@ services:
       - backend
 
   app:
-    build: ./app
+    build:
+      context: ./app
+      target: runtime
     ports:
       - "8011:8000"
     env_file:
@@ -115,7 +117,9 @@ services:
   #   統合テストのみ:  docker compose -f docker-compose.dev.yml run --rm test pytest tests/integration
   test:
     profiles: [test]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     environment:
       TEST_DATABASE_URL: "mysql+pymysql://${COMPOSE_MYSQL_USER:-appuser}:${COMPOSE_MYSQL_PASSWORD:-apppass}@db:3306/${COMPOSE_TEST_MYSQL_DATABASE:-appdb_test}?charset=utf8mb4"
       MYSQL_HOST: "db"
@@ -148,7 +152,9 @@ services:
   #   CSS 自動修正:   docker compose -f docker-compose.dev.yml run --rm lint-css npx stylelint 'app/static/css/**/*.css' --fix
   lint:
     profiles: [lint]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     volumes:
       - .:/workspace
     working_dir: /workspace
@@ -156,7 +162,9 @@ services:
 
   lint-html:
     profiles: [lint]
-    build: ./app
+    build:
+      context: ./app
+      target: dev
     volumes:
       - .:/workspace
     working_dir: /workspace

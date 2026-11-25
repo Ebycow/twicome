@@ -35,9 +35,11 @@ services:
       - backend
 
   app:
-    build: ./app
     ports:
       - "8000:8000"
+    build:
+      context: ./app
+      target: runtime
     env_file:
       - ./.env
     environment:

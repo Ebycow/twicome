@@ -1,11 +1,18 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN pip install -r requirements.txt
+
+# ── テスト・lint 用（docker-compose.dev.yml の test / lint サービスが target: dev で使う）──
+FROM base AS dev
+COPY requirements-dev.txt .
+RUN pip install -r requirements-dev.txt
+
+# ── 本番ランタイム（既定ターゲット）──────────────────────────────────────────
+FROM base AS runtime
 
 COPY main.py .
 COPY app_factory.py .

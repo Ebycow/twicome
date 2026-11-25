@@ -93,7 +93,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: app/requirements.txt
+          cache-dependency-path: |
+            app/requirements.txt
+            app/requirements-dev.txt
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -103,7 +105,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: pip install -r app/requirements.txt
+        run: pip install -r app/requirements-dev.txt
 
       - name: Install JS dependencies
         run: npm ci
@@ -138,10 +140,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: app/requirements.txt
+          cache-dependency-path: |
+            app/requirements.txt
+            app/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r app/requirements.txt
+        run: pip install -r app/requirements-dev.txt
 
       - name: Run unit tests
         env:
@@ -255,10 +259,11 @@ jobs:
           cache: "pip"
           cache-dependency-path: |
             app/requirements.txt
+            app/requirements-dev.txt
             migrate/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r app/requirements.txt -r migrate/requirements.txt
+        run: pip install -r app/requirements-dev.txt -r migrate/requirements.txt
 
       - name: Wait for MySQL
         run: |
@@ -327,10 +332,11 @@ jobs:
           cache: "pip"
           cache-dependency-path: |
             app/requirements.txt
+            app/requirements-dev.txt
             migrate/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r app/requirements.txt -r migrate/requirements.txt
+        run: pip install -r app/requirements-dev.txt -r migrate/requirements.txt
 
       - name: Install Playwright and Chromium
         run: |
@@ -398,10 +404,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: app/requirements.txt
+          cache-dependency-path: |
+            app/requirements.txt
+            app/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r app/requirements.txt
+        run: pip install -r app/requirements-dev.txt
 
       - name: Download unit test artifacts
         uses: actions/download-artifact@v4
